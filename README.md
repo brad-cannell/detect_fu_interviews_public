@@ -1,3 +1,3 @@
-# DETECT Dashboard
+# DETECT Public Repository
 
-This is the repository for the DETECT Shiny dashboard.
+This is the public repository for the DETECT follow-up interviews.
