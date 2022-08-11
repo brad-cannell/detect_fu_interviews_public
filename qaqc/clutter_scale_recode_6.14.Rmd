@@ -1,0 +1,137 @@
+---
+title: "clutter_scale_recode_factor"
+output: html_notebook
+author: "Marissa Gough"
+date : "May 11, 2022"
+---
+
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(purrr)
+library(stringr)
+library(tidyverse)
+library(expss)
+```
+
+
+## Load data
+
+Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r load data, messages = FALSE}
+clutter_scale <- read_csv("Clutter Scale.csv")
+
+```
+
+## Data cleaning.
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+# Convert all variable names to snake case
+walk(
+  # Grab the names of all data frames in the global environment
+  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
+  .f = function(x) {
+    # Grab individual df from environment
+    df <- get(x)
+    # Grab the variables names
+    var_names <- names(df)
+    # Convert variable names to snake case
+    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
+    # Convert variable names to lower case
+    var_names <- str_to_lower(var_names)
+    # Fix medstar_id
+    var_names[var_names == "medstar_i_d"] <- "medstar_id"
+    # assign back to the dataframe
+    names(df) <- var_names
+    # Replace df with new names in global environment
+    assign(x, df, envir = .GlobalEnv)
+  }
+)
+
+```
+
+
+## Clutter Scale Variables
+
+
+```{r}
+clutter_scale <- clutter_scale%>%
+  mutate(
+    look_living_3cat = case_when(
+      look_living == "Yes"            ~ 1,
+      look_living == "No"             ~ 2,
+      look_living == "No living room" ~ 7
+    ),
+    look_living_3cat_f = factor(
+      look_living,
+      levels = c("Yes", "No", "No living room")
+    ),
+    clutter_living_f = factor(
+      clutter_living
+    ),
+    clutter_living_photo_3cat = case_when(
+      clutter_living_photo == "Yes"            ~ 1,
+      clutter_living_photo == "No"             ~ 2,
+      clutter_living_photo == "No living room" ~ 7
+    ),
+    clutter_living_photo_3cat_f = factor(
+      clutter_living_photo,
+      levels = c("Yes", "No", "No living room")
+    ),
+    look_kitchen_3cat = case_when(
+      look_kitchen == "Yes"        ~ 1,
+      look_kitchen == "No"         ~ 2,
+      look_kitchen == "No kitchen" ~ 7
+    ),
+    look_kitchen_3cat_f = factor(
+      look_kitchen,
+      levels = c("Yes", "No", "No kitchen")
+    ),
+    clutter_kitchen_f = factor(
+      clutter_kitchen
+    ),
+    clutter_kitchen_photo_3cat = case_when(
+      clutter_kitchen_photo == "Yes"        ~ 1,
+      clutter_kitchen_photo == "No"         ~ 2,
+      clutter_kitchen_photo == "No kitchen" ~ 7
+    ),
+    clutter_kitchen_photo_3cat_f = factor(
+      clutter_kitchen_photo,
+      levels = c("Yes", "No", "No living room")
+    ),
+    look_bedroom_3cat = case_when(
+      look_bedroom == "Yes"        ~ 1,
+      look_bedroom == "No"         ~ 2,
+      look_bedroom == "No bedroom" ~ 7
+    ),
+    look_bedroom_3cat_f = factor(
+      look_bedroom,
+      levels = c("Yes", "No", "No bedroom")
+    ),
+    clutter_bedroom_f = factor(
+      clutter_bedroom
+    ),
+    clutter_bedroom_photo_3cat = case_when(
+      clutter_bedroom_photo == "Yes"        ~ 1,
+      clutter_bedroom_photo == "No"         ~ 2,
+      clutter_bedroom_photo == "No bedroom" ~ 7
+    ),
+    clutter_bedroom_photo_3cat_f = factor(
+      clutter_bedroom_photo,
+      levels = c("Yes", "No", "No bedroom")
+    ),
+    )
+
+```
+
+#### Write file to csv
+
+```{r}
+write_csv(clutter_scale, "clutter_scale_factor.csv")
+
+```
+
