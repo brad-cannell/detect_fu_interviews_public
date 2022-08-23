@@ -1,0 +1,133 @@
+---
+title: "APS Investigations Recode"
+output: html_notebook
+author: "Marissa Gough"
+---
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(purrr)
+library(stringr)
+library(tidyverse)
+
+```
+
+## Load data
+
+Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r load data, messages = FALSE}
+aps_investigations <- read_csv("APS Investigations.csv")
+
+```
+
+## Data cleaning.
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+# Convert all variable names to snake case
+walk(
+  # Grab the names of all data frames in the global environment
+  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
+  .f = function(x) {
+    # Grab individual df from environment
+    df <- get(x)
+    # Grab the variables names
+    var_names <- names(df)
+    # Convert variable names to snake case
+    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
+    # Convert variable names to lower case
+    var_names <- str_to_lower(var_names)
+    # Fix medstar_id
+    var_names[var_names == "medstar_i_d"] <- "medstar_id"
+    # assign back to the dataframe
+    names(df) <- var_names
+    # Replace df with new names in global environment
+    assign(x, df, envir = .GlobalEnv)
+  }
+)
+
+```
+
+Change the encoding of columns that contain unrecognized characters where there is an apostrophe. Substitute an apostrophe for the special characters so that the value is "Don't know"
+
+```{r}
+
+Encoding(aps_investigations$aps_first) <- "ASCII"
+
+
+aps_investigations <- aps_investigations %>%
+  mutate(
+    aps_first = 
+      iconv(aps_first, "ASCII", "latin1", "'")
+)
+```
+
+```{r}
+aps_investigations <- aps_investigations %>%
+  mutate(
+    aps_report_4cat = case_when(
+      aps_report == "Yes"        ~ 1,
+      aps_report == "No"         ~ 2,
+      aps_report == "Don't know" ~ 7,
+      aps_report == "Refused"    ~ 9
+    ),
+    aps_report_4cat_f = factor(
+      aps_report,
+      levels = c("Yes", "No", "Don't know", "Refused")),
+    aps_times_5cat = case_when(
+      aps_times == "0"          ~ 0,
+      aps_times == "1"          ~ 1,
+      aps_times == "2+"         ~ 2,
+      aps_times == "Don't know" ~ 7,
+      aps_times == "Refused"    ~ 9
+    ),
+    aps_times_5cat_f = factor(
+      aps_times,
+      levels = c("0", "1", "2+", "Don't know", "Refused")),
+    aps_first_8cat = case_when(
+      aps_first == "10 or more years ago"                       ~ 1,
+      aps_first == "5-10 years ago"                             ~ 2,
+      aps_first == "1-5 years ago"                              ~ 3,
+      aps_first == "In the past year but more than a month ago" ~ 4,
+      aps_first == "In the past month"                          ~ 5,
+      aps_first == "In the past week"                           ~ 6,
+      aps_first == "Don't know"                                 ~ 7,
+      aps_first == "Refused"                                    ~ 9
+    ),
+    aps_first_8cat_f = factor(
+      aps_first,
+      levels = c("10 or more years ago", "5-10 years ago", "1-5 years ago",
+                 "In the past year but more than a month ago",
+                 "In the past month" , "In the past week", "Don't know",
+                 "Refused")),
+    aps_recent_8cat = case_when(
+      aps_recent == "In the past week" ~ 1,
+      aps_recent == "In the past month" ~ 2,
+      aps_recent == "In the past year but more than a month ago" ~ 3,
+      aps_recent == "1-5 years ago" ~ 4,
+      aps_recent == "5-10 years ago" ~ 5, 
+      aps_recent == "10 or more years ago" ~ 6,
+      aps_recent == "Don’t know" ~ 7,
+      aps_recent == "Refused" ~ 9
+    ),
+    aps_recent_8cat_f = factor(
+      aps_recent,
+      levels = c("In the past week", "In the past month",
+                 "In the past year but more than a month ago",
+                 "1-5 years ago", "5-10 years ago", "10 or more years ago",
+                 "Don’t know", "Refused"))
+    )
+    
+  
+```
+
+#### Write file to csv
+
+```{r}
+write_csv(aps_investigations, "aps_investigations_factor.csv")
+
+```
+
