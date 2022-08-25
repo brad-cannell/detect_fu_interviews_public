@@ -1,5 +1,5 @@
 ---
-title: "clutter_scale_recode_factor"
+title: "clusca_recode_factor"
 output: html_notebook
 author: "Marissa Gough"
 date : "May 11, 2022"
@@ -21,8 +21,7 @@ library(expss)
 Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r load data, messages = FALSE}
-clutter_scale <- read_csv("Clutter Scale.csv")
-
+clusca <- read_csv("Clutter Scale.csv")
 ```
 
 ## Data cleaning.
@@ -51,15 +50,13 @@ walk(
     assign(x, df, envir = .GlobalEnv)
   }
 )
-
 ```
 
 
 ## Clutter Scale Variables
 
-
 ```{r}
-clutter_scale <- clutter_scale%>%
+clusca <- clusca%>%
   mutate(
     look_living_3cat = case_when(
       look_living == "Yes"            ~ 1,
@@ -69,7 +66,13 @@ clutter_scale <- clutter_scale%>%
     look_living_3cat_f = factor(
       look_living,
       levels = c("Yes", "No", "No living room")
-    ),
+    )
+  )
+```
+
+```{r}
+clusca <- clusca%>%
+  mutate(
     clutter_living_f = factor(
       clutter_living
     ),
@@ -81,7 +84,13 @@ clutter_scale <- clutter_scale%>%
     clutter_living_photo_3cat_f = factor(
       clutter_living_photo,
       levels = c("Yes", "No", "No living room")
-    ),
+    )
+  )
+```
+
+```{r}
+clusca <- clusca%>%
+  mutate(
     look_kitchen_3cat = case_when(
       look_kitchen == "Yes"        ~ 1,
       look_kitchen == "No"         ~ 2,
@@ -90,7 +99,13 @@ clutter_scale <- clutter_scale%>%
     look_kitchen_3cat_f = factor(
       look_kitchen,
       levels = c("Yes", "No", "No kitchen")
-    ),
+    )
+  )
+```
+
+```{r}
+clusca <- clusca%>%
+  mutate(
     clutter_kitchen_f = factor(
       clutter_kitchen
     ),
@@ -102,7 +117,13 @@ clutter_scale <- clutter_scale%>%
     clutter_kitchen_photo_3cat_f = factor(
       clutter_kitchen_photo,
       levels = c("Yes", "No", "No living room")
-    ),
+    )
+  )
+```
+
+```{r}
+clusca <- clusca%>%
+  mutate(
     look_bedroom_3cat = case_when(
       look_bedroom == "Yes"        ~ 1,
       look_bedroom == "No"         ~ 2,
@@ -111,7 +132,13 @@ clutter_scale <- clutter_scale%>%
     look_bedroom_3cat_f = factor(
       look_bedroom,
       levels = c("Yes", "No", "No bedroom")
-    ),
+    )
+  )
+```
+
+```{r}
+clusca <- clusca%>%
+  mutate(
     clutter_bedroom_f = factor(
       clutter_bedroom
     ),
@@ -123,15 +150,12 @@ clutter_scale <- clutter_scale%>%
     clutter_bedroom_photo_3cat_f = factor(
       clutter_bedroom_photo,
       levels = c("Yes", "No", "No bedroom")
-    ),
     )
-
+  )
 ```
 
 #### Write file to csv
 
 ```{r}
-write_csv(clutter_scale, "clutter_scale_factor.csv")
-
+write_csv(clusca, "clusca_factor.csv")
 ```
-
