@@ -18,8 +18,7 @@ library(tidyverse)
 Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r load data, messages = FALSE}
-aps_investigations <- read_csv("APS Investigations.csv")
-
+apinve <- read_csv("../data/raw/APS Investigations.csv")
 ```
 
 ## Data cleaning.
@@ -55,10 +54,10 @@ Change the encoding of columns that contain unrecognized characters where there 
 
 ```{r}
 
-Encoding(aps_investigations$aps_first) <- "ASCII"
+Encoding(apinve$aps_first) <- "ASCII"
 
 
-aps_investigations <- aps_investigations %>%
+apinve <- apinve %>%
   mutate(
     aps_first = 
       iconv(aps_first, "ASCII", "latin1", "'")
@@ -66,7 +65,7 @@ aps_investigations <- aps_investigations %>%
 ```
 
 ```{r}
-aps_investigations <- aps_investigations %>%
+apinve <- apinve %>%
   mutate(
     aps_report_4cat = case_when(
       aps_report == "Yes"        ~ 1,
@@ -76,7 +75,14 @@ aps_investigations <- aps_investigations %>%
     ),
     aps_report_4cat_f = factor(
       aps_report,
-      levels = c("Yes", "No", "Don't know", "Refused")),
+      levels = c("Yes", "No", "Don't know", "Refused")
+    )
+  )
+```
+
+```{r}
+apinve <- apinve %>%
+  mutate(
     aps_times_5cat = case_when(
       aps_times == "0"          ~ 0,
       aps_times == "1"          ~ 1,
@@ -86,7 +92,14 @@ aps_investigations <- aps_investigations %>%
     ),
     aps_times_5cat_f = factor(
       aps_times,
-      levels = c("0", "1", "2+", "Don't know", "Refused")),
+      levels = c("0", "1", "2+", "Don't know", "Refused")
+    )
+  )
+```
+
+```{r}
+apinve <- apinve %>%
+  mutate(
     aps_first_8cat = case_when(
       aps_first == "10 or more years ago"                       ~ 1,
       aps_first == "5-10 years ago"                             ~ 2,
@@ -99,10 +112,18 @@ aps_investigations <- aps_investigations %>%
     ),
     aps_first_8cat_f = factor(
       aps_first,
-      levels = c("10 or more years ago", "5-10 years ago", "1-5 years ago",
-                 "In the past year but more than a month ago",
-                 "In the past month" , "In the past week", "Don't know",
-                 "Refused")),
+      levels = c(
+        "10 or more years ago", "5-10 years ago", "1-5 years ago", 
+        "In the past year but more than a month ago", "In the past month", 
+        "In the past week", "Don't know", "Refused"
+      )
+    )
+  )
+```
+
+```{r}
+apinve <- apinve %>%
+  mutate(
     aps_recent_8cat = case_when(
       aps_recent == "In the past week" ~ 1,
       aps_recent == "In the past month" ~ 2,
@@ -118,16 +139,14 @@ aps_investigations <- aps_investigations %>%
       levels = c("In the past week", "In the past month",
                  "In the past year but more than a month ago",
                  "1-5 years ago", "5-10 years ago", "10 or more years ago",
-                 "Don’t know", "Refused"))
+                 "Don’t know", "Refused")
     )
-    
-  
+  )
 ```
 
 #### Write file to csv
 
 ```{r}
-write_csv(aps_investigations, "aps_investigations_factor.csv")
-
+write_csv(apinve, "apinve_factor.csv")
 ```
 
