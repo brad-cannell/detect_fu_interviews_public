@@ -1,5 +1,5 @@
 ---
-title: "general_health_recode_factor"
+title: "geheal_recode_factor"
 output: html_notebook
 author: "Marissa Gough"
 date: "June 29, 2022"
@@ -11,7 +11,6 @@ library(readr)
 library(purrr)
 library(stringr)
 library(tidyverse)
-
 ```
 
 
@@ -20,11 +19,10 @@ library(tidyverse)
 Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r load data, messages = FALSE}
-general_health <- read_csv("General Health.csv")
-
+geheal <- read_csv("../data/raw/General Health.csv")
 ```
 
-## Data cleaning.
+# Data cleaning
 
 Here we will convert all variable names to snake case so that everything is uniform.
 
@@ -50,22 +48,20 @@ walk(
     assign(x, df, envir = .GlobalEnv)
   }
 )
-
 ```
 
 
 Change the encoding of columns that contain unrecognized characters where there is an apostrophe. Substitute an apostrophe for the special characters so that the value is "Don't know"
 
 ```{r}
+Encoding(geheal$outcomes_health_general) <- "ASCII"
+Encoding(geheal$outcomes_health_unable) <- "ASCII"
+Encoding(geheal$outcomes_health_keep) <- "ASCII"
+Encoding(geheal$auditc_drink) <- "ASCII"
+Encoding(geheal$auditc_day) <- "ASCII"
+Encoding(geheal$auditc_five) <- "ASCII"
 
-Encoding(general_health$outcomes_health_general) <- "ASCII"
-Encoding(general_health$outcomes_health_unable) <- "ASCII"
-Encoding(general_health$outcomes_health_keep) <- "ASCII"
-Encoding(general_health$auditc_drink) <- "ASCII"
-Encoding(general_health$auditc_day) <- "ASCII"
-Encoding(general_health$auditc_five) <- "ASCII"
-
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     outcomes_health_general =
       iconv(outcomes_health_general, "ASCII", "latin1", "'"),
@@ -85,20 +81,20 @@ general_health <- general_health %>%
 
 Change all instances of "Very severe" to "Very Severe" to match codebook.
 ```{r}
-general_health <- general_health %>% 
+geheal <- geheal %>% 
   mutate_all(str_replace_all, "Very severe", "Very Severe")
 ```
 
 Remove unwanted characters and replace with "Don't know"
 ```{r}
-general_health[general_health == "Dont know"] <- "Don't know"
+geheal[geheal == "Dont know"] <- "Don't know"
 ```
 
 ### PEG: A Three-Item Scale Assessing Pain Intensity and Interference
 
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     across(
       .cols = starts_with("peg"),
@@ -120,10 +116,11 @@ general_health <- general_health %>%
       ),
        across(
       .cols  = ends_with("12cat"),
-      .fns   = ~ factor(.x, labels = c("0 - No pain", "1", "2", "3", "4", "5",
-                                    "6", "7", "8", "9", 
-                                    "10 - Pain as bad as you can imagine",
-                                    "Refused")),
+      .fns   = ~ factor(.x, labels = c(
+        "0 - No pain", "1", "2", "3", "4", "5", "6", "7", 
+        "8", "9", "10 - Pain as bad as you can imagine", "Refused"
+      )
+      ),
       .names = "{col}_f"
     )
   )
@@ -132,8 +129,7 @@ general_health <- general_health %>%
 ### Medical Outcomes Study
 
 ```{r}
-
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate (
     outcomes_health_general_7cat = case_when(
       outcomes_health_general == "Excellent"  ~ 1,
@@ -146,16 +142,17 @@ general_health <- general_health %>%
     ),
     outcomes_health_general_7cat_f = factor(
       outcomes_health_general,
-      levels = c("Excellent", "Very good", "Good", "Fair", "Poor", 
-                 "Don't know", "Refused")
+      levels = c(
+        "Excellent", "Very good", "Good", "Fair", 
+        "Poor", "Don't know", "Refused"
+      )
     )
   )
 ```
 
 
 ```{r}
-
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     across(
       .col = c(22:27),
@@ -170,18 +167,18 @@ general_health <- general_health %>%
     ),
     across(
       .col = c(22:27),
-      .fn = ~ factor(.x, levels = c("Yes, limited for more than 3 months",
-                                     "Yes, limited for 3 months or less",
-                                     "Not limited at all", "Don't know",
-                                     "Refused")),
+      .fn = ~ factor(.x, levels = c(
+        "Yes, limited for more than 3 months", "Yes, limited for 3 months or less", 
+        "Not limited at all", "Don't know", "Refused"
+      )
+      ),
       .names = "{col}_5cat_f"
     )
   )
-
 ```
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     outcomes4_weeks_pain_8cat = case_when(
       outcomes4_weeks_pain == "None"        ~ 0,
@@ -195,15 +192,13 @@ general_health <- general_health %>%
     ),
     outcomes4_weeks_pain_8cat_f = factor(
       outcomes4_weeks_pain,
-      levels = c("None", "Very mild", "Mild", "Moderate", "Severe", 
-                 "Very Severe", "Don't know", "Refused")
+      levels = c("None", "Very mild", "Mild", "Moderate", "Severe", "Very Severe", "Don't know", "Refused")
     )
   )
 ```
 
 ```{r}
-
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     across(
       .col = c(29:30),
@@ -218,17 +213,18 @@ general_health <- general_health %>%
     ),
     across(
       .col = c(29:30),
-      .fn = ~ factor(.x, levels = c("Yes, for more than 3 months",
-                                     "Yes, for 3 months or less",
-                                     "No", "Don't know",
-                                     "Refused")),
+      .fn = ~ factor(.x, levels = c(
+        "Yes, for more than 3 months", "Yes, for 3 months or less", 
+        "No", "Don't know", "Refused"
+      )
+      ),
       .names = "{col}_5cat_f"
     )
   )
 ```
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     across(
       .col =  starts_with("outcomes_month"),
@@ -245,18 +241,18 @@ general_health <- general_health %>%
     ),
     across(
       .col = (31:36),
-      .fn = ~ factor(.x, levels = c("All of the time", "Most of the time",
-                                    "Some of the time", 
-                                    "A little of the time",
-                                    "None of the time", "Don't know",
-                                    "Refused")),
+      .fn = ~ factor(.x, levels = c(
+        "All of the time", "Most of the time", "Some of the time", 
+        "A little of the time", "None of the time", "Don't know", "Refused"
+      )
+      ),
       .names = "{col}_7cat_f"
     )
   )
 ```
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     across(
       .col =  starts_with("outcomes_tf"),
@@ -272,9 +268,11 @@ general_health <- general_health %>%
     ),
     across(
       .col = (37:40),
-      .fn = ~ factor(.x, levels = c("Definitely true", "Mostly true", 
-                                    "Don't know", "Mostly false",
-                                    "Definitely false", "Refused")),
+      .fn = ~ factor(.x, levels = c(
+        "Definitely true", "Mostly true", "Don't know", 
+        "Mostly false", "Definitely false", "Refused"
+      )
+      ),
       .names = "{col}_6cat_f"
     )
   )
@@ -284,7 +282,7 @@ general_health <- general_health %>%
 
 These had to be coded individually, since some variables are coded 0 for "Yes" and 1 for "No" and others are coded the opposite
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     depres_satisfied_2cat = case_when(
       depres_satisfied == "Yes" ~ 0,
@@ -293,126 +291,210 @@ general_health <- general_health %>%
     depres_satisfied_2cat_f = factor(
       depres_satisfied,
       levels = c("Yes", "No")
-  ),
-  depres_hopeless_2cat = case_when(
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_hopeless_2cat = case_when(
     depres_hopeless == "No"  ~ 0,
     depres_hopeless == "Yes" ~ 1
-  ),
-  depres_hopeless_2cat_f = factor(
+    ),
+    depres_hopeless_2cat_f = factor(
     depres_hopeless,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_better_2cat = case_when(
     depres_better == "No"  ~ 0,
     depres_better == "Yes" ~ 1
-  ),
-  depres_better_2cat_f = factor(
+    ),
+    depres_better_2cat_f = factor(
     depres_better,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_activities_2cat = case_when(
     depres_activities == "No"  ~ 0,
     depres_activities == "Yes" ~ 1
-  ),
-  depres_activities_2cat_f = factor(
+    ),
+    depres_activities_2cat_f = factor(
     depres_activities,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_empty_2cat = case_when(
     depres_empty == "No"  ~ 0,
     depres_empty == "Yes" ~ 1
-  ),
-  depres_empty_2cat_f = factor(
+    ),
+    depres_empty_2cat_f = factor(
     depres_empty,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_bored_2cat = case_when(
     depres_bored == "No"  ~ 0,
     depres_bored == "Yes" ~ 1
-  ),
-  depres_bored_2cat_f = factor(
+    ),
+    depres_bored_2cat_f = factor(
     depres_bored,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_spirits_2cat = case_when(
     depres_spirits == "Yes"  ~ 0,
     depres_spirits == "No" ~ 1
-  ),
-  depres_spirits_2cat_f = factor(
+    ),
+    depres_spirits_2cat_f = factor(
     depres_spirits,
     levels = c("Yes", "No")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_afraid_2cat = case_when(
     depres_afraid == "No"  ~ 0,
     depres_afraid == "Yes" ~ 1
-  ),
-  depres_afraid_2cat_f = factor(
+    ),
+    depres_afraid_2cat_f = factor(
     depres_afraid,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_happy_2cat = case_when(
     depres_happy == "Yes"  ~ 0,
     depres_happy == "No" ~ 1
-  ),
-  depres_happy_2cat_f = factor(
+    ),
+    depres_happy_2cat_f = factor(
     depres_happy,
     levels = c("Yes", "No")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_helpless_2cat = case_when(
     depres_helpless == "No"  ~ 0,
     depres_helpless == "Yes" ~ 1
-  ),
-  depres_helpless_2cat_f = factor(
+    ),
+    depres_helpless_2cat_f = factor(
     depres_helpless,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_home_2cat = case_when(
     depres_home == "No"  ~ 0,
     depres_home == "Yes" ~ 1
-  ),
-  depres_home_2cat_f = factor(
+    ),
+    depres_home_2cat_f = factor(
     depres_home,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_memory_2cat = case_when(
     depres_memory == "No"  ~ 0,
     depres_memory == "Yes" ~ 1
-  ),
-  depres_memory_2cat_f = factor(
+    ),
+    depres_memory_2cat_f = factor(
     depres_memory,
     levels = c("No", "Yes")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_alive_2cat = case_when(
     depres_alive == "Yes"  ~ 0,
     depres_alive == "No" ~ 1
-  ),
-  depres_alive_2cat_f = factor(
+    ),
+    depres_alive_2cat_f = factor(
     depres_alive,
     levels = c("Yes", "No")
-  ),
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_worthless_2cat = case_when(
     depres_worthless == "No"  ~ 0,
     depres_worthless == "Yes" ~ 1
-  ),
-  depres_worthless_2cat_f = factor(
+    ),
+    depres_worthless_2cat_f = factor(
     depres_worthless,
     levels = c("No", "Yes")
-  ),
+    ),
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
     depres_energy_2cat = case_when(
     depres_energy == "Yes"  ~ 0,
     depres_energy == "No" ~ 1
-  ),
-  depres_energy_2cat_f = factor(
+    ),
+    depres_energy_2cat_f = factor(
     depres_energy,
     levels = c("Yes", "No")
-  ),
+    ),
   )
 ```
 
 ## UCLA 3-Item Loneliness Scale variables
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     across(
       .col = starts_with("ls"),
@@ -426,8 +508,8 @@ general_health <- general_health %>%
     ),
     across(
       .col = (56:58),
-      .fn = ~ factor(.x, levels = c("Hardly ever", "Some of the time",
-                                    "Often", "Refused")),
+      .fn = ~ factor(.x, levels = c("Hardly ever", "Some of the time", "Often", "Refused")
+      ),
       .names = "{col}_4cat_f"
     )
   )
@@ -436,7 +518,7 @@ general_health <- general_health %>%
 ## National Epidemiological Survey on Alcohol and Related Conditions-III (NESARC-III) variables
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     across(
       .col =  starts_with("nesarc"),
@@ -450,7 +532,8 @@ general_health <- general_health %>%
     ),
     across(
       .col = (59:60),
-      .fn = ~ factor(.x, levels = c("Yes", "No", "Don't know", "Refused")),
+      .fn = ~ factor(.x, levels = c("Yes", "No", "Don't know", "Refused")
+      ),
       .names = "{col}_4cat_f"
     )
   )
@@ -460,7 +543,7 @@ general_health <- general_health %>%
 ## Alcohol Use Disorders Test, Consumption Questions (AUDIT-C) variables
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     auditc_drink_7cat = case_when(
       auditc_drink == "Never"                  ~ 0,
@@ -470,19 +553,19 @@ general_health <- general_health %>%
       auditc_drink == "4 or more times a week" ~ 4,
       auditc_drink == "Don't know"             ~ 7,
       auditc_drink == "Refused"                ~ 9
-    ),
+      ),
     auditc_drink_7cat_f = factor(
       auditc_drink,
-      levels = c("Never", "Monthly or less", "2-4 times a month",
-                 "2-3 times a week", "4 or more times a week",
-                 "Don't know", "Refused")
+      levels = c(
+        "Never", "Monthly or less", "2-4 times a month", 
+        "2-3 times a week", "4 or more times a week", "Don't know", "Refused"
+      )
     )
-    )
-  
+  )
 ```
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     auditc_day_7cat = case_when(
       auditc_day == "1 or 2"     ~ 1,
@@ -495,14 +578,13 @@ general_health <- general_health %>%
     ),
     auditc_day_7cat_f = factor(
       auditc_day,
-      levels = c("1 or 2", "3 or 4", "5 or 6", "7 to 9", "10 or more",
-                 "Don't know", "Refused")
+      levels = c("1 or 2", "3 or 4", "5 or 6", "7 to 9", "10 or more", "Don't know", "Refused")
     )
-    )
+  )
 ```
 
 ```{r}
-general_health <- general_health %>%
+geheal <- geheal %>%
   mutate(
     auditc_five_7cat = case_when(
       auditc_five == "Never"                 ~ 0,
@@ -515,9 +597,7 @@ general_health <- general_health %>%
     ),
     auditc_five_7cat_f = factor(
       auditc_five,
-      levels = c("Never", "Less than monthly", "Monthly", "Weekly",
-      "Daily or almost daily", "Don't know", "Refused"
-      )
+      levels = c("Never", "Less than monthly", "Monthly", "Weekly", "Daily or almost daily", "Don't know", "Refused")
     )
   )
 ```
@@ -525,7 +605,6 @@ general_health <- general_health %>%
 #### Write file to csv
 
 ```{r}
-write_csv(general_health, "general_health_factor.csv")
-
+write_csv(geheal, "geheal_factor.csv")
 ```
 
