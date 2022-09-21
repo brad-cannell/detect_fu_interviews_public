@@ -1,6 +1,5 @@
 ---
-title: "self_report_recode_factor"
-output: html_notebook
+title: "Self Report Variables - Recode Categorical Variables as Factors"
 author: "Marissa Gough"
 ---
 ```{r, message= FALSE}
@@ -8,8 +7,7 @@ author: "Marissa Gough"
 library(readr)
 library(purrr)
 library(stringr)
-library(dplyr)
-
+library(dplyr, warn.conflicts = FALSE)
 ```
 
 
@@ -20,10 +18,10 @@ Load the data tables into the global environment as data frames. We will create 
 ```{r load data, messages = FALSE}
 # I changed the encoding to remove unrecognized characters "Donít know" for don't know
 
-self_report <- read_csv("../data/raw/Self Report.csv", show_col_types = FALSE, locale = locale(encoding = "latin1", asciify = TRUE)) # 598 203
+sr <- read_csv("../data/raw/Self Report.csv", show_col_types = FALSE, locale = locale(encoding = "latin1", asciify = TRUE)) # 598 203
 ```
 
-# Data cleaning.
+# Data cleaning
 
 Here we will convert all variable names to snake case so that everything is uniform.
 
@@ -49,15 +47,15 @@ walk(
     assign(x, df, envir = .GlobalEnv)
   }
 )
-
 ```
 
 Remove unwanted characters and replace with "Don't know"
+
 ```{r}
-self_report[self_report == "Dont know"] <- "Don't know"
+sr[sr == "Dont know"] <- "Don't know"
 ```
 
-# Self-report injury, violence, neglect, and exploitation
+## Self-report injury, violence, neglect, and exploitation
 
 Set levels to be used throughout this program
 
@@ -77,13 +75,13 @@ levels_person   <- c("A spouse or partner", "An ex spouse or partner",
                      "Don't know", "Refused")
 ```
 
-
 ### Neglect variables
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
+      #Selects variables that have yes/no levels
       .cols = starts_with("neglect") & !ends_with("help") &
         !ends_with("reliable") & !ends_with("person"),
       .fns  = ~ case_when(
@@ -104,7 +102,7 @@ self_report <- self_report %>%
 ```    
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols  = starts_with("neglect") & ends_with("help"),
@@ -126,7 +124,7 @@ self_report <- self_report %>%
 ```
    
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols  = starts_with("neglect") & ends_with("reliable"),
@@ -149,7 +147,7 @@ self_report <- self_report %>%
 ```
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     neglect_person_12cat = case_when(
         neglect_person == "A spouse or partner"     ~ 1, 
@@ -172,7 +170,7 @@ self_report <- self_report %>%
   )
 ```
   
-# Financial Exploitation Variables
+### Financial Exploitation Variables
 
 Set levels for factors used in these variables
 
@@ -188,9 +186,10 @@ levels_last_time <- c("Less than 1 month ago",
 Recode categorical variables to factor variables
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
+      #Select variables that have yes/no levels
       .cols = starts_with("finance") & !ends_with("years") &
         !ends_with("times") &  !ends_with("age") & !ends_with("person") &
         !ends_with("last_time"),
@@ -213,7 +212,7 @@ self_report <- self_report %>%
 ```    
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     finance_person_12cat = case_when(
       finance_person == "A spouse or partner"     ~ 1, 
@@ -237,7 +236,7 @@ self_report <- self_report %>%
 ```
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("finance") & ends_with("last_time"),
@@ -261,8 +260,7 @@ self_report <- self_report %>%
   )
 ```
     
-
-# Emotional Mistreatment Variables
+### Emotional Mistreatment Variables
 
 Set levels to be used with these variables
 
@@ -275,6 +273,8 @@ levels_times     <- c("1 or 2 times", "Between 3 and less than 5 times",
 levels_friends   <- c("None", "Very few (1-3)", "Some (4-6)", "A lot (7+)",
                       "Don't know", "Refused")
 
+#These levels are different than Levels_person as they start with "A Stranger"
+# v2 variables were used in later versions of the follow-up interview
 levels_person_v2 <- c("A stranger", "A spouse or partner", "An ex spouse or partner", 
                       "A parent or step-parent", "A brother or sister",
                       "A son or daughter", "Another relative", "A coworker", 
@@ -282,13 +282,13 @@ levels_person_v2 <- c("A stranger", "A spouse or partner", "An ex spouse or part
                       "Don't know", "Refused")
 ```
  
-
 Recode categorical variables to factor variables
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
+      #Select variables with yes/no levels
       .cols = starts_with("emotional") & !ends_with("years") &
         !ends_with("times") &  !ends_with("age") & !ends_with("person") &
         !ends_with("last_time") & !ends_with("friends") &
@@ -313,7 +313,7 @@ self_report <- self_report %>%
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     emotional_incident_person_12cat = case_when(
       emotional_incident_person == "A stranger"              ~ 1,
@@ -335,11 +335,10 @@ self_report <- self_report %>%
       levels = levels_person_v2
     )
   )
-  
 ```
     
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("emotional") & ends_with("last_time"),
@@ -361,12 +360,10 @@ self_report <- self_report %>%
       .names =  "{col}_8cat_f"
     )
   )
-
-  
 ```
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("emotional") & ends_with("times") & 
@@ -392,7 +389,7 @@ self_report <- self_report %>%
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     emotional_person_friends_6cat = case_when(
       emotional_person_friends == "None"           ~ 0, 
@@ -410,7 +407,7 @@ self_report <- self_report %>%
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     emotional_incident_person_v2_12cat = case_when(
       emotional_incident_person_v2 == "A stranger"              ~ 1,
@@ -434,14 +431,15 @@ self_report <- self_report %>%
   )
 ```
   
-# Physical Mistreatment Variables
+### Physical Mistreatment Variables
 
 Recode categorical variables to factor variables
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
+      #Select variables with yes/no levels
       .cols = starts_with("physical") & !ends_with("years") &
         !ends_with("times") &  !ends_with("age") &
         !ends_with("last_time") & !ends_with("friends") &
@@ -466,7 +464,7 @@ self_report <- self_report %>%
 ```
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("physical") & ends_with("last_time"),
@@ -491,7 +489,7 @@ self_report <- self_report %>%
 ```
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("physical") & ends_with("times") & 
@@ -516,7 +514,7 @@ self_report <- self_report %>%
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     physical_person_friends_6cat = case_when(
       physical_person_friends == "None"           ~ 0, 
@@ -535,7 +533,7 @@ self_report <- self_report %>%
   
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     physical_incident_person_v2_12cat = case_when(
       physical_incident_person_v2 == "A stranger"              ~ 1,
@@ -560,7 +558,7 @@ self_report <- self_report %>%
 ```
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     physical_person_12cat = case_when(
       physical_person == "A stranger"              ~ 1,
@@ -584,12 +582,12 @@ self_report <- self_report %>%
   )
 ```
   
-# Sexual mistreatment variables
+### Sexual mistreatment variables
 
 Recode categorical variables to factor variables
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("sexual") & !ends_with("years") &
@@ -616,7 +614,7 @@ self_report <- self_report %>%
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("sexual") & ends_with("last_time"),
@@ -641,7 +639,7 @@ self_report <- self_report %>%
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("sexual") & ends_with("times") & 
@@ -664,11 +662,10 @@ self_report <- self_report %>%
       .names = "{col}_7cat_f"
     )
   )
-    
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     sexual_person_friends_6cat = case_when(
       sexual_person_friends == "None"           ~ 0, 
@@ -686,7 +683,7 @@ self_report <- self_report %>%
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     sexual_incident_person_v2_12cat = case_when(
       sexual_incident_person_v2 == "A stranger"              ~ 1,
@@ -711,7 +708,7 @@ self_report <- self_report %>%
 ```
   
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     sexual_person_12cat = case_when(
       sexual_person == "A stranger"              ~ 1,
@@ -735,12 +732,12 @@ self_report <- self_report %>%
   )
 ```
 
-# Fears, wants, needs variables
+## Fears, wants, needs variables
 
 Recode categorical variables to factor variables
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     across(
       .cols = starts_with("fear") & !ends_with("response"),
@@ -757,16 +754,15 @@ self_report <- self_report %>%
       .names = "{col}_2cat_f"
     )
   )
-
 ```
 
 
-# Environment Variables
+## Environment Variables
 
 Recode categorical variables to factor variables
 
 ```{r}
-self_report <- self_report %>%
+sr <- sr %>%
   mutate(
     report_private_5cat = case_when(
       report_private == "Yes, for the entire time"                     ~ 1,
@@ -795,14 +791,22 @@ self_report <- self_report %>%
 
 
 ```{r}
-dim(self_report) # 598 491
+dim(sr) # 598 491
 ```
 
 
 
-#### Write to CSV
+# Write data frame to files
+
+Write data frame to CSV
 
 ```{r}
-write_csv(self_report, "../data/self_report_factor.csv")
+write_csv(sr, "sr_factor.csv") #598 491
+```
+
+Write data frame to RDS to preserve metadata
+
+```{r}
+write_rds(sr, "sr_factor.rds") #598 491
 ```
 
