@@ -1,8 +1,6 @@
 ---
-title: "obs_recode_factor"
-output: html_notebook
+title: "Observational Measures Data -  Recode Categorical Variables as Factors"
 author: "Marissa Gough"
-date: "June 19, 2022"
 ---
 
 ```{r, message= FALSE}
@@ -10,10 +8,8 @@ date: "June 19, 2022"
 library(readr)
 library(purrr)
 library(stringr)
-library(tidyverse)
-
+library(dplyr, warn.conflicts = FALSE)
 ```
-
 
 # Load data
 
@@ -21,9 +17,7 @@ Load the data tables into the global environment as data frames. We will create 
 
 ```{r load data, messages = FALSE}
 obs <- read_csv("../data/raw/Observational Measures.csv", show_col_types = FALSE) # 598 101
-
 ```
-
 
 # Data cleaning.
 
@@ -51,24 +45,21 @@ walk(
     assign(x, df, envir = .GlobalEnv)
   }
 )
-
 ```
 
-
-# Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items
+## Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items
 
 ```{r}
 obs <- obs %>%
   mutate(
     across(
       .cols  = ("unusual_odor": "report_elder_abuse" ),
-      .fns   = ~ factor(.x),
-      .names = "{col}_f"
+      .fns   = ~ factor(.x)
     )
   )
 ```
 
-# Elder Assessment Instrument (EAI) / Self-neglect Severity Scale
+## Elder Assessment Instrument (EAI) / Self-neglect Severity Scale
 
 General Assessment Variables
 
@@ -77,11 +68,9 @@ obs <- obs %>%
   mutate(
     across(
       .cols  = ("hygiene": "skin_integrity" ),
-      .fns   = ~ factor(.x),
-      .names = "{col}_f"
+      .fns   = ~ factor(.x)
     )
   )
-
 ```
 
 ```{r}
@@ -116,7 +105,6 @@ obs <- obs %>%
       levels = c("0 - Clean/combed", 1, 2, 3, "4 - Matted/dirty")
     )
   )
-
 ```
 
 ```{r}
@@ -131,13 +119,13 @@ obs <- obs %>%
     ),
     nails_5cat_f = factor(
       nails,
-      levels = c("0 - Clean/neat", 1, 2, 3, "4 - Long/untrimmed/dirty")
+      levels = c("0 - Clean/trimmed", 1, 2, 3, "4 - Long/untrimmed/dirty")
     )
   )
 ```
   
 
-# Possible Abuse, Neglect, Exploitation and Abandonment Indicators
+## Possible Abuse, Neglect, Exploitation and Abandonment Indicators
 
 ```{r}
 obs <- obs %>%
@@ -187,7 +175,7 @@ obs <- obs %>%
   )
 ```
 
-# Environmental Status of Subject
+## Environmental Status of Subject
 
 ```{r}
 obs <- obs %>%
@@ -476,7 +464,7 @@ obs <- obs %>%
 ```
 
 
-# Summary Variables
+## Summary Variables
 
 ```{r}
 obs <- obs %>%
@@ -490,7 +478,7 @@ obs <- obs %>%
   )
 ```
 
-# APS Report Variables
+## APS Report Variables
 
 ```{r}
 obs <- obs %>%
@@ -503,7 +491,7 @@ obs <- obs %>%
   )
 ```
 
-# Medic EM Assessment Variables
+## Medic EM Assessment Variables
 
 ```{r}
 obs <- obs %>%
@@ -533,16 +521,23 @@ obs <- obs %>%
       .names = "{col}_4cat_f" 
     )
   )
-    
 ```
     
 ```{r}
 dim(obs)
 ```
 
-#### Write to CSV
+# Write data frame to files
+
+Write data frame to CSV
+
 ```{r}
-write_csv(obs, "obs_factor.csv") #598 202
+write_csv(obs, "obs_factor.csv") #598 184
 ```
 
+Write data frame to RDS file to maintain metadata
+
+```{r}
+write_rds(obs, "obs_factor.rds") #598 184
+```
 
