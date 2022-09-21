@@ -1,6 +1,5 @@
 ---
 title: "APS Investigations Recode"
-output: html_notebook
 author: "Marissa Gough"
 ---
 
@@ -9,8 +8,7 @@ author: "Marissa Gough"
 library(readr)
 library(purrr)
 library(stringr)
-library(tidyverse)
-
+library(dplyr, warn.conflicts = FALSE)
 ```
 
 ## Load data
@@ -21,7 +19,7 @@ Load the data tables into the global environment as data frames. We will create 
 apinve <- read_csv("../data/raw/APS Investigations.csv")
 ```
 
-## Data cleaning.
+# Data cleaning.
 
 Here we will convert all variable names to snake case so that everything is uniform.
 
@@ -47,15 +45,12 @@ walk(
     assign(x, df, envir = .GlobalEnv)
   }
 )
-
 ```
 
-Change the encoding of columns that contain unrecognized characters where there is an apostrophe. Substitute an apostrophe for the special characters so that the value is "Don't know"
+## Change the encoding of columns that contain unrecognized characters where there is an apostrophe. Substitute an apostrophe for the special characters so that the value is "Don't know"
 
 ```{r}
-
 Encoding(apinve$aps_first) <- "ASCII"
-
 
 apinve <- apinve %>%
   mutate(
@@ -67,13 +62,7 @@ apinve <- apinve %>%
 ```{r}
 apinve <- apinve %>%
   mutate(
-    aps_report_4cat = case_when(
-      aps_report == "Yes"        ~ 1,
-      aps_report == "No"         ~ 2,
-      aps_report == "Don't know" ~ 7,
-      aps_report == "Refused"    ~ 9
-    ),
-    aps_report_4cat_f = factor(
+    aps_report_4cat = factor(
       aps_report,
       levels = c("Yes", "No", "Don't know", "Refused")
     )
@@ -100,17 +89,7 @@ apinve <- apinve %>%
 ```{r}
 apinve <- apinve %>%
   mutate(
-    aps_first_8cat = case_when(
-      aps_first == "10 or more years ago"                       ~ 1,
-      aps_first == "5-10 years ago"                             ~ 2,
-      aps_first == "1-5 years ago"                              ~ 3,
-      aps_first == "In the past year but more than a month ago" ~ 4,
-      aps_first == "In the past month"                          ~ 5,
-      aps_first == "In the past week"                           ~ 6,
-      aps_first == "Don't know"                                 ~ 7,
-      aps_first == "Refused"                                    ~ 9
-    ),
-    aps_first_8cat_f = factor(
+    aps_first_8cat = factor(
       aps_first,
       levels = c(
         "10 or more years ago", "5-10 years ago", "1-5 years ago", 
@@ -124,17 +103,7 @@ apinve <- apinve %>%
 ```{r}
 apinve <- apinve %>%
   mutate(
-    aps_recent_8cat = case_when(
-      aps_recent == "In the past week" ~ 1,
-      aps_recent == "In the past month" ~ 2,
-      aps_recent == "In the past year but more than a month ago" ~ 3,
-      aps_recent == "1-5 years ago" ~ 4,
-      aps_recent == "5-10 years ago" ~ 5, 
-      aps_recent == "10 or more years ago" ~ 6,
-      aps_recent == "Don’t know" ~ 7,
-      aps_recent == "Refused" ~ 9
-    ),
-    aps_recent_8cat_f = factor(
+    aps_recent_8cat = factor(
       aps_recent,
       levels = c("In the past week", "In the past month",
                  "In the past year but more than a month ago",
@@ -144,7 +113,7 @@ apinve <- apinve %>%
   )
 ```
 
-#### Write file to csv
+# Write file to csv
 
 ```{r}
 write_csv(apinve, "apinve_factor.csv")
