@@ -1,0 +1,437 @@
+---
+title: "geheal_recode_factor"
+author: "Marissa Gough"
+date: "June 29, 2022"
+---
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(purrr)
+library(stringr)
+library(dplyr, warn.conflicts = FALSE)
+```
+
+
+## Load data
+
+Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r load data, messages = FALSE}
+geheal <- read_csv("../data/raw/General Health.csv")
+```
+
+# Data cleaning
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+# Convert all variable names to snake case
+walk(
+  # Grab the names of all data frames in the global environment
+  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
+  .f = function(x) {
+    # Grab individual df from environment
+    df <- get(x)
+    # Grab the variables names
+    var_names <- names(df)
+    # Convert variable names to snake case
+    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
+    # Convert variable names to lower case
+    var_names <- str_to_lower(var_names)
+    # Fix medstar_id
+    var_names[var_names == "medstar_i_d"] <- "medstar_id"
+    # assign back to the dataframe
+    names(df) <- var_names
+    # Replace df with new names in global environment
+    assign(x, df, envir = .GlobalEnv)
+  }
+)
+```
+
+
+## Change the encoding of columns that contain unrecognized characters where there is an apostrophe. Substitute an apostrophe for the special characters so that the value is "Don't know"
+
+```{r}
+Encoding(geheal$outcomes_health_general) <- "ASCII"
+Encoding(geheal$outcomes_health_unable) <- "ASCII"
+Encoding(geheal$outcomes_health_keep) <- "ASCII"
+Encoding(geheal$auditc_drink) <- "ASCII"
+Encoding(geheal$auditc_day) <- "ASCII"
+Encoding(geheal$auditc_five) <- "ASCII"
+
+geheal <- geheal %>%
+  mutate(
+    outcomes_health_general =
+      iconv(outcomes_health_general, "ASCII", "latin1", "'"),
+    outcomes_health_keep = 
+      iconv(outcomes_health_keep, "ASCII", "latin1", "'"),
+    outcomes_health_unable = 
+      iconv(outcomes_health_unable, "ASCII", "latin1", "'"),
+    auditc_drink = 
+      iconv(auditc_drink, "ASCII", "latin1", "'"),
+    auditc_day = 
+      iconv(auditc_day, "ASCII", "latin1", "'"),
+    auditc_five = 
+      iconv(auditc_five, "ASCII", "latin1", "'")
+)
+```
+
+## Change all instances of "Very severe" to "Very Severe" to match codebook.
+
+```{r}
+geheal <- geheal %>% 
+  mutate_all(str_replace_all, "Very severe", "Very Severe")
+```
+
+Remove unwanted characters and replace with "Don't know"
+
+```{r}
+geheal[geheal == "Dont know"] <- "Don't know"
+```
+
+### PEG: A Three-Item Scale Assessing Pain Intensity and Interference
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    across(
+      .cols = starts_with("peg"),
+      .fns  = ~case_when(
+        .x == "0 - No pain"                         ~ 0,
+        .x == "1"                                   ~ 1,
+        .x == "2"                                   ~ 2,
+        .x == "3"                                   ~ 3,
+        .x == "4"                                   ~ 4,
+        .x == "5"                                   ~ 5,
+        .x == "6"                                   ~ 6,
+        .x == "7"                                   ~ 7,
+        .x == "8"                                   ~ 8,
+        .x == "9"                                   ~ 9,
+        .x == "10 - Pain as bad as you can imagine" ~ 10,
+        .x == "Refused"                             ~ 99
+        ),
+      .names = "{col}_12cat"
+      ),
+       across(
+      .cols  = ends_with("12cat"),
+      .fns   = ~ factor(.x, labels = c(
+        "0 - No pain", "1", "2", "3", "4", "5", "6", "7", 
+        "8", "9", "10 - Pain as bad as you can imagine", "Refused"
+      )
+      ),
+      .names = "{col}_f"
+    )
+  )
+```
+
+### Medical Outcomes Study
+
+```{r}
+geheal <- geheal %>%
+  mutate (
+    outcomes_health_general_7cat = factor(
+      outcomes_health_general,
+      levels = c(
+        "Excellent", "Very good", "Good", "Fair", 
+        "Poor", "Don't know", "Refused"
+      )
+    )
+  )
+```
+
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    across(
+      .col = c(22:27),
+      .fn = ~ factor(.x, levels = c(
+        "Yes, limited for more than 3 months", "Yes, limited for 3 months or less", 
+        "Not limited at all", "Don't know", "Refused"
+      )
+      ),
+      .names = "{col}_5cat"
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    outcomes4_weeks_pain_8cat = factor(
+      outcomes4_weeks_pain,
+      levels = c("None", "Very mild", "Mild", "Moderate", "Severe", "Very Severe", "Don't know", "Refused")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    across(
+      .col = c(29:30),
+      .fn = ~ factor(.x, levels = c(
+        "Yes, for more than 3 months", "Yes, for 3 months or less", 
+        "No", "Don't know", "Refused"
+      )
+      ),
+      .names = "{col}_5cat"
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    across(
+      .col = (31:36),
+      .fn = ~ factor(.x, levels = c(
+        "All of the time", "Most of the time", "Some of the time", 
+        "A little of the time", "None of the time", "Don't know", "Refused"
+      )
+      ),
+      .names = "{col}_7cat"
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    across(
+      .col = (37:40),
+      .fn = ~ factor(.x, levels = c(
+        "Definitely true", "Mostly true", "Don't know", 
+        "Mostly false", "Definitely false", "Refused"
+      )
+      ),
+      .names = "{col}_6cat"
+    )
+  )
+```
+
+## Geriatric Depression Scale Variables
+
+These had to be coded individually, since some variables are coded 0 for "Yes" and 1 for "No" and others are coded the opposite
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_satisfied_2cat = factor(
+      depres_satisfied,
+      levels = c("Yes", "No")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_hopeless_2cat = factor(
+    depres_hopeless,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_better_2cat = factor(
+    depres_better,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_activities_2cat = factor(
+    depres_activities,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_empty_2cat = factor(
+    depres_empty,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_bored_2cat = factor(
+    depres_bored,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_spirits_2cat = factor(
+    depres_spirits,
+    levels = c("Yes", "No")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_afraid_2cat = factor(
+    depres_afraid,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_happy_2cat = factor(
+    depres_happy,
+    levels = c("Yes", "No")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_helpless_2cat = factor(
+    depres_helpless,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_home_2cat = factor(
+    depres_home,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_memory_2cat = factor(
+    depres_memory,
+    levels = c("No", "Yes")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_alive_2cat = factor(
+    depres_alive,
+    levels = c("Yes", "No")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_worthless_2cat = factor(
+    depres_worthless,
+    levels = c("No", "Yes")
+    ),
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    depres_energy_2cat = factor(
+    depres_energy,
+    levels = c("Yes", "No")
+    ),
+  )
+```
+
+## UCLA 3-Item Loneliness Scale variables
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    across(
+      .col = (56:58),
+      .fn = ~ factor(.x, levels = c("Hardly ever", "Some of the time", "Often", "Refused")
+      ),
+      .names = "{col}_4cat"
+    )
+  )
+```
+
+## National Epidemiological Survey on Alcohol and Related Conditions-III (NESARC-III) variables
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    across(
+      .col = (59:60),
+      .fn = ~ factor(.x, levels = c("Yes", "No", "Don't know", "Refused")
+      ),
+      .names = "{col}_4cat"
+    )
+  )
+```
+
+
+## Alcohol Use Disorders Test, Consumption Questions (AUDIT-C) variables
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    auditc_drink_7cat = factor(
+      auditc_drink,
+      levels = c(
+        "Never", "Monthly or less", "2-4 times a month", 
+        "2-3 times a week", "4 or more times a week", "Don't know", "Refused"
+      )
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    auditc_day_7cat = factor(
+      auditc_day,
+      levels = c("1 or 2", "3 or 4", "5 or 6", "7 to 9", "10 or more", "Don't know", "Refused")
+    )
+  )
+```
+
+```{r}
+geheal <- geheal %>%
+  mutate(
+    auditc_five_7cat = factor(
+      auditc_five,
+      levels = c("Never", "Less than monthly", "Monthly", "Weekly", "Daily or almost daily", "Don't know", "Refused")
+    )
+  )
+```
+
+# Write file to csv
+
+```{r}
+write_csv(geheal, "geheal_factor.csv")
+```
+
