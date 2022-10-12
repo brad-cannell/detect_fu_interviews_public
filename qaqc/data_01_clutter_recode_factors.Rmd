@@ -20,7 +20,7 @@ library(expss)
 Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r load data, messages = FALSE}
-clusca <- read_csv("Clutter Scale.csv")
+clusca <- read_csv("Clutter Scale.csv") #598 20
 ```
 
 # Data cleaning.
@@ -95,7 +95,7 @@ clusca <- clusca%>%
     ),
     clutter_kitchen_photo_3cat = factor(
       clutter_kitchen_photo,
-      levels = c("Yes", "No", "No living room")
+      levels = c("Yes", "No", "No kitchen")
     )
   )
 ```
@@ -126,5 +126,12 @@ clusca <- clusca%>%
 # Write file to csv
 
 ```{r}
-write_csv(clusca, "clusca_factor.csv")
+write_csv(clusca, "clusca_factor.csv") #598 29
 ```
+
+# Write file to rds
+
+```{r}
+write_rds(clusca, "clusca_factor.rds") #598 29
+```
+
