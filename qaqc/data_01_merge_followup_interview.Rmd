@@ -1,0 +1,382 @@
+---
+title: "Merge Follow-up Interview Data Frames"
+author: "Marissa Gough"
+---
+
+```{r}
+# Load necessary packages
+library(dplyr, warn.conflicts = FALSE)
+library(testthat)
+```
+
+We import the recoded and cleaned data tables containing the DETECT post-interview data. Here we will merge them into one analysis data frame. We will merge them in the order of the DETECT Follow-up Interview Protocol document:
+
+* Section 1: Sociodemographic Information
+* Section 2: General Health
+* Section 3: Home Inspection and Clutter Image Rating Scale
+* Section 4: Self-report injury, violence, neglect, and exploitation
+* Section 5: APS Investigations
+* Section 6: Observational Measures of Elder Abuse, Neglect, and Exploitation
+
+```{r}
+# Load data
+aps    <- read_rds("~.../detect_public/data/aps_factor.rds") #595 23 APS Information
+clusca <- read_rds("~.../detect_public/data/clusca_factor.rds") #598 29 Clutter Scale
+geheal <- read_rds("~.../detect_public/data/geheal_factor.rds") #598 155 General Health
+obs    <- read_rds("~.../detect_public/data/obs_factor.rds") #598 184 Observational Measures
+socdem <- read_rds("~.../detect_public/data/socdem_factor.rds") #600 63 Sociodemographic Info
+sr     <- read_rds("~.../detect_public/data/sr_factor.rds") #595 576 Self-Report
+```
+
+# Current Data Tables
+## Sociodemographic Information
+
+Has data on the sociodemographic information of the participants. 
+
+## General Health
+
+Includes PEG data to assess pain intensity and interference, medical outcomes study, geriatric depression scale, UCLA 3-item loneliness scale, National Epidemiological Survey on Alcohol and Related Conditions-III (NESARC-III), and Alcohol Use Disorders Test, Consumption Questions (AUDIT-C).
+
+## Home Inspection and Clutter Image Rating Scale
+
+Includes clutter rating of rooms in the home based on pictures. 
+
+## Self-report injury, violence, neglect, and exploitation
+
+Includes self-reported instances of neglect, physical abuse, financial abuse, emotional abuse, sexual abuse, data on fears, needs and wants, and the interviewers observations of the environment. 
+
+## APS Investigations
+
+Contains data on any visits the older indiviaual has had from Adult Protective Services. 
+
+## Observational Measures of Elder Abuse, Neglect, and Exploitation
+
+Includes Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items, the medic EM assessment.
+
+# Data Wrangling
+
+## Keep only the needed columns from each data table
+
+```{r}
+socdem <- socdem %>%
+  select(-c(x_created_by, x_modified_by, x_modified_timestamp, x_record_status))
+```
+
+```{r}
+geheal <- geheal %>%
+  select(-c(x_created_by, x_created_timestamp, x_modified_by, x_modified_timestamp, x_record_status))
+```
+
+```{r}
+clusca <- clusca %>%
+  select(-c(x_created_by, x_created_timestamp, x_modified_by, x_modified_timestamp, x_record_status))
+```
+
+```{r}
+sr <- sr %>%
+  select(-c(x_created_by, x_created_timestamp, x_modified_by, x_modified_timestamp, x_record_status))
+```
+
+```{r}
+aps <- aps %>%
+  select(-c(x_created_by, x_created_timestamp, x_modified_by, x_modified_timestamp, x_record_status))
+```
+
+```{r}
+obs <- obs %>%
+  select(-c(x_created_by, x_modified_by, x_modified_timestamp, x_record_status))
+```
+
+## For data frames that have x_record_year as a character variable, change to numerical
+
+```{r}
+socdem <- socdem %>% 
+  mutate_at(c('x_record_year'), as.numeric)
+
+geheal <- geheal %>% 
+  mutate_at(c('x_record_year'), as.numeric)
+```
+
+# Merge the data frames together
+
+## Sociodemographic Information and General Health
+
+### Check MedStar IDs
+
+How many MedStar IDs are in sociodemographic information, but not general health?
+
+```{r}
+ids_in_sd_not_gh <- socdem %>% 
+  anti_join(geheal, by = c("medstar_id" = "medstar_id")) %>% 
+  select(medstar_id, x_error_message) 
+```
+
+```{r}
+length(unique(ids_in_sd_not_gh$medstar_id))
+```
+
+As of 10-11-2022, there are 3 MedStar IDs that are in the Sociodemographic Information that are not in the General Health data. All of these records have an error message that participant consent was not recorded. 
+
+How many MedStar IDs are in general health, but not in sociodemographic information?
+```{r}
+ids_in_gh_not_sd <- geheal %>% 
+  anti_join(socdem, by = c("medstar_id" = "medstar_id")) %>% 
+  select(medstar_id, x_error_message) 
+```
+
+```{r}
+length(unique(ids_in_gh_not_sd$medstar_id))
+```
+As of 10-11-2022, there is 1 MedStar ID that is in the General Health data that is not in the Sociodemographic Information. 
+
+First, we will make sure there is only one row for each MedStar ID in the Sociodemodemographic Information data.
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the sociodemographic data. This is necessary for merging the socioeconomic and general health data.", {
+  rows <- nrow(socdem)
+  ids  <- length(unique(socdem$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+We will do the same for the general health data
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the general health data. This is necessary for merging the socioeconomic and general health data.", {
+  rows <- nrow(geheal)
+  ids  <- length(unique(geheal$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+### Merge the call log and phone recruitment
+
+There are some MedStar Ids that are in the sociodemographic data, but not the general health data and there is one MedStar ID that is in the general health data but not in the sociodemographic data. Therefore, we full_join the general health data to the  socioeconomic data and all rows will from both data sets will be maintained.
+
+October 11, 2022: 
+* There are 600 rows in socdem. 
+* There are 598 rows in geheal.
+* There were 3 ids in socdem that didn't have a match in geheal.
+* There was 1 id in geheal that didn't have a match in socdem.
+* Therefore, the merged data frame should have 601 rows.
+
+The columns that we used to join the data frames 
+
+```{r}
+# Join data frames
+
+merged_follow_up <- socdem %>% 
+  full_join(
+    geheal, 
+    by = c('medstar_id', 'name_full', 'x_error_message', 'x_record_month', 'x_record_year',
+           'x_record_comment')
+  )
+```
+
+## Merged data frame and Clutter Scale
+
+### Check MedStar IDs
+
+How many MedStar IDs are in clusca, but not the merged_df1?
+
+```{r}
+ids_in_clusca_not_mdf <- clusca %>% 
+  anti_join(merged_follow_up, by = c("medstar_id" = "medstar_id")) %>% 
+  select(medstar_id, x_error_message) 
+```
+
+```{r}
+length(unique(ids_in_clusca_not_mdf$medstar_id))
+```
+
+There is one MedStarID that is in the clutter scale data, but not in the merged data frame. The error message reads "Participant Consent Not recorded" for this participant. There is no data for this individual in the Clutter Scale, and this MedStar ID is not in any other data frame. I believe we can drop this individual, but I will keep it for now. 
+
+
+Also, make sure that there aren't any repeated MedStar IDs in the clusca data. 
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the clusca data. This is necessary for merging clusca with merged_df1.", {
+  rows <- nrow(clusca)
+  ids  <- length(unique(clusca$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+### Merge clusca with merged_follow_up
+
+We will do a full join to preserve all rows from both data frames. We should have 602 rows. 
+
+```{r}
+merged_follow_up <- merged_follow_up %>% 
+  full_join(
+    clusca, 
+    by = c('medstar_id', 'name_full', 'x_error_message', 'x_record_month', 'x_record_year',
+           'x_record_comment')
+  )
+```
+
+
+## Merged follow-up data and self-report data
+
+### Check MedStar IDs
+
+How many MedStar IDs are in sr, but not the merged_follow_up?
+
+```{r}
+# Data check
+ids_in_sr_not_mdf <- sr %>% 
+  anti_join(merged_follow_up, by = c("medstar_id" = "medstar_id")) %>% 
+  select(medstar_id, x_error_message) 
+```
+
+```{r}
+length(unique(ids_in_sr_not_mdf$medstar_id))
+```
+
+There is one individual where the MedStar ID is NA. There is no name recorded and the error message reads "Participant consent not recorded". There are no other data frames that contain NA for a MedStar ID, so I can drop this individual.
+
+Also, make sure that there aren't any repeated MedStar IDs in the self-report data. 
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the consent data. This is necessary for merging consent with merged_follow_up.", {
+  rows <- nrow(sr)
+  ids  <- length(unique(sr$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+### Merge sr with merged_follow_up
+
+We will do a left join since we do not need to preserve the record with the NA for MedStar ID in the self-report data. A left join will preserve all rows in the merged data frame and add columns from the self-report data. The number of rows should still be 602.
+
+```{r}
+merged_follow_up <- merged_follow_up %>% 
+  left_join(
+    sr, 
+    by = c('medstar_id', 'name_full', 'x_error_message', 'x_record_month', 'x_record_year',
+           'x_record_comment')
+  )
+```
+
+## Merged follow-up data and APS investigation data
+
+### Check MedStar IDs
+
+How many MedStar IDs are in aps, but not the merged_follow_up?
+
+```{r}
+# Data check
+ids_in_aps_not_mdf <- aps %>% 
+  anti_join(merged_follow_up, by = c("medstar_id" = "medstar_id")) %>% 
+  select(medstar_id, x_error_message) 
+```
+
+```{r}
+length(unique(ids_in_aps_not_mdf$medstar_id))
+```
+
+There are no MedStar IDs that are in the APS Investigation data that are not in the merged data. 
+
+Also, make sure that there aren't any repeated MedStar IDs in the APS investigation data. 
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the APS investigation data. This is necessary for merging consent with merged_follow_up.", {
+  rows <- nrow(aps)
+  ids  <- length(unique(aps$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+### Merge aps with merged_follow_up
+
+We will do a left join. We should still have 602 rows after the data is merged. 
+
+```{r}
+merged_follow_up <- merged_follow_up %>% 
+  left_join(
+    aps, 
+    by = c('medstar_id', 'name_full', 'x_error_message', 'x_record_month', 'x_record_year',
+           'x_record_comment')
+  )
+```
+
+## Merged follow-up data and observational measures data
+
+### Check MedStar IDs
+
+How many MedStar IDs are in obs, but not the merged_follow_up?
+
+```{r}
+# Data check
+ids_in_obs_not_mdf <- obs %>% 
+  anti_join(merged_follow_up, by = c("medstar_id" = "medstar_id")) %>% 
+  select(medstar_id, x_error_message) 
+```
+
+```{r}
+length(unique(ids_in_obs_not_mdf$medstar_id))
+```
+
+There is one individual with a MedStar ID that is in obs but not in the merged data. There is data from this person for observational measures and there is no error message reported. I will keep this individual in the data set. 
+
+Also, make sure that there aren't any repeated MedStar IDs in the self-report data. 
+
+```{r}
+# Data check
+test_that("Make sure there is only one row for each MedStar ID in the observational measures data. This is necessary for merging consent with merged_follow_up.", {
+  rows <- nrow(obs)
+  ids  <- length(unique(sr$medstar_id))
+  expect_equal(rows, ids)
+})
+```
+
+### Merge obs with merged_follow_up
+
+We will do a full join to preserve all rows in both data sets. We should have 603 rows.
+
+```{r}
+merged_follow_up <- merged_follow_up %>% 
+  full_join(
+    obs, 
+    by = c('medstar_id', 'name_full', 'x_record_month', 'x_record_year', 'x_record_comment'))
+```
+
+We expected 603 rows, but we ended up with 605 rows. That means we have 2 individuals where one of the values we merged by did not match. For 2 individuals, the error comments did not match, so we did not merge on this column. 
+
+```{r}
+dim(merged_follow_up)
+```
+
+# Final data cleaning
+
+We will rename some columns in the merged data frame
+
+```{r}
+merged_follow_up <- merged_follow_up %>%
+  rename(
+    x_created_timestamp_socdem = x_created_timestamp.x,
+    x_created_timestamp_obs    = x_created_timestamp.y,
+    x_error_message_socdem     = x_error_message.x,
+    x_error_message_obs        = x_error_message.y
+  )
+```
+
+
+# Write merged data to file
+
+## Write to csv
+
+```{r}
+write_csv(merged_follow_up, "merged_follow_up_data.csv") #603 973
+```
+
+## Write to rds
+```{r}
+write_rds(merged_follow_up, "merged_follow_up_data.rds") #603 973
+```
+
