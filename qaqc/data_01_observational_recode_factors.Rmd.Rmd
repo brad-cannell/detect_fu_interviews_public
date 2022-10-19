@@ -294,11 +294,11 @@ obs <- obs%>%
 obs <- obs %>%
   mutate(
     odor_5cat = case_when(
-      windows == "0 - Normal household odor"                                              ~ 0,
-      windows == "1"                                                                      ~ 1,
-      windows == "2"                                                                      ~ 2,
-      windows == "3"                                                                      ~ 3,
-      windows == "4 - Pungent, unpleasant odor (may be human/animal waste, rotting food)" ~ 4
+      odor == "0 - Normal household odor"                                              ~ 0,
+      odor == "1"                                                                      ~ 1,
+      odor == "2"                                                                      ~ 2,
+      odor == "3"                                                                      ~ 3,
+      odor == "4 - Pungent, unpleasant odor (may be human/animal waste, rotting food)" ~ 4
     ),
     odor_5cat_f = factor(
       odor,
