@@ -19,7 +19,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 ```{r}
 #| warning: false
 clutter_scale_import.rds <- file.choose()
-clutter_scale <- readRDS("clutter_scale_import.rds")
+clutter_scale <- readRDS(clutter_scale_import.rds)
 ```
 
 # Glimpse data with every column shown
@@ -264,5 +264,5 @@ clutter_scale_codebook <- codebook(
 ```
 
 ```{r}
-print(clutter_scale_codebook, "data_01_clutter_scale_codebook.docx")
+print(clutter_scale_codebook, "clutter_scale_codebook.docx")
 ```

@@ -19,7 +19,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 ```{r}
 #| warning: false
 general_health_import.rds <- file.choose()
-general_health <- readRDS("general_health_import.rds")
+general_health <- readRDS(general_health_import.rds)
 ```
 
 # Set column attributes
@@ -963,5 +963,5 @@ general_health_codebook <- codebook(
 ```
 
 ```{r}
-print(general_health_codebook, "data_01_general_health_codebook.docx")
+print(general_health_codebook, "general_health_codebook.docx")
 ```

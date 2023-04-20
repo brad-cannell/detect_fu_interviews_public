@@ -15,7 +15,7 @@ library(tidyverse)
 
 # Load data
 
-Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data tables into the global environment as data frames by running the code in the data_01_import file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r}
 aps_inv <- a_p_s_investigations
@@ -148,7 +148,7 @@ aps_inv <- aps_inv %>%
 colnames(aps_inv)[13] <- "xc_case_id"
 ```
 
-## Save as rds file
+# Save as rds file
 
 ```{r}
 saveRDS(aps_inv, "aps_investigations_import.rds")

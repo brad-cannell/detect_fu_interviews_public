@@ -13,11 +13,11 @@ library(tidyverse)
 ```
 
 
-## Load data
+# Load data
 
-Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data tables into the global environment as data frames by running the code in the data_01_import file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
-## Data cleaning.
+# Clean data
 
 Here we will convert all variable names to snake case so that everything is uniform.
 
@@ -46,21 +46,22 @@ walk(
 
 ```
 
-### Change column name and position
+## Change column name and position
 
 ```{r}
-self_rep<-self_report %>% relocate(xc_case_i_d, .after=	x_error_message)
+self_rep <- self_report %>% relocate(xc_case_i_d, .after=	x_error_message)
 colnames(self_rep)[8]  <- "xc_case_id"
-self_rep<-self_rep %>% relocate(xc_lead_panel_summary_count, .after=	xc_case_id)	
-self_rep<-self_rep %>% relocate(x_record_month, .after=	xc_lead_panel_summary_count)	
-self_rep<-self_rep %>% relocate(x_record_year, .after=	x_record_month)	
-self_rep<-self_rep %>% relocate(x_record_comment, .after=	x_record_year)	
+self_rep <- self_rep %>% relocate(xc_lead_panel_summary_count, .after =	xc_case_id)	
+self_rep <- self_rep %>% relocate(x_record_month, .after = xc_lead_panel_summary_count)	
+self_rep <- self_rep %>% relocate(x_record_year, .after =	x_record_month)	
+self_rep <- self_rep %>% relocate(x_record_comment, .after =	x_record_year)	
 
 ```
 
-## Self-report injury, violence, neglect, and exploitation
+## Create factor variables to match levels in follow-up interview protocol
 
-### Set levels to be used throughout this program
+### Self-report injury, violence, neglect, and exploitation
+
 ```{r}
 
 # Set levels for factors for different types of questions
@@ -114,7 +115,7 @@ self_rep <- self_rep %>%
       .cols  = starts_with("neglect") & ends_with("help"),
       .fns   = ~ factor(.x, levels = levels_help),
       .names = "{col}_5cat_f"
-  ),
+    ),
     across(
       .cols  = starts_with("neglect") & ends_with("reliable"),
       .fns   = ~ case_when(
@@ -131,25 +132,25 @@ self_rep <- self_rep %>%
       .cols  = starts_with("neglect") & ends_with("reliable"),
       .fns   = ~ factor(.x, levels = levels_reliable),
       .names = "{col}_6cat_f"
-  ),
-  neglect_person_12cat = case_when(
-    neglect_person == "A spouse or partner"     ~ 1, 
-    neglect_person == "An ex spouse or partner" ~ 2, 
-    neglect_person == "A parent or step-parent" ~ 3, 
-    neglect_person == "A brother or sister"     ~ 4, 
-    neglect_person == "A son or daughter"       ~ 5, 
-    neglect_person == "Another relative"        ~ 6, 
-    neglect_person == "A coworker"              ~ 7, 
-    neglect_person == "A neighbor"              ~ 8, 
-    neglect_person == "A friend"                ~ 9, 
-    neglect_person == "Some other non-relative" ~ 10,
-    neglect_person == "Don't know"              ~ 77, 
-    neglect_person == "Refused"                 ~ 99
-  ),
-  neglect_person_12cat_f = factor(
-    neglect_person,
-    levels = levels_person
-  )
+    ),
+    neglect_person_12cat = case_when(
+      neglect_person == "A spouse or partner"     ~ 1, 
+      neglect_person == "An ex spouse or partner" ~ 2, 
+      neglect_person == "A parent or step-parent" ~ 3, 
+      neglect_person == "A brother or sister"     ~ 4, 
+      neglect_person == "A son or daughter"       ~ 5, 
+      neglect_person == "Another relative"        ~ 6, 
+      neglect_person == "A coworker"              ~ 7, 
+      neglect_person == "A neighbor"              ~ 8, 
+      neglect_person == "A friend"                ~ 9, 
+      neglect_person == "Some other non-relative" ~ 10,
+      neglect_person == "Don't know"              ~ 77, 
+      neglect_person == "Refused"                 ~ 99
+    ),
+    neglect_person_12cat_f = factor(
+      neglect_person,
+      levels = levels_person
+    )
   )
 
 ```
@@ -189,8 +190,8 @@ self_rep <- self_rep %>%
         !ends_with("times") &  !ends_with("age") & !ends_with("person") &
         !ends_with("last_time") & !ends_with("4cat"),
       .fns  = ~ factor(.x, levels = levels_yes_no),
-    .names = "{col}_4cat_f"
-      ),
+      .names = "{col}_4cat_f"
+    ),
 
     finance_person_12cat = case_when(
       finance_person == "A spouse or partner"     ~ 1, 
@@ -205,41 +206,37 @@ self_rep <- self_rep %>%
       finance_person == "Some other non-relative" ~ 10,
       finance_person == "Don't know"              ~ 77, 
       finance_person == "Refused"                 ~ 99
-  ),
-  finance_person_12cat_f = factor(
-    finance_person,
-    levels = levels_person
-  ),
-  across(
-    .cols = starts_with("finance") & ends_with("last_time"),
-    .fns  = ~ case_when(
-      .x == "Less than 1 month ago"                       ~ 1,
-      .x == "Between 1 month and less than 3 months ago"  ~ 2,
-      .x == "Between 3 months and less than 6 months ago" ~ 3,
-      .x == "Between 6 months and less than 1 year ago"   ~ 4,
-      .x == "Between 1 year and less than 3 years ago"    ~ 5,
-      .x == "3 or more years ago"                         ~ 6, 
-      .x == "Don't know"                                  ~ 7,
-      .x == "Refused"                                     ~ 9),
-    .names = "{col}_8cat"
-  ),
-  across(
-    .cols  = starts_with("finance") & ends_with("last_time"),
-    .fns   = ~ factor(.x, levels = levels_last_time),
-    .names =  "{col}_8cat_f"
+    ),
+    finance_person_12cat_f = factor(
+      finance_person,
+      levels = levels_person
+    ),
+    across(
+      .cols = starts_with("finance") & ends_with("last_time"),
+      .fns  = ~ case_when(
+        .x == "Less than 1 month ago"                       ~ 1,
+        .x == "Between 1 month and less than 3 months ago"  ~ 2,
+        .x == "Between 3 months and less than 6 months ago" ~ 3,
+        .x == "Between 6 months and less than 1 year ago"   ~ 4,
+        .x == "Between 1 year and less than 3 years ago"    ~ 5,
+        .x == "3 or more years ago"                         ~ 6, 
+        .x == "Don't know"                                  ~ 7,
+        .x == "Refused"                                     ~ 9),
+      .names = "{col}_8cat"
+    ),
+    across(
+      .cols  = starts_with("finance") & ends_with("last_time"),
+      .fns   = ~ factor(.x, levels = levels_last_time),
+      .names =  "{col}_8cat_f"
+    )
   )
-  )
-      
-
-
-  
-    
-
+     
 ```
 
 ### Emotional Mistreatment Variables
 
 #### Set levels to be used with these variables
+
 ```{r}
 levels_times <- c("1 or 2 times", "Between 3 and less than 5 times",
                   "Between 5 and less than 10 times", 
@@ -250,10 +247,10 @@ levels_friends <- c("None", "Very few (1-3)", "Some (4-6)", "A lot (7+)",
                     "Don't know", "Refused")
 
 levels_person_v2 <- c("A stranger", "A spouse or partner", "An ex spouse or partner", 
-                             "A parent or step-parent", "A brother or sister",
-                             "A son or daughter", "Another relative", "A coworker", 
-                             "A neighbor", "A friend", "Some other non-relative",
-                             "Don't know", "Refused")
+                      "A parent or step-parent", "A brother or sister",
+                      "A son or daughter", "Another relative", "A coworker", 
+                      "A neighbor", "A friend", "Some other non-relative",
+                      "Don't know", "Refused")
 ```
  
 
@@ -281,8 +278,8 @@ self_rep <- self_rep %>%
         !ends_with("last_time") & !ends_with("friends") & !ends_with("4cat") &
         !ends_with("person_v2"),
       .fns  = ~ factor(.x, levels = levels_yes_no),
-    .names = "{col}_4cat_f"
-      ),
+      .names = "{col}_4cat_f"
+    ),
 
     emotional_incident_person_12cat = case_when(
       emotional_incident_person == "A stranger"              ~ 1,
@@ -372,10 +369,10 @@ self_rep <- self_rep %>%
     emotional_incident_person_v2,
     levels = levels_person_v2
   ),
-  )
+)
 ```
  
-#### Physical Mistreatment Variables
+### Physical Mistreatment Variables
 
 #### Recode categorical variables to factor variables
 
@@ -495,7 +492,7 @@ self_rep <- self_rep %>%
 ```
 
 
-#### Sexual mistreatment variables
+### Sexual mistreatment variables
 
 #### Recode categorical variables to factor variables
 
@@ -523,56 +520,56 @@ self_rep <- self_rep %>%
       .fns  = ~ factor(.x, levels = levels_yes_no),
     .names = "{col}_4cat_f"
       ),
-  across(
-    .cols = starts_with("sexual") & ends_with("last_time"),
-    .fns  = ~ case_when(
-      .x == "Less than 1 month ago"                       ~ 1,
-      .x == "Between 1 month and less than 3 months ago"  ~ 2,
-      .x == "Between 3 months and less than 6 months ago" ~ 3,
-      .x == "Between 6 months and less than 1 year ago"   ~ 4,
-      .x == "Between 1 year and less than 3 years ago"    ~ 5,
-      .x == "3 or more years ago"                         ~ 6, 
-      .x == "Don't know"                                  ~ 7,
-      .x == "Refused"                                     ~ 9),
-    .names = "{col}_8cat"
-  ),
-  across(
-    .cols  = starts_with("sexual") & ends_with("last_time"),
-    .fns   = ~ factor(.x, levels = levels_last_time),
-    .names =  "{col}_8cat_f"
-  ),
-  across(
-    .cols = starts_with("sexual") & ends_with("times") & 
+    across(
+      .cols = starts_with("sexual") & ends_with("last_time"),
+      .fns  = ~ case_when(
+        .x == "Less than 1 month ago"                       ~ 1,
+        .x == "Between 1 month and less than 3 months ago"  ~ 2,
+        .x == "Between 3 months and less than 6 months ago" ~ 3,
+        .x == "Between 6 months and less than 1 year ago"   ~ 4,
+        .x == "Between 1 year and less than 3 years ago"    ~ 5,
+        .x == "3 or more years ago"                         ~ 6, 
+        .x == "Don't know"                                  ~ 7,
+        .x == "Refused"                                     ~ 9),
+      .names = "{col}_8cat"
+    ),
+    across(
+      .cols  = starts_with("sexual") & ends_with("last_time"),
+      .fns   = ~ factor(.x, levels = levels_last_time),
+      .names =  "{col}_8cat_f"
+    ),
+    across(
+      .cols = starts_with("sexual") & ends_with("times") & 
             !ends_with("times_times"),
-    .fns = ~ case_when(
-      .x == "1 or 2 times"                      ~ 1, 
-      .x == "Between 3 and less than 5 times"   ~ 2,
-      .x == "Between 5 and less than 10 times"  ~ 3, 
-      .x == "Between 10 and less than 20 times" ~ 4, 
-      .x == "20 or more times"                  ~ 5,
-      .x == "Don't know"                        ~ 7, 
-      .x == "Refused"                           ~ 9),
-    .names = "{col}_7cat"
-  ),
-  across(
-    .cols  = starts_with("sexual") & ends_with("times") & 
+      .fns = ~ case_when(
+        .x == "1 or 2 times"                      ~ 1, 
+        .x == "Between 3 and less than 5 times"   ~ 2,
+        .x == "Between 5 and less than 10 times"  ~ 3, 
+        .x == "Between 10 and less than 20 times" ~ 4, 
+        .x == "20 or more times"                  ~ 5,
+        .x == "Don't know"                        ~ 7, 
+        .x == "Refused"                           ~ 9),
+      .names = "{col}_7cat"
+    ),
+    across(
+      .cols  = starts_with("sexual") & ends_with("times") & 
             !ends_with("times_times"),
-    .fns   = ~ factor(.x, levels = levels_times),
-    .names = "{col}_7cat_f"
-  ),
-  sexual_person_friends_6cat = case_when(
-    sexual_person_friends == "None"           ~ 0, 
-    sexual_person_friends == "Very few (1-3)" ~ 1, 
-    sexual_person_friends == "Some (4-6)"     ~ 2, 
-    sexual_person_friends == "A lot (7+)"     ~ 3,
-    sexual_person_friends == "Don't know"     ~ 7, 
-    sexual_person_friends == "Refused"        ~ 9
-  ),
-  sexual_person_friends_6cat_f = factor(
-    sexual_person_friends,
-    levels = levels_friends
-  ),
-  sexual_incident_person_v2_12cat = case_when(
+      .fns   = ~ factor(.x, levels = levels_times),
+      .names = "{col}_7cat_f"
+    ),
+    sexual_person_friends_6cat = case_when(
+      sexual_person_friends == "None"           ~ 0, 
+      sexual_person_friends == "Very few (1-3)" ~ 1, 
+      sexual_person_friends == "Some (4-6)"     ~ 2, 
+      sexual_person_friends == "A lot (7+)"     ~ 3,
+      sexual_person_friends == "Don't know"     ~ 7, 
+      sexual_person_friends == "Refused"        ~ 9
+    ),
+    sexual_person_friends_6cat_f = factor(
+      sexual_person_friends,
+      levels = levels_friends
+    ),
+    sexual_incident_person_v2_12cat = case_when(
       sexual_incident_person_v2 == "A stranger"              ~ 1,
       sexual_incident_person_v2 == "A spouse or partner"     ~ 2, 
       sexual_incident_person_v2 == "An ex spouse or partner" ~ 3, 
@@ -586,12 +583,12 @@ self_rep <- self_rep %>%
       sexual_incident_person_v2 == "Some other non-relative" ~ 11,
       sexual_incident_person_v2 == "Don't know"              ~ 77, 
       sexual_incident_person_v2 == "Refused"                 ~ 99
-  ),
-  sexual_incident_person_v2_12cat_f = factor(
-    sexual_incident_person_v2,
-    levels = levels_person_v2
-  ),
-  sexual_person_12cat = case_when(
+    ),
+    sexual_incident_person_v2_12cat_f = factor(
+      sexual_incident_person_v2,
+      levels = levels_person_v2
+    ),
+    sexual_person_12cat = case_when(
       sexual_person == "A stranger"              ~ 1,
       sexual_person == "A spouse or partner"     ~ 2, 
       sexual_person == "An ex spouse or partner" ~ 3, 
@@ -605,15 +602,15 @@ self_rep <- self_rep %>%
       sexual_person == "Some other non-relative" ~ 11,
       sexual_person == "Don't know"              ~ 77, 
       sexual_person == "Refused"                 ~ 99
-  ),
-  sexual_person_12cat_f = factor(
-    sexual_person,
-    levels = levels_person_v2
-  )
+    ),
+    sexual_person_12cat_f = factor(
+      sexual_person,
+      levels = levels_person_v2
+    )
   )
 ```
 
-#### Fears, wants, needs variables
+### Fears, wants, needs variables
 
 #### Recode categorical variables to factor variables
 
@@ -638,7 +635,7 @@ self_rep <- self_rep %>%
 ```
 
 
-#### Environment Variables
+### Environment Variables
 
 #### Recode categorical variables to factor variables
 
@@ -671,7 +668,7 @@ self_rep <- self_rep %>%
 ```
 
 
-### Remove raw character variables that have recoded forms
+## Remove raw character variables that have recoded forms
 
 ```{r}
 #keep all variables before and after self_rep[15:209]
@@ -679,15 +676,15 @@ keep_vars <- c(1:14,210:497)
 self_rep1 <- self_rep[, keep_vars]
 
 #keep additional variables within self_rep[15:209] that do not have recoded versions
-more_keep_vars<-self_rep[15:209]%>% select(-c(!matches("age") & !matches("_times_times") & !matches("response") & !matches("xc_") & !matches("finance_stranger_forged_times")))
+more_keep_vars<-self_rep[15:209] %>% select(-c(!matches("age") & !matches("_times_times") & !matches("response") & !matches("xc_") & !matches("finance_stranger_forged_times")))
 self_rep <- cbind(self_rep1,more_keep_vars)
                           
 ```
 
 
-#### Save as rds file
+# Save as rds file
 
 ```{r}
-  saveRDS(self_rep, "self_report_import.rds")
+saveRDS(self_rep, "self_report_import.rds")
 
 ```

@@ -19,7 +19,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 ```{r}
 #| warning: false
 self_report_import.rds <- file.choose()
-sr <- readRDS("self_report_import.rds")
+sr <- readRDS(self_report_import.rds)
 ```
 
 # Set column attributes
@@ -377,7 +377,7 @@ self_report <- sr %>%
       ),
       col_type = "Categorical"
     ) %>%
-  
+ 
     cb_add_col_attributes( 
       neglect_clean_reliable_6cat, 
       description = "SR_4c. How reliable would you say (that person/these people) is/are? Would you say they are… (READ LIST)",
@@ -459,7 +459,7 @@ self_report <- sr %>%
       neglect_person_12cat_f, 
       description = "SR_7. Considering all the things that we just talked about, who is the person who is supposed to help you with these things most of the time? (MULTIPLE RECORD)"
     ) %>%
-  
+self_report <- sr %>%   
     cb_add_col_attributes( 
       neglect_person_12cat, 
       description = "SR_7. Considering all the things that we just talked about, who is the person who is supposed to help you with these things most of the time? (MULTIPLE RECORD)",
@@ -480,7 +480,7 @@ self_report <- sr %>%
       col_type = "Categorical"
       
     ) %>%
-  
+ 
     cb_add_col_attributes( 
       finance_help_4cat, 
       description = "SR_8. Is there someone who helps you take care of your finances, or is there someone other than yourself who makes decisions about your money and your property, either with or without your approval?",
@@ -497,7 +497,7 @@ self_report <- sr %>%
     cb_add_col_attributes( 
       finance_person_permission_4cat, 
       description = "SR_10. Does that person usually ask for your permission before deciding to spend your money or sell your property?",
-      skip_pattern - "If 'No', go to SR_10a. All other answers, go to SR_11",
+      skip_pattern = "If 'No', go to SR_10a. All other answers, go to SR_11",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -506,7 +506,7 @@ self_report <- sr %>%
       ),
       col_type = "Categorical"
     ) %>%
-  
+   
     cb_add_col_attributes( 
       finance_person_decisions_4cat, 
       description = "SR_11. Do you feel like that person usually makes good decisions about your finances?",
@@ -3128,10 +3128,10 @@ cb_add_col_attributes(
 self_report_codebook <- codebook(
   df = self_report,
   title = "Self Report Dataset",
-  description = "Data collected during DETECT follow-up interviews on self-report of injury, violence, neglect, and exploitation",
+  description = "Data collected during DETECT follow-up interviews on self-report of injury, violence, neglect, and exploitation.",
   no_summary_stats = no_stats_vars)
 ```
 
 ```{r}
-print(self_report_codebook, "data_01_self_report_codebook.docx")
+print(self_report_codebook, "self_report_codebook.docx")
 ```

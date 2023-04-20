@@ -19,7 +19,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 ```{r}
 #| warning: false
 observational_measures_import.rds <- file.choose()
-obs <- readRDS("observational_measures_import.rds")
+obs <- readRDS(observational_measures_import.rds)
 ```
 
 # Set column attributes
@@ -118,17 +118,17 @@ observational_measures <- obs %>%
   
      cb_add_col_attributes( 
       xc_lead_panel_summary_count, 
-      description = "Calculated count of positive abuse instances across SelfReport, ApsInvestigations, and ObservationalMeasures"
+      description = "Calculated total count of positive abuse instances across self report, ApsInvestigations, and observational measures."
      ) %>%
   
      cb_add_col_attributes( 
        xc_lead_panel_summary_comment_count, 
-       description = "Calculated count of comments on positive abuse instances across SelfReport, ApsInvestigations, and ObservationalMeasures comments"
+       description = "Calculated count of comments provided by the medic, excluding for phrases such as 'No', 'Nothing to report', etc."
      ) %>%
     
      cb_add_col_attributes( 
        xc_lead_panel_summary, 
-       description = "Summary of positive abuse instances across SelfReport, ApsInvestigations, and ObservationalMeasures"
+       description = "Summary of positive abuse instances across self report, ApsInvestigations, and observational measures."
      ) %>%
   
     cb_add_col_attributes( 
@@ -803,12 +803,12 @@ observational_measures <- obs %>%
   
     cb_add_col_attributes( 
       aps_reported_f, 
-      description = ""
+      description = "No longer used - In the original observational measures, it would indicate if the medic submitted an APS report."
     ) %>%
   
     cb_add_col_attributes( 
       aps_reported_method_f, 
-      description = ""
+      description = "No longer used - In the original observational measures, it would indicate the method through which the medic submitted the APS report (Phone, Online, Other)."
     )%>%
   
     cb_add_col_attributes( 
@@ -817,7 +817,7 @@ observational_measures <- obs %>%
     ) %>%
     cb_add_col_attributes( 
       c_detect_status_f, 
-      description = ""
+      description = "Calculation indicating if the DETECT screener was positive or negative."
     )
   
 ```
@@ -835,5 +835,5 @@ obs_meas_codebook <- codebook(
 ```
 
 ```{r}
-print(obs_meas_codebook, "data_01_observational_measures_codebook.docx")
+print(obs_meas_codebook, "observational_measures_codebook.docx")
 ```

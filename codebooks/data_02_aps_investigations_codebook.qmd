@@ -19,7 +19,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 ```{r}
 #| warning: false
 aps_investigations_import.rds <- file.choose()
-aps_inv <- readRDS("aps_investigations_import.rds")
+aps_inv <- readRDS(aps_investigations_import.rds)
 ```
 
 # Glimpse data with every column shown
@@ -32,7 +32,7 @@ glimpse(aps_inv)
 ```{r}
 # Set the source to "DETECT Follow-up Interview APS Investigations" for all the variables
 aps_vars <- aps_inv %>% 
-  select(1:22)%>% 
+  select(1:22) %>% 
   names()
 
 for(i in aps_vars) {
@@ -225,5 +225,5 @@ aps_codebook <- codebook(
 
 
 ```{r}
-print(aps_codebook, "data_01_aps_investigations_codebook.docx")
+print(aps_codebook, "aps_investigations_codebook.docx")
 ```

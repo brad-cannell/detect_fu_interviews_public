@@ -13,11 +13,11 @@ library(tidyverse)
 ```
 
 
-## Load data
+# Load data
 
-Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data tables into the global environment as data frames by running the code in the data_01_import file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
-## Data cleaning.
+# Clean data
 
 Here we will convert all variable names to snake case so that everything is uniform.
 
@@ -47,17 +47,20 @@ walk(
 ```
 
 Change all instances of "Very severe" to "Very Severe" to match codebook.
+
 ```{r}
 general_health2 <- general_health %>% 
   mutate_all(str_replace_all, "Very severe", "Very Severe")
 ```
 
 Remove unwanted characters and replace with "Don't know"
+
 ```{r}
 general_health2[general_health2 == "Dont know"] <- "Don't know"
 ```
-### Create recoded variables and factor variables to match levels in follow-up interview protocol
-#### PEG: A Three-Item Scale Assessing Pain Intensity and Interference
+
+## Create recoded variables and factor variables to match levels in follow-up interview protocol
+### PEG: A Three-Item Scale Assessing Pain Intensity and Interference
 
 ```{r}
 general_health2 <- general_health2 %>%
@@ -91,7 +94,7 @@ general_health2 <- general_health2 %>%
   )
 ```
 
-#### Medical Outcomes Study
+### Medical Outcomes Study
 
 
 ```{r}
@@ -246,7 +249,7 @@ general_health2 <- general_health2 %>%
   )
 ```
 
-#### Geriatric Depression Scale Variables
+### Geriatric Depression Scale Variables
 
 These had to be coded individually, since some variables are coded 0 for "Yes" and 1 for "No" and others are coded the opposite
 ```{r}
@@ -259,123 +262,123 @@ general_health2 <- general_health2 %>%
     depres_satisfied_2cat_f = factor(
       depres_satisfied,
       levels = c("Yes", "No")
-  ),
-  depres_hopeless_2cat = case_when(
-    depres_hopeless == "No"  ~ 0,
-    depres_hopeless == "Yes" ~ 1
-  ),
-  depres_hopeless_2cat_f = factor(
-    depres_hopeless,
-    levels = c("No", "Yes")
-  ),
+    ),
+    depres_hopeless_2cat = case_when(
+      depres_hopeless == "No"  ~ 0,
+      depres_hopeless == "Yes" ~ 1
+    ),
+    depres_hopeless_2cat_f = factor(
+      depres_hopeless,
+      levels = c("No", "Yes")
+    ),
     depres_better_2cat = case_when(
-    depres_better == "No"  ~ 0,
-    depres_better == "Yes" ~ 1
-  ),
-  depres_better_2cat_f = factor(
-    depres_better,
-    levels = c("No", "Yes")
-  ),
+      depres_better == "No"  ~ 0,
+      depres_better == "Yes" ~ 1
+    ),
+    depres_better_2cat_f = factor(
+      depres_better,
+      levels = c("No", "Yes")
+    ),
     depres_activities_2cat = case_when(
-    depres_activities == "No"  ~ 0,
-    depres_activities == "Yes" ~ 1
-  ),
-  depres_activities_2cat_f = factor(
-    depres_activities,
-    levels = c("No", "Yes")
-  ),
+      depres_activities == "No"  ~ 0,
+      depres_activities == "Yes" ~ 1
+    ),
+    depres_activities_2cat_f = factor(
+      depres_activities,
+      levels = c("No", "Yes")
+    ),
     depres_empty_2cat = case_when(
-    depres_empty == "No"  ~ 0,
-    depres_empty == "Yes" ~ 1
-  ),
-  depres_empty_2cat_f = factor(
-    depres_empty,
-    levels = c("No", "Yes")
-  ),
+      depres_empty == "No"  ~ 0,
+      depres_empty == "Yes" ~ 1
+    ),
+    depres_empty_2cat_f = factor(
+      depres_empty,
+      levels = c("No", "Yes")
+    ),
     depres_bored_2cat = case_when(
-    depres_bored == "No"  ~ 0,
-    depres_bored == "Yes" ~ 1
-  ),
-  depres_bored_2cat_f = factor(
-    depres_bored,
-    levels = c("No", "Yes")
-  ),
+      depres_bored == "No"  ~ 0,
+      depres_bored == "Yes" ~ 1
+    ),
+    depres_bored_2cat_f = factor(
+      depres_bored,
+      levels = c("No", "Yes")
+    ),
     depres_spirits_2cat = case_when(
-    depres_spirits == "Yes"  ~ 0,
-    depres_spirits == "No" ~ 1
-  ),
-  depres_spirits_2cat_f = factor(
-    depres_spirits,
-    levels = c("Yes", "No")
-  ),
+      depres_spirits == "Yes"  ~ 0,
+      depres_spirits == "No" ~ 1
+    ),
+    depres_spirits_2cat_f = factor(
+      depres_spirits,
+      levels = c("Yes", "No")
+    ),
     depres_afraid_2cat = case_when(
-    depres_afraid == "No"  ~ 0,
-    depres_afraid == "Yes" ~ 1
-  ),
-  depres_afraid_2cat_f = factor(
-    depres_afraid,
-    levels = c("No", "Yes")
-  ),
+      depres_afraid == "No"  ~ 0,
+      depres_afraid == "Yes" ~ 1
+    ),
+    depres_afraid_2cat_f = factor(
+      depres_afraid,
+      levels = c("No", "Yes")
+    ),
     depres_happy_2cat = case_when(
-    depres_happy == "Yes"  ~ 0,
-    depres_happy == "No" ~ 1
-  ),
-  depres_happy_2cat_f = factor(
-    depres_happy,
-    levels = c("Yes", "No")
-  ),
+      depres_happy == "Yes"  ~ 0,
+      depres_happy == "No" ~ 1
+    ),
+    depres_happy_2cat_f = factor(
+      depres_happy,
+      levels = c("Yes", "No")
+    ),
     depres_helpless_2cat = case_when(
-    depres_helpless == "No"  ~ 0,
-    depres_helpless == "Yes" ~ 1
-  ),
-  depres_helpless_2cat_f = factor(
-    depres_helpless,
-    levels = c("No", "Yes")
-  ),
+      depres_helpless == "No"  ~ 0,
+      depres_helpless == "Yes" ~ 1
+    ),
+    depres_helpless_2cat_f = factor(
+      depres_helpless,
+      levels = c("No", "Yes")
+    ),
     depres_home_2cat = case_when(
-    depres_home == "No"  ~ 0,
-    depres_home == "Yes" ~ 1
-  ),
-  depres_home_2cat_f = factor(
-    depres_home,
-    levels = c("No", "Yes")
-  ),
+      depres_home == "No"  ~ 0,
+      depres_home == "Yes" ~ 1
+    ),
+    depres_home_2cat_f = factor(
+      depres_home,
+      levels = c("No", "Yes")
+    ),
     depres_memory_2cat = case_when(
-    depres_memory == "No"  ~ 0,
-    depres_memory == "Yes" ~ 1
-  ),
-  depres_memory_2cat_f = factor(
-    depres_memory,
-    levels = c("No", "Yes")
-  ),
+      depres_memory == "No"  ~ 0,
+      depres_memory == "Yes" ~ 1
+    ),
+    depres_memory_2cat_f = factor(
+      depres_memory,
+      levels = c("No", "Yes")
+    ),
     depres_alive_2cat = case_when(
-    depres_alive == "Yes"  ~ 0,
-    depres_alive == "No" ~ 1
-  ),
-  depres_alive_2cat_f = factor(
-    depres_alive,
-    levels = c("Yes", "No")
-  ),
+      depres_alive == "Yes"  ~ 0,
+      depres_alive == "No" ~ 1
+    ),
+    depres_alive_2cat_f = factor(
+      depres_alive,
+      levels = c("Yes", "No")
+    ),
     depres_worthless_2cat = case_when(
-    depres_worthless == "No"  ~ 0,
-    depres_worthless == "Yes" ~ 1
-  ),
-  depres_worthless_2cat_f = factor(
-    depres_worthless,
-    levels = c("No", "Yes")
-  ),
+      depres_worthless == "No"  ~ 0,
+      depres_worthless == "Yes" ~ 1
+    ),
+    depres_worthless_2cat_f = factor(
+      depres_worthless,
+      levels = c("No", "Yes")
+    ),
     depres_energy_2cat = case_when(
-    depres_energy == "Yes"  ~ 0,
-    depres_energy == "No" ~ 1
-  ),
-  depres_energy_2cat_f = factor(
-    depres_energy,
-    levels = c("Yes", "No")
-  ),
+      depres_energy == "Yes"  ~ 0,
+      depres_energy == "No" ~ 1
+    ),
+    depres_energy_2cat_f = factor(
+      depres_energy,
+      levels = c("Yes", "No")
+    ),
   )
 ```
 
-#### UCLA 3-Item Loneliness Scale variables
+### UCLA 3-Item Loneliness Scale variables
 
 ```{r}
 general_health2 <- general_health2 %>%
@@ -399,7 +402,7 @@ general_health2 <- general_health2 %>%
   )
 ```
 
-#### National Epidemiological Survey on Alcohol and Related Conditions-III (NESARC-III) variables
+### National Epidemiological Survey on Alcohol and Related Conditions-III (NESARC-III) variables
 
 ```{r}
 general_health2 <- general_health2 %>%
@@ -422,8 +425,7 @@ general_health2 <- general_health2 %>%
   )
 ```
 
-
-#### Alcohol Use Disorders Test, Consumption Questions (AUDIT-C) variables
+### Alcohol Use Disorders Test, Consumption Questions (AUDIT-C) variables
 
 ```{r}
 #Create categorical and factor variables for the auditc_drink variable
@@ -444,7 +446,7 @@ general_health2 <- general_health2 %>%
                  "2-3 times a week", "4 or more times a week",
                  "Don't know", "Refused")
     )
-    )
+  )
   
 ```
 
@@ -466,7 +468,7 @@ general_health2 <- general_health2 %>%
       levels = c("1 or 2", "3 or 4", "5 or 6", "7 to 9", "10 or more",
                  "Don't know", "Refused")
     )
-    )
+  )
 ```
 
 ```{r}
@@ -491,21 +493,21 @@ general_health2 <- general_health2 %>%
   )
 ```
 
-### Change column name
+## Change column name
 
 ```{r}
 colnames(general_health2)[62]  <- "xc_case_id"
 ```
-### Remove raw variables that have recoded forms
+## Remove raw variables that have recoded forms
 
 ```{r}
-general_health2<-general_health2%>%select(-c(14:47,49:51, 53:55,59:61,63:65))
+general_health2<-general_health2 %>% select(-c(9:47,49:55,59:61,63:65))
 ```
 
 
-## Save as rds file
+# Save as rds file
 
 ```{r}
-  saveRDS(general_health2, "general_health_import.rds")
+saveRDS(general_health2, "general_health_import.rds")
 
 ```

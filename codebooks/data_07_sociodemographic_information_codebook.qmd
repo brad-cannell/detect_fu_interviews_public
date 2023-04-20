@@ -18,7 +18,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 ```{r}
 #| warning: false
 sociodemographic_information_import.rds <- file.choose()
-socdem <- readRDS("sociodemographic_information_import.rds")
+socdem <- readRDS(sociodemographic_information_import.rds)
 ```
 
 # Set column attributes
@@ -381,7 +381,7 @@ socdem_codebook <- codebook(
 ```
 
 ```{r}
-print(socdem_codebook, "data_01_sociodemographic_information_codebook.docx")
+print(socdem_codebook, "sociodemographic_information_codebook.docx")
 ```
 
 

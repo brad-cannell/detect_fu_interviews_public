@@ -12,12 +12,13 @@ library(tidyverse)
 library(expss)
 ```
 
-## Load data
+# Load data
 
-Load the data tables into the global environment as data frames. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data tables into the global environment as data frames by running the code in the data_01_import file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
-## Data cleaning.
-### Convert all variable names to snake case
+# Clean up data.
+
+## Convert all variable names to snake case
 
 ```{r}
 walk(
@@ -43,10 +44,10 @@ walk(
 
 ```
 
-### Create recoded variables and factor variables to match levels in follow-up interview protocol
+## Create recoded variables and factor variables to match levels in follow-up interview protocol
 ```{r}
 #Create recoded variable for look_living
-clutter_scale <- clutter_scale%>%
+clutter_scale <- clutter_scale %>%
   mutate(
     look_living_3cat = case_when(
       look_living == "Yes"            ~ 1,
@@ -63,7 +64,7 @@ clutter_scale <- clutter_scale%>%
 
 ```{r}
 #Create factor variable for clutter_living
-clutter_scale <- clutter_scale%>%
+clutter_scale <- clutter_scale %>%
   mutate(
     clutter_living_f = factor(
       clutter_living
@@ -84,7 +85,7 @@ clutter_scale <- clutter_scale%>%
 
 ```{r}
 #Create recoded variable for look_kitchen
-clutter_scale <- clutter_scale%>%
+clutter_scale <- clutter_scale %>%
   mutate(
     look_kitchen_3cat = case_when(
       look_kitchen == "Yes"        ~ 1,
@@ -101,7 +102,7 @@ clutter_scale <- clutter_scale%>%
 
 ```{r}
 #Create factor variable for clutter_kitchen
-clutter_scale <- clutter_scale%>%
+clutter_scale <- clutter_scale %>%
   mutate(
     clutter_kitchen_f = factor(
       clutter_kitchen
@@ -122,7 +123,7 @@ clutter_scale <- clutter_scale%>%
 
 ```{r}
 #Create recoded variable for look_bedroom
-clutter_scale <- clutter_scale%>%
+clutter_scale <- clutter_scale %>%
   mutate(
     look_bedroom_3cat = case_when(
       look_bedroom == "Yes"        ~ 1,
@@ -139,7 +140,7 @@ clutter_scale <- clutter_scale%>%
 
 ```{r}
 #Create factor variable for clutter_bedroom
-clutter_scale <- clutter_scale%>%
+clutter_scale <- clutter_scale %>%
   mutate(
     clutter_bedroom_f = factor(
       clutter_bedroom
@@ -158,20 +159,20 @@ clutter_scale <- clutter_scale%>%
   )
 ```
 
-### Remove raw variables that have recoded forms
+## Remove raw variables that have recoded forms
 ```{r}
-clutter_scale<-clutter_scale%>%select(-c(8:16))
+clutter_scale <- clutter_scale %>% select(-c(8:16))
 ```
 
-### Change column name
+## Change column name
 ```{r}
 colnames(clutter_scale)[14]  <- "xc_case_id"
 ```
 
-#### Save as rds file
+# Save as rds file
 
 ```{r}
-  saveRDS(clutter_scale, "clutter_scale_import.rds")
+saveRDS(clutter_scale, "clutter_scale_import.rds")
 
 ```
 
