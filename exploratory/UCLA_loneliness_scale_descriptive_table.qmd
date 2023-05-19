@@ -7,10 +7,18 @@ format: html
 library(arsenal)
 ```
 
+# Load cleaned data
+
+```{r}
+#| warning: false
+general_health_import.rds <- file.choose()
+general_health <- readRDS(general_health_import.rds)
+```
+
 # Select UCLA loneliness scale factor variables and ommit missing values
 
 ```{r}
-UCLA_ls <- general_health_import %>% 
+UCLA_ls <- general_health %>% 
   select(
     starts_with("ls") & ends_with("4cat_f") 
     )%>% 
