@@ -1,0 +1,48 @@
+---
+title: "UCLA 3-Item Loneliness Scale Initial Descriptive Table"
+format: html
+---
+
+```{r}
+library(arsenal)
+```
+
+# Load cleaned data
+
+```{r}
+#| warning: false
+general_health_import.rds <- file.choose()
+general_health <- readRDS(general_health_import.rds)
+```
+
+# Select UCLA loneliness scale factor variables and ommit missing values
+
+```{r}
+UCLA_ls <- general_health %>% 
+  select(
+    starts_with("ls") & ends_with("4cat_f") 
+    )%>% 
+  na.omit
+```
+
+# Create table
+
+```{r}
+my_labels <- list(
+  ls_lack_companionship_4cat_f = "feel a lack of companionship",
+  ls_feel_left_out_4cat_f = "feel left out",
+  ls_feel_isolated_4cat_f = "feel isolated"
+)
+
+des_stats <- tableby(~ ls_lack_companionship_4cat_f + ls_feel_left_out_4cat_f + ls_feel_isolated_4cat_f , data = UCLA_ls)
+
+des_tab <- summary(des_stats, labelTranslations = my_labels,
+  title = "UCLA 3-Item Loneliness Scale Descriptive Table")
+```
+
+# Print table in word document
+
+```{r}
+write2word(des_tab, "UCLA_ls_descriptive_table.docx")
+```
+
