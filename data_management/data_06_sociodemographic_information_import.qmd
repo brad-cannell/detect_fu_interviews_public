@@ -1,5 +1,5 @@
 ---
-title: "data_01_sociodemographic_information_import.qmd"
+title: "data_01_soc_dem_import.qmd"
 format: html
 ---
 
@@ -10,9 +10,17 @@ library(stringr)
 library(tidyverse)
 library(expss)
 ```
+
 # Load the data
 
-Load the data tables into the global environment as data frames by running the code in the data_01_import file.We will create factor variables for all categorical variables in the data frames and save them to a new CSV file. 
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+
+sociodemographic_information_import.csv <- file.choose()
+sociodemographic_information <- read_csv(sociodemographic_information_import.csv)
+
+``` 
 
 # Clean the data
 
@@ -43,21 +51,6 @@ walk(
 
 ```
 
-Replace "<92>" and "\x92" with an apostrophe so that values read "Don't know".
-
-```{r}
-sociodemographic_information <- data.frame(lapply(
-  sociodemographic_information, function(x) {
-                  gsub("<92>", "'", x)
-              }))
-
-sociodemographic_information <- data.frame(lapply(
-  sociodemographic_information, function(x) {
-                  gsub("\x92", "'", x)
-              }))
-```
-
-
 ## Change column name
 
 ```{r}
@@ -71,7 +64,7 @@ colnames(sociodemographic_information)[26]  <- "xc_case_id"
 Create factor variables and match levels to codebook for all categorical variables except sode_race. For sode_race, several participants have multiple values. During analysis, the researchers may want to collapse some categories of race/ethnicity, so it can be coded correctly at that time. 
 
 ```{r}
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- sociodemographic_information %>%
   mutate(
     sode_marital_8cat = case_when(
       sode_marital == "Married"                                     ~ 1,
@@ -92,7 +85,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
   )
     
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sogi_identity_5cat = case_when(
       sogi_identity == "Male"       ~ 1,
@@ -108,7 +101,7 @@ sociodemographic_information <- sociodemographic_information %>%
   )
 
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sogi_orientation_8cat = case_when(
       sogi_orientation == "Straight/heterosexual" ~ 1,
@@ -128,7 +121,7 @@ sociodemographic_information <- sociodemographic_information %>%
   )
 
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_age_4cat = case_when(
       sode_age == "Age 65 to 100+" ~ 1,
@@ -142,7 +135,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
   )
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_hispanic_4cat = case_when(
       sode_hispanic == "Yes"         ~ 1,
@@ -158,7 +151,7 @@ sociodemographic_information <- sociodemographic_information %>%
   )
 
   
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_school_9cat = case_when(
       sode_school == "Did not complete high school or GED"               ~ 1,
@@ -189,7 +182,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
 
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_employed_11cat = case_when(
       sode_employed == "Employed full time"         ~ 1,
@@ -214,7 +207,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
   )
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_income_9cat = case_when(
       sode_income == "$10,000 or less"              ~ 1,
@@ -237,7 +230,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
   )
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_military_4cat = case_when(
       sode_military == "Yes"        ~ 1,
@@ -252,7 +245,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
   )
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_unwanted_4cat = case_when(
       sode_unwanted == "Yes"        ~ 1,
@@ -267,7 +260,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
   )
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_sexual_4cat = case_when(
       sode_sexual == "Yes"        ~ 1,
@@ -282,7 +275,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
   )
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     hsi_contact_4cat = case_when(
       hsi_contact == "Yes"        ~ 1,
@@ -297,7 +290,7 @@ sociodemographic_information <- sociodemographic_information %>%
     )
   )
 
-sociodemographic_information <- sociodemographic_information %>%
+soc_dem <- soc_dem %>%
   mutate(
     sode_people_def = case_when(
       grepl("0|1|2|3|4|5|6|7|8|9", sode_people)  ~ "Number 1 to 9+",
@@ -320,7 +313,7 @@ sociodemographic_information <- sociodemographic_information %>%
 ### Remove variables that have recoded forms
 
 ```{r}
-sociodemographic_information <- sociodemographic_information %>% select(-c(11:13,15:21,27,28,53))
+sociodemographic_information <- soc_dem %>% select(-c(11:13,15:21,27,28,53))
 ```
 
 # Save as rds file

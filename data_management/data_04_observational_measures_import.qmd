@@ -1,5 +1,5 @@
 ---
-title: "data_01_observational_measures_import.qmd"
+title: "data_05_observational_measures_import.qmd"
 format: html
 ---
 
@@ -15,7 +15,13 @@ library(tidyverse)
 
 # Load data
 
-Load the data tables into the global environment as data frames by running the code in the data_01_import file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+observational_measures_import.csv <- file.choose()
+obs_meas <- read_csv(observational_measures_import.csv)
+
+```
 
 # Clean data
 
@@ -50,7 +56,7 @@ walk(
 
 ```{r}
 col_order <- c(1:7, 66, 67, 83:89, 104:107, 51:65, 9, 11, 13, 8, 14, 15, 16:19, 80:81, 20:25, 12, 26, 10, 27:30, 31:35, 36:38, 73, 39:43, 68, 44:47, 69, 48, 49, 50, 74:77, 70:72, 78, 79, 82, 90:103)
-obs_meas <- observational_measures[, col_order]
+obs_meas <- obs_meas[, col_order]
 ```
 
 ## Change column name
