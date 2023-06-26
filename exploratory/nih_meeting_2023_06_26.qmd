@@ -1,0 +1,65 @@
+---
+title: "NIA Network Meeting"
+format: html
+---
+
+# Overview
+
+Calculating some metrics for the NIA meeting on 2023-06-26.
+
+# Load packages
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
+library(stringr)
+```
+
+# Import data
+
+I just quickly downloaded the data from from FM Pro to try to my desktop.
+
+```{r}
+participants <- readr::read_csv("/Users/bradcannell/Desktop/Participant.csv")
+lead <- readr::read_csv("/Users/bradcannell/Desktop/Lead Panel Assessment.csv")
+```
+
+How many screenings were completed?
+
+```{r}
+unique(participants$MedstarID) |> 
+  length()
+```
+
+How many screenings were positive?
+
+```{r}
+participants_02 <- participants |> 
+  mutate(
+    across(
+      xUnusualOdor:xDepressed,
+      ~ if_else(.x == "Yes", 1L, 0L),
+      .names = "{.col}_yes"
+    )
+  )
+```
+
+```{r}
+positive_screens <- participants_02 |> 
+  select(MedstarID, ends_with("_yes")) |> 
+  # slice(1:100) |> 
+  rowwise() |> 
+  mutate(count_yes = sum(c_across(xUnusualOdor_yes:xDepressed_yes))) |> 
+  ungroup() |> 
+  mutate(any_yes = count_yes > 0) |> 
+  print()
+```
+
+```{r}
+sum(positive_screens$any_yes, na.rm = TRUE)
+```
+
+```{r}
+3082 / 76375 * 100
+```
+
+Why is this so low?
