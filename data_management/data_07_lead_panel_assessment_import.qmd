@@ -1,0 +1,117 @@
+---
+title: "LEAD Panel Assessment Import"
+format: html
+---
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(purrr)
+library(stringr)
+library(tidyverse)
+library(expss)
+```
+
+# Load the data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+lead_panel_assessment_import.csv <- file.choose()
+lpa <- read_csv(lead_panel_assessment_import.csv)
+
+```
+
+# Clean the data
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+# Convert all variable names to snake case
+walk(
+  # Grab the names of all data frames in the global environment
+  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
+  .f = function(x) {
+    # Grab individual df from environment
+    df <- get(x)
+    # Grab the variables names
+    var_names <- names(df)
+    # Convert variable names to snake case
+    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
+    # Convert variable names to lower case
+    var_names <- str_to_lower(var_names)
+    # Fix medstar_id
+    var_names[var_names == "medstar_i_d"] <- "medstar_id"
+    # assign back to the dataframe
+    names(df) <- var_names
+    # Replace df with new names in global environment
+    assign(x, df, envir = .GlobalEnv)
+  }
+)
+
+```
+
+## Change column name
+
+```{r}
+colnames(lpa)[15]  <- "case_id"
+```
+
+## Coerce categorical variables to factor variables
+
+```{r}
+lpa <- lpa %>%
+  mutate(
+    panelist_name_10cat_f = factor(
+      panelist_name,
+      levels = c("Hannah Bell", "Janice Knebl", "Jason Burnett", "Jason Knebl", 
+                 "John Halphen", "Jordan Rolfe", "Kristen Reuter",
+                 "Samantha Fant", "Stephanie Large", 
+                 "Tarrant County District Attorney's Office"
+                )
+      )
+    )
+    
+lpa <- lpa %>%
+  mutate(
+    assessment_type_3cat_f = factor(
+      assessment_type,
+      levels = c("Initial assessment", "Secondary assessment",
+                 "Post-detect assessment" 
+                )
+      )
+    )
+
+
+lpa <- lpa %>%
+  mutate(
+    across(
+      .cols  = c(17:23),
+      .fns   = ~ factor(.x, levels = c("No", "Yes")),
+      .names = "{col}_2cat_f"
+      )
+    )
+
+lpa <- lpa %>%
+  mutate(
+    xc_assessment_screened_2cat_f = factor(
+      xc_assessment_screened,
+      levels = c("Negative", "Positive" 
+                )
+      )
+    )
+
+```
+
+### Remove variables that have recoded forms
+
+```{r}
+lpa <- lpa %>% select(-c(13, 16:23))
+```
+
+# Save as rds file
+
+```{r}
+saveRDS(lpa, "LEAD_panel_assessment_import.rds")
+
+```

@@ -15,7 +15,14 @@ library(tidyverse)
 
 # Load data
 
-Load the data tables into the global environment as data frames by running the code in the data_01_import file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+
+self_report_import.csv <- file.choose()
+self_report <- read_csv(self_report_import.csv)
+
+```
 
 # Clean data
 
@@ -46,12 +53,11 @@ walk(
 
 ```
 
-## Change column name and position
+## Change column positions
 
 ```{r}
 self_rep <- self_report %>% relocate(xc_case_i_d, .after=	x_error_message)
-colnames(self_rep)[8]  <- "xc_case_id"
-self_rep <- self_rep %>% relocate(xc_lead_panel_summary_count, .after =	xc_case_id)	
+self_rep <- self_rep %>% relocate(xc_lead_panel_summary_count, .after =	xc_case_i_d)	
 self_rep <- self_rep %>% relocate(x_record_month, .after = xc_lead_panel_summary_count)	
 self_rep <- self_rep %>% relocate(x_record_year, .after =	x_record_month)	
 self_rep <- self_rep %>% relocate(x_record_comment, .after =	x_record_year)	
@@ -681,6 +687,15 @@ self_rep <- cbind(self_rep1,more_keep_vars)
                           
 ```
 
+# Change column names
+
+```{r}
+
+colnames(self_rep)[8]  <- "xc_case_id"
+regmatches(names(self_rep), regexpr("60", names(self_rep), fixed=TRUE)) <- "_60"
+regmatches(names(self_rep), regexpr("65", names(self_rep), fixed=TRUE)) <- "_65"
+
+```
 
 # Save as rds file
 

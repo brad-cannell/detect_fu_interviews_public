@@ -15,7 +15,12 @@ library(tidyverse)
 
 # Load data
 
-Load the data tables into the global environment as data frames by running the code in the data_01_import file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+general_health_import.csv <- file.choose()
+general_health <- read_csv(general_health_import.csv)
+```
 
 # Clean data
 
@@ -49,21 +54,21 @@ walk(
 Change all instances of "Very severe" to "Very Severe" to match codebook.
 
 ```{r}
-general_health2 <- general_health %>% 
+general_health <- general_health %>% 
   mutate_all(str_replace_all, "Very severe", "Very Severe")
 ```
 
 Remove unwanted characters and replace with "Don't know"
 
 ```{r}
-general_health2[general_health2 == "Dont know"] <- "Don't know"
+general_health[general_health == "Dont know"] <- "Don't know"
 ```
 
 ## Create recoded variables and factor variables to match levels in follow-up interview protocol
 ### PEG: A Three-Item Scale Assessing Pain Intensity and Interference
 
 ```{r}
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     across(
       .cols = starts_with("peg"),
@@ -99,7 +104,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for variables beginning with "outcomes_health" excluding those that contain "general", "keep" and "unable"
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     across(
       .cols  = setdiff(starts_with("outcomes_health"), ends_with(c("keep", "general", "unable"))),
@@ -127,7 +132,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for outcomes_health_general
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate (
     outcomes_health_general_7cat = case_when(
       outcomes_health_general == "Excellent"  ~ 1,
@@ -148,7 +153,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for outcomes_4weeks_pain
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     outcomes4_weeks_pain_8cat = case_when(
       outcomes4_weeks_pain == "None"        ~ 0,
@@ -170,7 +175,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for outcomes_health_keep, outcomes_health_unable
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     across(
       .cols  = contains(c("keep", "unable")),
@@ -196,7 +201,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for variables that start with "outcomes_month
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     across(
       .col =  starts_with("outcomes_month"),
@@ -225,7 +230,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for variables that start with "outcomes_tf"
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     across(
       .col =  starts_with("outcomes_tf"),
@@ -253,7 +258,7 @@ general_health2 <- general_health2 %>%
 
 These had to be coded individually, since some variables are coded 0 for "Yes" and 1 for "No" and others are coded the opposite
 ```{r}
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     depres_satisfied_2cat = case_when(
       depres_satisfied == "Yes" ~ 0,
@@ -381,7 +386,7 @@ general_health2 <- general_health2 %>%
 ### UCLA 3-Item Loneliness Scale variables
 
 ```{r}
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     across(
       .col = starts_with("ls"),
@@ -405,7 +410,7 @@ general_health2 <- general_health2 %>%
 ### National Epidemiological Survey on Alcohol and Related Conditions-III (NESARC-III) variables
 
 ```{r}
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     across(
       .col =  starts_with("nesarc"),
@@ -429,7 +434,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for the auditc_drink variable
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     auditc_drink_7cat = case_when(
       auditc_drink == "Never"                  ~ 0,
@@ -452,7 +457,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for the auditc_day variable
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     auditc_day_7cat = case_when(
       auditc_day == "1 or 2"     ~ 1,
@@ -473,7 +478,7 @@ general_health2 <- general_health2 %>%
 
 ```{r}
 #Create categorical and factor variables for the auditc_five variable
-general_health2 <- general_health2 %>%
+general_health <- general_health %>%
   mutate(
     auditc_five_7cat = case_when(
       auditc_five == "Never"                 ~ 0,
@@ -496,18 +501,18 @@ general_health2 <- general_health2 %>%
 ## Change column name
 
 ```{r}
-colnames(general_health2)[62]  <- "xc_case_id"
+colnames(general_health)[62]  <- "xc_case_id"
 ```
+
 ## Remove raw variables that have recoded forms
 
 ```{r}
-general_health2<-general_health2 %>% select(-c(9:47,49:55,59:61,63:65))
+general_health<-general_health %>% select(-c(9:47,49:55,59:61,63:65))
 ```
-
 
 # Save as rds file
 
 ```{r}
-saveRDS(general_health2, "general_health_import.rds")
+saveRDS(general_health, "general_health_import.rds")
 
 ```

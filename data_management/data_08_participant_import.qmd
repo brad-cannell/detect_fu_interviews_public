@@ -1,0 +1,113 @@
+---
+title: "Participant Import"
+format: html
+---
+
+
+```{r, message= FALSE}
+library(readr)
+library(purrr)
+library(stringr)
+library(tidyverse)
+library(expss)
+```
+# Load the data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+participant_import.csv <- file.choose()
+participant <- read_csv(participant_import.csv)
+
+```
+# Clean the data
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+# Convert all variable names to snake case
+walk(
+  # Grab the names of all data frames in the global environment
+  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
+  .f = function(x) {
+    # Grab individual df from environment
+    df <- get(x)
+    # Grab the variables names
+    var_names <- names(df)
+    # Convert variable names to snake case
+    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
+    # Convert variable names to lower case
+    var_names <- str_to_lower(var_names)
+    # Fix medstar_id
+    var_names[var_names == "medstar_i_d"] <- "medstar_id"
+    # assign back to the dataframe
+    names(df) <- var_names
+    # Replace df with new names in global environment
+    assign(x, df, envir = .GlobalEnv)
+  }
+)
+
+```
+
+## Change column name
+
+```{r}
+colnames(participant)[28]  <- "medstar_internal_id"
+colnames(participant)[48]  <- "xc_case_id"
+```
+
+## Coerce categorical variables to factor variables
+
+```{r}
+participant <- participant %>%
+  mutate(
+    across(
+      .cols  = c(45,54:62,64,65),
+      .fns   = ~ factor(.x, levels = c("No", "Yes")),
+      .names = "{col}_2cat_f"
+      )
+    )
+
+participant <- participant %>%
+  mutate(
+    across(
+      .cols  = c(51,53,63),
+      .fns   = ~ factor(.x, levels = c("No", "Unable To Assess", "Yes")),
+      .names = "{col}_3cat_f"
+      )
+    )
+
+participant <- participant %>%
+  mutate(
+    x_disarray_hoarding_3cat_f = factor(
+      x_disarray_hoarding,
+      levels = c("Did Not Enter Patient's Home", "No", "Yes" 
+                )
+      )
+    )
+
+participant <- participant %>%
+  mutate(
+    xc_detect_status_2cat_f = factor(
+      xc_detect_status,
+      levels = c("Negative", "Positive" 
+                )
+      )
+    )
+
+```
+
+### Remove variables that have recoded forms
+
+```{r}
+participant <- participant %>% select(-c(45,51:65,74))
+```
+
+
+
+# Save as rds file
+
+```{r}
+  saveRDS(participant, "participant_import.rds")
+
+```
