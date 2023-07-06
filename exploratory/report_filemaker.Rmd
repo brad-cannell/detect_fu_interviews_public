@@ -1,0 +1,491 @@
+---
+title: "Summarize LEAD Panel Voting"
+date: "Created: 2020-02-25 <br> Updated: `r Sys.Date()`"
+---
+
+# Overview
+
+Summarize the initial LEAD Panel voting prior to the LEAD panel meeting.
+
+* Just click "Run All Chunks Below" and a word report will be created in the home directory.
+
+* Data is imported from FileMaker Pro via ODBC. Make sure you are connected to the VPN.
+
+You may eventually want to parameterize this markdown document for each updating each month.
+
+# Load packages and data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(comment = NA)
+Sys.setenv(TZ = "US/Central")
+```
+
+```{r message=FALSE}
+library(dplyr)
+library(dplyr)
+library(officer)
+library(flextable)
+```
+
+Open the connection to the FM database
+
+```{r}
+LeadPanelAssessment <- readr::read_csv("/Users/bradcannell/Desktop/Lead Panel Assessment.csv")
+```
+
+
+# Data cleaning
+
+```{r}
+# # Test case. There is no agreement on any 1 type of abuse, but every panelist selected Yes for at least one form of abuse. This should equal 100% for AnyANE.
+# votes <- votes %>%
+#   # filter(CaseNumber == "0347e") %>%
+#   mutate(
+#     Physical = if_else(CaseNumber == "0347e" & RecipientLastName == "Burnett", "Yes", Physical),
+#     Sexual = if_else(CaseNumber == "0347e" & RecipientLastName == "Fant", "Yes", Sexual),
+#     Emotional = if_else(CaseNumber == "0347e" & RecipientLastName == "Large", "Yes", Emotional),
+#     Neglect = if_else(CaseNumber == "0347e" & RecipientLastName == "Reuter", "Yes", Neglect),
+#     Financial = if_else(CaseNumber == "0347e" & RecipientLastName == "Knebl", "Yes", Financial)
+#   )
+```
+
+Change some variable names to make them easier to work with
+
+```{r}
+LeadPanelAssessment <- LeadPanelAssessment %>% 
+  rename(
+    panelist    = PanelistName,
+    physical    = PhysicalAbuse,
+    sexual      = SexualAbuse,
+    emotional   = EmotionalPsychoAbuse,
+    neglect     = Neglect,
+    abandonment = Abandonment,
+    financial   = FinancialExploitation,
+    selfneglect = SelfNeglect
+  )
+```
+
+Keep this month
+
+```{r}
+# first_day_of_month <- Sys.Date() %>% stringr::str_replace("\\d{2}$", "01")
+```
+
+```{r}
+# LeadPanelAssessment <- LeadPanelAssessment %>% 
+  # filter(xCreatedTimestamp >= first_day_of_month)
+```
+
+
+# Quality control metrics
+
+There should only be initial votes at this point.
+
+When a LEAD panel member fills out two initial assessments for the same case:
+
+  * If their responses are identical (i.e., they didn’t change their mind about anything, they most likely just forgot they already completed this case) then just delete the second case. It never should have happened.
+  
+  * If their responses are not identical:
+  
+    - The last (most recent) response will be considered their official vote.
+    
+    - Keep all votes. It may be interesting later to see how often these changes happen and in what direction.
+
+When a LEAD panel member fills out a secondary assessment (presumably by accident) before the actual date of the LEAD panel meeting:
+
+  * Change the value of AssessmentType to “Initial” directly in FM Pro.
+  
+  * If there is already another initial assessment for that case, follow the rules above.
+  
+```{r}
+# # For testing
+# LeadPanelAssessment <- tibble(
+#   panelist = rep(c("k", "j", "s"), each = 3),
+#   CaseID = rep(c("104bg", "1h8c9", "163ac"), 3), 
+#   AssessmentType = rep("Initial assessment", 9), 
+#   physical = rep("No", 9),
+#   sexual = rep("No", 9),
+#   emotional = rep("No", 9),
+#   neglect = rep("No", 9),
+#   abandonment = rep("No", 9),
+#   financial = rep("No", 9),
+#   selfneglect = rep("No", 9),
+#   xcAssessmentScreened = rep("Negative")
+# )
+# 
+# # K creates a blank row by accident
+# LeadPanelAssessment[1, 4:10] <- NA_character_
+# 
+# # J forgets to check a response for physical only
+# LeadPanelAssessment[4, 4] <- NA_character_
+# 
+# # S accidentally chooses secondary assessment one time
+# LeadPanelAssessment[7, 3] <- "Secondary assessment"
+```
+
+## Number of unique cases this month
+
+```{r}
+n_unique_cases <- unique(LeadPanelAssessment$CaseID) %>% length() %>% 
+  # Must be character for officer table below
+  as.character()
+n_unique_cases
+```
+
+## Number of LEAD panel members who voted this month
+
+```{r}
+n_unique_panelists <- unique(LeadPanelAssessment$panelist) %>% length() %>% 
+  # Must be character for officer table below
+  as.character()
+n_unique_panelists
+```
+
+## Number of votes this month by assessment type
+
+```{r}
+count(LeadPanelAssessment, AssessmentType)
+```
+
+Count of secondary assessment for the summary report
+
+If there are any secondary assessments prior to the LEAD panel meeting, contact the LEAD panel member and ask them to change it from secondary to initial.
+
+```{r}
+n_secondary_assessments <- sum(LeadPanelAssessment$AssessmentType == "Secondary assessment") %>% as.character()
+if (is.na(n_secondary_assessments)) {
+  n_secondary_assessments <- "0"
+}
+n_secondary_assessments
+```
+  
+## Check for blank votes
+
+2021-02-22. We were having a situation in which it appeared as though people were completing multiple initial assessments. I asked Sunil to look into it. He said, "It looks like its not that users are creating multiple initial assessments, rather they are creating blanks assessment and not filling anything in. I believe in your code you are marking records where the assessment type (initial or secondary) is blank as initial assessments."
+
+So, I want to see if there are any blank votes or any incomplete votes.
+
+```{r}
+LeadPanelAssessment <- LeadPanelAssessment %>% 
+  rowwise() %>% 
+  mutate(
+    n_votes_na = sum(is.na(c_across(physical:selfneglect))),
+    all_votes_na = n_votes_na == 7,
+    partial_votes_na = n_votes_na > 0 & n_votes_na < 7
+  ) %>% 
+  ungroup()
+```
+
+```{r}
+n_all_votes_na <- sum(LeadPanelAssessment$all_votes_na) %>% as.character()
+n_all_votes_na
+```
+
+```{r}
+n_partial_votes_na <- sum(LeadPanelAssessment$partial_votes_na) %>% as.character()
+n_partial_votes_na
+```
+
+If there are any blank or partially completed records, contact the LEAD panel member and ask them to delete or complete their initial assessment as needed.
+
+# Summary of votes completed
+
+```{r rows.print=19}
+summary_votes_completed <- LeadPanelAssessment %>% 
+  count(panelist, CaseID) %>% 
+  tidyr::pivot_wider(names_from = panelist, values_from = n) %>% 
+  # Add row totals
+  mutate(Total = rowSums(select(., -CaseID), na.rm = TRUE)) %>% 
+  # Add column totals
+  bind_rows(
+    summarise_all(., ~{
+      if(is.numeric(.)) sum(., na.rm = TRUE)
+      else "Total"
+    })
+  ) %>% 
+  print()
+```
+
+
+# Summary tables of Abuse Type by Case Number
+
+Base table that will be used for counts and means. Just converting all votes from character to numeric.
+
+Remember, these totals are out of _completed_ votes.
+
+```{r}
+abuse_type_numeric <- LeadPanelAssessment %>% 
+  select(
+    CaseID, physical, sexual, emotional, 
+    neglect, abandonment, financial, selfneglect, 
+    xcAssessmentScreened
+  ) %>% 
+  # Convert votes to numeric, No = 0, Yes = 1
+  mutate_at(
+    vars(-CaseID),
+    ~if_else(. == "No", 0L, 1L)
+  ) %>% 
+  group_by(CaseID)
+```
+
+
+## Summary of Abuse Type by Case Number - Count
+
+Number of _completed_ reviews with a "Yes" response for each type of abuse.
+
+```{r rows.print=19}
+summary_count_abuse_type <- abuse_type_numeric %>%
+  # Summarize voting by case number
+  summarise_all(sum, na.rm = TRUE) %>% 
+  # Add row totals
+  # AnyANE and Total will differ when a single panelist picks Yes
+  # to more than one form of abuse.
+  mutate(Total = rowSums(select(., -CaseID, -xcAssessmentScreened))) %>% 
+  # Moving AnyANE to be behind Total so that it is more clear that
+  # AnyANE is not included in Total.
+  select(CaseID:selfneglect, Total, xcAssessmentScreened) %>% 
+  # Add column totals
+  bind_rows(
+    summarise_all(., ~{
+      if(is.numeric(.)) sum(., na.rm = TRUE)
+      else "Total"
+    })
+  ) %>% 
+  print()
+```
+
+Create a version of the table above that dichotomizes each type of abuse into any concern yes or no.
+
+```{r}
+summary_count_abuse_type_2 <- summary_count_abuse_type |> 
+  select(-xcAssessmentScreened) |> 
+  filter(CaseID != "Total") |> 
+  mutate(
+    across(
+      physical:Total,
+      ~ if_else(.x > 0, 1L, 0L)
+    )
+  ) |> 
+  rowwise() |> 
+  mutate(Total = sum(c_across(physical:selfneglect))) |> 
+  ungroup() |> 
+  mutate(Any = Total > 0) |>
+  print()
+```
+
+Add column totals
+
+```{r}
+summary_count_abuse_type_3 <- summary_count_abuse_type_2 |> 
+  summarise(
+    across(
+      physical:Any,
+      sum
+    )
+  ) |> 
+  print()
+```
+Show these as percentages
+
+```{r}
+summary_count_abuse_type_3 |> 
+  mutate(
+    across(
+      everything(),
+      ~ .x / nrow(summary_count_abuse_type_2) * 100
+    )
+  )
+```
+
+## Summary of Abuse Type by Case Number - percent
+
+Percent of _completed_ reviews with a "Yes" response for each type of abuse.
+
+Did a test case where there was no agreement on any 1 type of abuse (i.e., only <= 1 person said yes for any single type of abuse), but every panelist selected Yes for at least one type of abuse (within case number). This resulted in equal 100% for AnyANE, which is what we wanted.
+
+```{r rows.print=18}
+summary_agreement_percent_abuse_type <- abuse_type_numeric %>% 
+  summarise_all(mean) %>% 
+  mutate_at(vars(-CaseID), ~round(. * 100)) %>% 
+  print()
+```
+
+## Summary of Abuse Type by Case Number - Agree/Disagree
+
+Did a test case where there was no agreement on any 1 type of abuse (i.e., only <= 1 person said yes for any single type of abuse), but every panelist selected Yes for at least one type of abuse (within case number). In this case, AnyANE will equal Agree, which it should -- all panelists agree that there was some form of ANE. However, the case should still be discussed, because we would like to get a unanimous decision on each form of abuse as well. Therefore, we need to create a new variable that is equal to "Agree" when there is agreement on all individual types of abuse and "Disagree" otherwise.
+
+```{r rows.print=18}
+summary_agreement_ad_abuse_type <- summary_agreement_percent_abuse_type %>%
+  mutate_at(
+    vars(-CaseID),
+    ~if_else(. == 0 | . == 100, "Agree", "Disagree")
+  ) %>% 
+  # Create total agreement variable
+  # Panelists agreed on all types of abuse for all cases -- not just 
+  # any abuse overall
+  mutate(
+    TotalAgreement = if_else(
+      physical == "Agree" & sexual == "Agree" & 
+      emotional == "Agree" & neglect == "Agree" & 
+      abandonment == "Agree" & financial == "Agree" & 
+      selfneglect == "Agree", TRUE, FALSE
+    ),
+    # If there was an NA, convert that to a lack of total agreement to make sure it is
+    # discussed.
+    TotalAgreement = if_else(is.na(TotalAgreement), FALSE, TotalAgreement),
+    AnyDisagreement = !TotalAgreement
+  ) %>% 
+  
+  
+  print()
+```
+
+```{r}
+summary_agreement_ad_abuse_type %>% 
+  filter(AnyDisagreement)
+```
+
+How many need to be reviewed?
+
+```{r}
+summary_agreement_ad_abuse_type %>% 
+  count(AnyDisagreement) %>% 
+  mutate(
+    percent = ((n / sum(n)) * 100) %>% round() %>% paste0("%")
+  ) %>% 
+  rename("Any Disagreement" = AnyDisagreement)
+```
+
+# Make a word report
+
+Formats:
+
+* Create a blank Word document ahead of time called "officer_word_template.docx"
+
+* Use the styles pane in that document to set all the formatting for the document you want to create.
+
+* Use "officer_word_template.docx" inside the `read_docx` function as a template for your formats.
+
+* Use the `styles_info` function to see what styles are available.
+
+* If a style isn't currently available, then go update it in "officer_word_template.docx" and it should become available.
+
+## Summary of votes completed to flextable
+
+```{r}
+title <- "Table 1. Number of completed initial reviews by Case Number and LEAD Panelist"
+
+summary_votes_completed_ft <- flextable(
+  # Set the "Total" column to integer to get "5" instead of "5.000"
+  summary_votes_completed %>% 
+    mutate(Total = as.integer(Total))
+  ) %>% 
+  # Column width: Trial and error
+  # Make a table and play with properties
+  # Change the width of the CaseNumber column
+  width(j = 1, width = 1.1) %>% 
+  # Change the width of the other columns
+  width(j = 2:ncol(summary_votes_completed), width = 0.9) %>% 
+  # Add border above bottom (total) row
+  hline(i = nrow(summary_votes_completed), 
+        border = fp_border(color="black", width = 2.25)
+  ) %>% 
+  # Add space in between Case and Number
+  set_header_labels(CaseID = "Case Number") %>% 
+  # Add title to top of table
+  add_header_lines(title) %>% 
+  # Change font to times new roman
+  font(fontname = "Times New Roman", part = "all") %>% 
+  # Center column headings
+  align(i = 2, align = "center", part = "header") %>% 
+  # Center body text
+  align(align = "center", part = "body")
+
+# For checking
+# summary_votes_completed_ft
+```
+
+## Summary of Abuse Type by Case Number - Agree/Disagree
+
+```{r}
+title <- "Table 2. Presence/absence of unanimous agreement for each abuse type by case number."
+
+summary_agreement_ad_abuse_type_ft <- flextable(
+  # Remove unneeded columns
+  summary_agreement_ad_abuse_type %>% 
+    select(
+      CaseID, physical, sexual, emotional, neglect, 
+      abandonment, financial, selfneglect
+    )
+  ) %>% 
+  # Column width: Trial and error
+  # Make a table and play with properties
+  width(
+    j = c(1:8), 
+    width = c(0.98, 0.66, 0.56, 0.78, 0.71, 1.01, 0.71, 0.90)
+  ) %>% 
+  # Improve readability of column headers
+  set_header_labels(CaseID = "Case Number", selfneglect = "Self Neglect") %>% 
+  # Add title to top of table
+  add_header_lines(title) %>%
+  # Change font to times new roman
+  font(fontname = "Times New Roman", part = "all") %>% 
+  # Change background color of first column
+  bg(j = 1, bg = "#E5E8E8", part = "body") %>% 
+  # Center column headings
+  align(i = 2, align = "center", part = "header") %>% 
+  # Center body text
+  align(align = "center", part = "body") %>% 
+  # Conditionally format disagree to red
+  color(i = ~ physical == "Disagree", j = c("CaseID", "physical"), color = "red") %>%
+  color(i = ~ sexual == "Disagree", j = c("CaseID", "sexual"), color = "red") %>%
+  color(i = ~ emotional == "Disagree", j = c("CaseID", "emotional"), color = "red") %>%
+  color(i = ~ neglect == "Disagree", j = c("CaseID", "neglect"), color = "red") %>%
+  color(i = ~ abandonment == "Disagree", j = c("CaseID", "abandonment"), color = "red") %>%
+  color(i = ~ financial == "Disagree", j = c("CaseID", "financial"), color = "red") %>%
+  color(i = ~ selfneglect == "Disagree", j = c("CaseID", "selfneglect"), color = "red")
+
+# For checking
+# summary_agreement_ad_abuse_type_ft
+```
+
+## Create Word document
+
+```{r}
+doc <- read_docx("Word Template for Officer.docx") %>%
+  
+  # Add quality control metrics
+  body_replace_text_at_bkm("updated_date", as.character(Sys.Date())) %>% 
+  body_replace_text_at_bkm("unique_cases", n_unique_cases) %>%
+  body_replace_text_at_bkm("unique_panelists", n_unique_panelists) %>% 
+  body_replace_text_at_bkm("blank_records", n_all_votes_na) %>%
+  body_replace_text_at_bkm("partial_records", n_partial_votes_na) %>%
+  body_replace_text_at_bkm("secondary_assessments", n_secondary_assessments)
+
+# Add table of votes completed by panelist and case ID
+doc <- doc %>%
+  body_replace_flextable_at_bkm(
+    bookmark = "table_1",
+    value = summary_votes_completed_ft
+  )
+
+# Add table of voting agreement by case ID and abuse type
+doc <- doc %>%
+  body_replace_flextable_at_bkm(
+    bookmark = "table_2",
+    value = summary_agreement_ad_abuse_type_ft
+  )
+
+# Output Word document
+# Update the year and month in the file name dynamically
+print(
+  doc, 
+  paste(Sys.Date() %>% format("%Y-%m"), " Initial Review Report.docx")
+)
+```
+
+# Session information
+
+```{r echo=FALSE}
+sessionInfo()
+```
