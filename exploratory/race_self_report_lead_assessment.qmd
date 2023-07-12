@@ -26,7 +26,7 @@ Load the participant, self report, LEAD panel assessment and sociodemographic in
 ```{r}
 #| warning: false
 socio_demo <- readRDS("../data/cleaned_rds_files/sociodemographic_information_import.rds")
-self_report <- readRDS("../data/cleaned_rds_files/self_report_import.rds")
+observational_measures <- readRDS("../data/cleaned_rds_files/observational_measures_import.rds")
 lead_panel_assessment <- readRDS("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
 ```
 
@@ -39,7 +39,7 @@ Prepare and then merge the relevant variables in the self report, LEAD panel ass
 ```{r}
 # select relevant variables from sociodemographic information df
 soc_dem <- socio_demo %>%
-  select(medstar_id, sode_hispanic_4cat_f, sode_race) %>% drop_na(-c("sode_hispanic_4cat_f"))
+  select(medstar_id, sode_hispanic_4cat_f, sode_race, sode_income_9cat_f)
 
 # create dummy variables for race
 soc_dem <- soc_dem %>% 
@@ -65,6 +65,32 @@ soc_dem <- soc_dem %>%
     )
   )
     
+```
+
+## MedStar Medic Assessment (Observational Measures Dataset)
+
+```{r}
+obs_meas <- observational_measures %>% select(medstar_id, at_physical_4cat_f: at_self_4cat_f)
+```
+
+#### Any positive determinations across all subtypes
+
+```{r}
+obs_meas <- obs_meas %>%
+  mutate(
+    medic_abuse_any = case_when(
+      if_any(at_physical_4cat_f : at_self_4cat_f, ~. == "Yes")  ~ 1,
+      if_all(at_physical_4cat_f : at_self_4cat_f, ~. == "No")   ~ 0,
+      TRUE                                                      ~ NA
+    )
+  )%>%
+  mutate(
+    medic_abuse_any = factor(
+      medic_abuse_any,
+      levels = c(0, 1),
+      labels = c("No", "Yes")
+    )
+  )
 ```
 
 ## LEAD Panel Assessment
@@ -196,7 +222,7 @@ post_detect <- post_detect %>%
   )
 ```
 
-#### Any positive determinations for each subtype
+#### Any positive determinations for each subtypes
 
 3. Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of EM.
 
@@ -556,15 +582,15 @@ final_determination <- initial[!initial$medstar_id %in% secondary$medstar_id,]
 final_determination <- rbind(final_determination, secondary)
 ```
 
-## Merge sociodemographic and LEAD dateframes
+## Merge observational measures, sociodemographic and LEAD dateframes
 
 ```{r}
 # Merge subset dfs into a new df
 
-final_determination <- left_join(final_determination, soc_dem, by = "medstar_id")
-final_det_initial   <- left_join(initial, soc_dem, by = "medstar_id")
-final_det_sec       <- left_join(secondary, soc_dem, by = "medstar_id")
-final_det_post      <- left_join(post_detect, soc_dem, by = "medstar_id")
+final_determination <- purrr::reduce(list(final_determination, soc_dem, obs_meas), dplyr::left_join, by = 'medstar_id')
+final_det_initial   <- purrr::reduce(list(initial, soc_dem, obs_meas), dplyr::left_join, by = 'medstar_id')
+final_det_sec       <- purrr::reduce(list(secondary, soc_dem, obs_meas), dplyr::left_join, by = 'medstar_id')
+final_det_post      <- purrr::reduce(list(post_detect, soc_dem, obs_meas), dplyr::left_join, by = 'medstar_id')
 ```
 
 # Analaysis
@@ -628,7 +654,7 @@ sum_table <- data.frame(
   flextable()
 # Set caption
 
-sum_table <- set_caption(sum_table, "Summary of Unique Medstar IDs for the LEAD assessment data")
+sum_table <- set_caption(sum_table, "Summary of Unique Medstar IDs for the LEAD Assessment Data")
 sum_table <- bold(sum_table, i = 4, bold = TRUE)
 sum_table <- width(sum_table, width = 2)
 
@@ -636,12 +662,12 @@ sum_table <- width(sum_table, width = 2)
 sum_table
 ```
 
-##Missing data summary
+## Missing data summary
 
 ```{r, fig.width = 15}
 fd_m <- final_determination %>% 
   select(
-    physical_abuse_det:other 
+    physical_abuse_det: at_self_4cat_f,  
     )%>% md.pattern(., plot = T, rotate.names = T)
 ```
 
@@ -664,7 +690,7 @@ Before we analyze race, we want to know the number and proportion of determinati
 cap_1  <- "Summary Statistics for Abuse Determinations Overall - Secondary (Initial When Unavailable)"
 
 
-overall_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det + xc_assessment_screened_det, 
+overall_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det + abuse_any, 
                data = final_determination, 
                caption = cap_1)
 overall_tab <- t1flex(overall_tab, tablefn = c("qflextable", "flextable", "regulartable"))
@@ -733,14 +759,57 @@ The data set includes the Secondary Assessment (initial When unavailable)
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Abuse Determination by Race/ Ethnicity"
+cap_1  <- "Summary Statistics for Race/ Ethnicity by Abuse Determination"
 
 
-xc_as_tab <- table1(~ sode_hispanic_4cat_f + american_indian_or_alaska_native + asian + black_or_african_american + native_hawaiian_or_other_pacific_islander + white + other| abuse_any, 
+abuse_any_tab <- table1(~ sode_hispanic_4cat_f + american_indian_or_alaska_native + asian + black_or_african_american + native_hawaiian_or_other_pacific_islander + white + other| abuse_any, 
                data = fd_na, 
                caption = cap_1)
-xc_as_tab <- t1flex(xc_as_tab, tablefn = c("qflextable", "flextable", "regulartable"))
-xc_as_tab <- width(xc_as_tab, width = 3)
-xc_as_tab
+abuse_any_tab <- t1flex(abuse_any_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+abuse_any_tab <- width(abuse_any_tab, width = 3)
+abuse_any_tab
 ```
 
+#### Abuse Determination Overall by Household Income
+The data set includes the Secondary Assessment (initial When unavailable)
+
+```{r}
+# Create caption/ title
+cap_1  <- "Summary Statistics for Household Income by Abuse Determination"
+
+
+income_tab <- table1(~ sode_income_9cat_f | abuse_any, 
+               data = fd_na, 
+               caption = cap_1)
+income_tab <- t1flex(income_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+income_tab <- width(income_tab, width = 3)
+income_tab
+```
+
+#### MedStar Medic vs LEAD Abuse Determination
+
+```{r}
+# Create caption/ title
+cap_1  <- "Summary Statistics for MedStar Medic Abuse Determinations"
+
+
+medic_tab <- table1(~ at_physical_4cat_f + at_sexual_4cat_f + at_emotional_4cat_f + at_neglect_4cat_f + at_abandon_4cat_f + at_financial_4cat_f + at_self_4cat_f + medic_abuse_any,
+               data = final_determination,
+               caption = cap_1)
+medic_tab <- t1flex(medic_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+medic_tab <- width(medic_tab, width = 3)
+medic_tab
+```
+
+```{r}
+# Create caption/ title
+cap_1  <- "Summary Statistics for Overall MedStar Medic Abuse Abuse Determinations by Overall LEAD Determinations"
+
+
+mvl_tab <- table1(~ medic_abuse_any | abuse_any,
+               data = fd_na,
+               caption = cap_1)
+mvl_tab <- t1flex(mvl_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+mvl_tab <- width(mvl_tab, width = 3)
+mvl_tab
+```
