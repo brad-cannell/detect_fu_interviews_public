@@ -1,5 +1,5 @@
 ---
-title: "Race Interactions with Abuse"
+title: "LEAD Data Analysis"
 format: html
 ---
 
@@ -670,9 +670,6 @@ fd_m <- final_determination %>%
     physical_abuse_det: at_self_4cat_f,  
     )%>% md.pattern(., plot = T, rotate.names = T)
 ```
-
-
-
 
 
 # 🔴 NOTE
