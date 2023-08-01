@@ -9,7 +9,8 @@ library(readr)
 library(purrr)
 library(stringr)
 library(tidyverse)
-
+library(dplyr)
+library(janitor)
 ```
 
 
@@ -18,8 +19,7 @@ library(tidyverse)
 Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r}
-general_health_import.csv <- file.choose()
-general_health <- read_csv(general_health_import.csv)
+general_health <- read_csv("../data/filemaker_pro_exports/general_health_import.csv")
 ```
 
 # Clean data
@@ -28,27 +28,9 @@ Here we will convert all variable names to snake case so that everything is unif
 
 ```{r}
 # Convert all variable names to snake case
-walk(
-  # Grab the names of all data frames in the global environment
-  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
-  .f = function(x) {
-    # Grab individual df from environment
-    df <- get(x)
-    # Grab the variables names
-    var_names <- names(df)
-    # Convert variable names to snake case
-    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
-    # Convert variable names to lower case
-    var_names <- str_to_lower(var_names)
-    # Fix medstar_id
-    var_names[var_names == "medstar_i_d"] <- "medstar_id"
-    # assign back to the dataframe
-    names(df) <- var_names
-    # Replace df with new names in global environment
-    assign(x, df, envir = .GlobalEnv)
-  }
-)
+general_health <- clean_names(general_health)
 
+colnames(general_health)[which(names(general_health) == "outcomes4weeks_pain")] <- "outcomes_4weeks_pain"
 ```
 
 Change all instances of "Very severe" to "Very Severe" to match codebook.
@@ -155,18 +137,18 @@ general_health <- general_health %>%
 #Create categorical and factor variables for outcomes_4weeks_pain
 general_health <- general_health %>%
   mutate(
-    outcomes4_weeks_pain_8cat = case_when(
-      outcomes4_weeks_pain == "None"        ~ 0,
-      outcomes4_weeks_pain == "Very mild"   ~ 1,
-      outcomes4_weeks_pain == "Mild"        ~ 2,
-      outcomes4_weeks_pain == "Moderate"    ~ 3,
-      outcomes4_weeks_pain == "Severe"      ~ 4,
-      outcomes4_weeks_pain == "Very Severe" ~ 5,
-      outcomes4_weeks_pain == "Don’t know"  ~ 7,
-      outcomes4_weeks_pain == "Refused"     ~ 9
+    outcomes_4weeks_pain_8cat = case_when(
+      outcomes_4weeks_pain == "None"        ~ 0,
+      outcomes_4weeks_pain == "Very mild"   ~ 1,
+      outcomes_4weeks_pain == "Mild"        ~ 2,
+      outcomes_4weeks_pain == "Moderate"    ~ 3,
+      outcomes_4weeks_pain == "Severe"      ~ 4,
+      outcomes_4weeks_pain == "Very Severe" ~ 5,
+      outcomes_4weeks_pain == "Don’t know"  ~ 7,
+      outcomes_4weeks_pain == "Refused"     ~ 9
     ),
-    outcomes4_weeks_pain_8cat_f = factor(
-      outcomes4_weeks_pain,
+    outcomes_4weeks_pain_8cat_f = factor(
+      outcomes_4weeks_pain,
       levels = c("None", "Very mild", "Mild", "Moderate", "Severe", 
                  "Very Severe", "Don't know", "Refused")
     )
@@ -497,12 +479,7 @@ general_health <- general_health %>%
     )
   )
 ```
-
-## Change column name
-
-```{r}
-colnames(general_health)[62]  <- "xc_case_id"
-```
+`
 
 ## Remove raw variables that have recoded forms
 

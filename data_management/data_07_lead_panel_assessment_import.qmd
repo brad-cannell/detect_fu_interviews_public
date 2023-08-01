@@ -10,6 +10,8 @@ library(purrr)
 library(stringr)
 library(tidyverse)
 library(expss)
+library(janitor)
+library(dplyr)
 ```
 
 # Load the data
@@ -17,9 +19,7 @@ library(expss)
 Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r}
-lead_panel_assessment_import.csv <- file.choose()
-lpa <- read_csv(lead_panel_assessment_import.csv)
-
+lpa <- read_csv("../data/filemaker_pro_exports/lead_panel_assessment_import.csv")
 ```
 
 # Clean the data
@@ -28,38 +28,13 @@ Here we will convert all variable names to snake case so that everything is unif
 
 ```{r}
 # Convert all variable names to snake case
-walk(
-  # Grab the names of all data frames in the global environment
-  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
-  .f = function(x) {
-    # Grab individual df from environment
-    df <- get(x)
-    # Grab the variables names
-    var_names <- names(df)
-    # Convert variable names to snake case
-    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
-    # Convert variable names to lower case
-    var_names <- str_to_lower(var_names)
-    # Fix medstar_id
-    var_names[var_names == "medstar_i_d"] <- "medstar_id"
-    # assign back to the dataframe
-    names(df) <- var_names
-    # Replace df with new names in global environment
-    assign(x, df, envir = .GlobalEnv)
-  }
-)
-
-```
-
-## Change column name
-
-```{r}
-colnames(lpa)[15]  <- "case_id"
+lpa <- clean_names(lpa)
 ```
 
 ## Coerce categorical variables to factor variables
 
 ```{r}
+# Panelist names
 lpa <- lpa %>%
   mutate(
     panelist_name_10cat_f = factor(
@@ -71,7 +46,8 @@ lpa <- lpa %>%
                 )
       )
     )
-    
+
+# Assessment type    
 lpa <- lpa %>%
   mutate(
     assessment_type_3cat_f = factor(
@@ -82,22 +58,33 @@ lpa <- lpa %>%
       )
     )
 
-
+# Abuse variables
 lpa <- lpa %>%
   mutate(
     across(
-      .cols  = c(17:23),
-      .fns   = ~ factor(.x, levels = c("No", "Yes")),
-      .names = "{col}_2cat_f"
+      .cols  = ends_with(c("_abuse", "neglect", "_exploitation", "abandonment")),
+      .fns   = ~ case_when(
+        .x   == "No"  ~ 0,
+        .x   == "Yes" ~ 1
+      ),
+      .names = "{col}_2cat"
+    ),
+    across(
+      .cols = ends_with(c("_abuse_2cat", "neglect_2cat", "exploitation_2cat", "abandonment_2cat")),
+      .fns   = ~ factor(.x, levels = c(0, 1)),
+      .names = "{col}_f"
       )
     )
 
 lpa <- lpa %>%
   mutate(
+    xc_assessment_screened_2cat = case_when(
+      xc_assessment_screened == "Negative"  ~ 0,
+      xc_assessment_screened == "Positive"  ~ 1
+    ),
     xc_assessment_screened_2cat_f = factor(
       xc_assessment_screened,
-      levels = c("Negative", "Positive" 
-                )
+      levels = c(0, 1)
       )
     )
 
@@ -106,12 +93,12 @@ lpa <- lpa %>%
 ### Remove variables that have recoded forms
 
 ```{r}
-lpa <- lpa %>% select(-c(13, 16:23))
+lpa <- lpa %>% select(-c(13, 16:23,25))
 ```
 
 # Save as rds file
 
 ```{r}
-saveRDS(lpa, "LEAD_panel_assessment_import.rds")
+saveRDS(lpa, "lead_panel_assessment_import.rds")
 
 ```
