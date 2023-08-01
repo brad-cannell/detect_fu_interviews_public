@@ -28,16 +28,41 @@ Load the participant, self report, LEAD panel assessment and sociodemographic in
 socio_demo <- readRDS("../data/cleaned_rds_files/sociodemographic_information_import.rds")
 observational_measures <- readRDS("../data/cleaned_rds_files/observational_measures_import.rds")
 lead_panel_assessment <- readRDS("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
+participant <- readr::read_rds("../data/cleaned_rds_files/participant_import.rds")
 ```
 
 # Data preparation
 
 Prepare and then merge the relevant variables in the self report, LEAD panel assessment and sociodemographic information data sets into one data frame.
 
-## Sociodemographic Information
+## Participant data
+
+This data was collected by MedStar at the initial 911 response. It includes the results of the intitial DETECT screening. We will need those screening results below to compare with LEAD panel findings. 
 
 ```{r}
-# select relevant variables from sociodemographic information df
+#| eval: false
+
+# Look for duplicate by (MedStar ID) records
+participant |> 
+  group_by(medstar_id) |> 
+  count() |> 
+  filter(n > 1)
+
+# 2023-08-01: No duplicate rows by MedStar ID
+```
+
+```{r}
+# Keep only the columns of interest
+participant <- participant |> 
+  select(medstar_id, xc_detect_positive_summary_count:xc_detect_status_2cat_f)
+```
+
+## Sociodemographic Information
+
+Add quick description of where this data comes from and how it was collected. Also, why do we need it.
+
+```{r}
+# Select relevant variables of interest from sociodemographic information df
 soc_dem <- socio_demo %>%
   select(medstar_id, sode_hispanic_4cat_f, sode_race, sode_income_9cat_f)
 
@@ -69,11 +94,16 @@ soc_dem <- soc_dem %>%
 
 ## MedStar Medic Assessment (Observational Measures Dataset)
 
+Add quick description of where this data comes from and how it was collected. Also, why do we need it. If this is the DETECT tool filled out at the follow-up interview, I think we will also want the results of the DETECT tool filled out at the initial 911 call. Because we want to be able to say, "At the inital 911 response the DETECT tool was [positive/negtive] for EM. The lead panel then reviewed the case and determined that EM [was/was not] occuring. X porportion of the time, the initial DETECT screening and the LEAD panel determination agreed with each other."
+
 ```{r}
-obs_meas <- observational_measures %>% select(medstar_id, at_physical_4cat_f: at_self_4cat_f)
+obs_meas <- observational_measures %>% 
+  select(medstar_id, at_physical_4cat_f: at_self_4cat_f)
 ```
 
-#### Any positive determinations across all subtypes
+### Any positive determinations across all subtypes
+
+Add a quick description of what this is doing and why.
 
 ```{r}
 obs_meas <- obs_meas %>%
@@ -95,24 +125,27 @@ obs_meas <- obs_meas %>%
 
 ## LEAD Panel Assessment
 
+Add quick description of where this data comes from and how it was collected. Also, why do we need it.
+
 ```{r}
-# select relevant variables from LEAD panel assessment df
+# Select relevant variables from LEAD panel assessment df
 lpa <- lead_panel_assessment %>%
   select(medstar_id, panelist_name_10cat_f:xc_assessment_screened_2cat_f)
 ```
 
-
 ```{r}
-# subset with initial assessment only
+# Subset with initial assessment only
 initial <- lpa %>% filter(assessment_type_3cat_f == "Initial assessment")
 
-# subset with Secondary assessment only
+# Subset with Secondary assessment only
 secondary <- lpa %>% filter(assessment_type_3cat_f == "Secondary assessment")
 
-# subset with Post-detect assessment only
+# Subset with Post-detect assessment only
 post_detect <- lpa %>% filter(assessment_type_3cat_f == "Post-detect assessment")
 ```
+
 # 🔴 Ebie, please review this.
+
 ### Create overall EM determination columns
 
 For each medstar_id reviewed by the LEAD panel, we want to calculate:
@@ -121,10 +154,36 @@ For each medstar_id reviewed by the LEAD panel, we want to calculate:
 
 2. Create a column containing the proportion (denominator is number of non-missing votes) of positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of EM.
 
-#### Total and proportion of positive votes for each Medstar iD
+### Total and proportion of positive votes for each Medstar iD
+
+# 🔴 Ebie, please review this.
+
+The code below is not actually add new columns to the df called "initial". It is creating a new df (still called initial) that has different columns of summary information. We should either use `mutate` to add the summary columns to initial or we should name this new df something else.
 
 ```{r}
-# create columns with number of positive votes and proportion of positive votes for each medstar_id
+initial |> 
+  group_by(medstar_id) |> 
+  mutate(
+    across(
+      .cols  = physical_abuse_2cat:abandonment_2cat,
+      .fns   = ~ sum(.x),
+      .names = "{col}_total"
+    )
+  ) |> filter(self_neglect_2cat_total > 0)
+```
+
+# 🔴 Potential data error
+
+Look at medstar_id 47311d550da4471297501ae2b3b03b02. It looks like Jason completed two initial assessments, which shouldn't happen. My guess is that the second initial assessment should have been a secondary assessment and he accidentally clicked the wrong option in FM Pro. We could check this by:
+1. Check to see if the there is already a secondary assessment for Jason for 47311d550da4471297501ae2b3b03b02.
+2. Check the time stamp on the votes. The secondary assessment should come after the initial assessment (probably on a different day).
+3. If there truly are multiple initial assessments, then we need to check if there is any difference between them. If not, then just keep the final row (in terms of time stamp).
+4. If there ARE differences, this is trickier. I'm leaning towards keeping the final row here too, but we should look at some examples before making a final decision.
+
+Also, the code below has a lot of repetition. This woulb be a good opportunity to practice writing a function that we can apply to all three dfs. 
+
+```{r}
+# Create columns with number of positive votes and proportion of positive votes for each medstar_id
 initial <- initial %>%
   group_by(medstar_id) %>%
   reframe(
