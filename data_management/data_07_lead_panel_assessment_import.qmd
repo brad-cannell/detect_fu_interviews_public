@@ -83,7 +83,7 @@ lpa <- lpa %>%
       xc_assessment_screened == "Positive"  ~ 1
     ),
     xc_assessment_screened_2cat_f = factor(
-      xc_assessment_screened,
+      xc_assessment_screened_2cat,
       levels = c(0, 1)
       )
     )

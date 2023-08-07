@@ -1,0 +1,467 @@
+---
+title: "data_09_participant_codebook"
+format: html
+---
+
+```{r}
+# Load necessary packages
+library(codebookr)
+library(dplyr, warn.conflicts = FALSE)
+library(readr)
+```
+
+# Purpose of the program
+
+Using the CodebookR package, we will create a data dictionary for follow-up interview data for the DETECT project.
+
+# Load cleaned data
+
+```{r}
+#| warning: false
+participant <- readRDS("../data/cleaned_rds_files/participant_import.rds")
+```
+
+# Set column attributes
+
+```{r}
+#Set the source to "Participant data" for all the variables
+participant_vars <- participant %>% 
+  select(1:76) %>% 
+  names()
+
+for(i in participant_vars) {
+  attr(participant[[i]], "source") <- "Participant data"
+}
+```
+```{r}
+# Choose variables that will not have summary statistics
+no_stats <- participant %>%
+  select(1:28, 30:32, 34:58)
+
+no_stats_vars <- colnames(no_stats)
+```
+
+
+```{r}
+# Add column attributes to all variables
+participant <- participant %>%
+  
+    cb_add_col_attributes( 
+      x_primary_key, 
+      description = "Unique record ID used internally by the database"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_created_by, 
+      description = "User who created the record"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_created_timestamp, 
+      description = "Timestamp when the record was created",
+      col_type = "Time"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_modified_by, 
+      description = "User who last modified the record"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_modified_timestamp, 
+      description = "Timestamp when the record was last modified",
+      col_type = "Time"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_error_message, 
+      description = "Any database error messages"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_record_month, 
+      description = "Related month of the record",
+      col_type = "Time"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_record_year, 
+      description = "Related year of the record",
+      col_type = "Time"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_record_status, 
+      description = "The records status"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      medstar_id, 
+      description = "Record ID of the participant"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      name_full, 
+      description = "Full name of the participant"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      name_first, 
+      description = "First name of the participant"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      name_middle_initial, 
+      description = "Initial of the middle name of the participant"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      name_last, 
+      description = "Last name of the participant"
+    ) %>%
+
+    cb_add_col_attributes( 
+      name_suffix, 
+      description = "Name suffix of the participant"
+    ) %>%
+
+    cb_add_col_attributes( 
+      xc_case_id, 
+      description = "Last 5 characters of the MedstarID"
+    ) %>%
+
+    cb_add_col_attributes( 
+      x_address_original, 
+      description = "Participant's street address"
+    ) %>%  
+  
+    cb_add_col_attributes( 
+      city, 
+      description = "Participant's city of residence"
+    ) %>% 
+  
+    cb_add_col_attributes( 
+      state, 
+      description = "Participant's state of residence"
+    ) %>% 
+  
+    cb_add_col_attributes( 
+      zip_code, 
+      description = "Participant's zip_code"
+    ) %>% 
+  
+    cb_add_col_attributes( 
+      dob, 
+      description = "Participant's date of birth"
+    ) %>% 
+  
+    cb_add_col_attributes( 
+      x_randomizer, 
+      description = "Internal system variable used to randomize records"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      phone, 
+      description = "Participant phone number"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_call_order, 
+      description = "System variable used to track the order that participants should be called"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      incident_timestamp, 
+      description = "Coming from Medstar; Timestamp of when EMS was notified of the incident"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      unit_arrived_timestamp, 
+      description = "Coming from Medstar; Timestamp of when EMS arrived at the incident"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      medstar_internal_id, 
+      description = "Coming from Medstar; Internal ID number for the incident"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      ems_response_number, 
+      description = "Coming from Medstar; EMS response number"
+    ) %>%
+
+      cb_add_col_attributes( 
+      complaint_reported, 
+      description = "Coming from Medstar; Compliants reported by dispatch for patient"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      age, 
+      description = "Participant's age in years"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      incident_result, 
+      description = "Coming from Medstar; Result of the incident"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      ems_crew_member, 
+      description = "Coming from Medstar; Name of the EMS crew member that completed the report"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      symptom_list, 
+      description = "Coming from Medstar; participant list of symptoms"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      race, 
+      description = "Participant's racial identity"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_incident_day_name, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_incident_month_name, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_incident_day, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_incident_year, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_record_month_year_abbr, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_is_archived, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      apt, 
+      description = "Participant's apartment number"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      address, 
+      description = "Participant's street address (reformatted)"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_usps_address_result, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_address_verified, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_call_order_initial, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_exclusion_reason, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_call_order_even_odd, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_participant_list_found_count, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_aps_reported_confirmation_number, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      incident_timestamp, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_name_title, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      address_valid, 
+      description = ""
+    ) %>%
+  
+    cb_add_col_attributes( 
+      address_updated, 
+      description = "Participant's address"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      apt_updated, 
+      description = "Participant's apartment number"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      city_updated, 
+      description = "Participant's city"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      zip_code_updated, 
+      description = "Participant's ZIP code"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_address, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_incident_date, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_detect_positive_summary_count, 
+      description = "Internal system variable"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_do_not_call_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_caregiver_lack_knowledge_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+
+    cb_add_col_attributes( 
+      x_caregiver_unengaged_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_caregiver_frustrated_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_caregiver_anxious_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_isolated_home_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_depressed_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_poor_personal_hygiene_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_inadequately_clothed_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_difficulty_medications_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_unmet_needs_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_aps_reported_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_health_safety_concern_3cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_hoarding_medications_3cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      x_disarray_hoarding_3cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_detect_status_2cat_f, 
+      description = "Internal system variable",
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sex_3cat_f, 
+      description = "Participant's sex",
+      col_type = "Categorical"
+    ) 
+```
+
+# Pass data frame to the codebook() function
+
+```{r}
+# Add title and description to codebook
+participant_codebook <- codebook(
+  df = participant,
+  title = "Participant Dataset",
+  description = "",
+  no_summary_stats = no_stats_vars)
+```
+
+```{r}
+print(participant_codebook, "participant_codebook.docx")
+```
+
+
