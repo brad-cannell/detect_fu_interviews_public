@@ -5,7 +5,7 @@ format: html
 
 # Load packages
 
-```{r, warning=FALSE, echo=FALSE, output = FALSE}
+```{r, warning=FALSE, echo=FALSE, output = FALSE, include=FALSE}
 library(flextable)
 library(table1)
 library(dplyr)
@@ -17,6 +17,7 @@ library(readr)
 library(purrr)
 library(stringr)
 library(mice)
+library(lubridate)
 ```
 
 # Load cleaned data
@@ -37,7 +38,7 @@ Prepare and then merge the relevant variables in the self report, LEAD panel ass
 
 ## Participant data
 
-This data was collected by MedStar at the initial 911 response. It includes the results of the intitial DETECT screening. We will need those screening results below to compare with LEAD panel findings. 
+This data was collected by MedStar at the initial 911 response. It includes the results of the initial DETECT screening. We will need those screening results below to compare with LEAD panel findings. 
 
 ```{r}
 #| eval: false
@@ -59,14 +60,14 @@ participant <- participant |>
 
 ## Sociodemographic Information
 
-Add quick description of where this data comes from and how it was collected. Also, why do we need it.
+This data was collected during the DETECT follow-up interview. It includes participant sociodemographic information like race, household income and others. We will compare LEAD screening results across different sociodemographic categories. 
 
 ```{r}
 # Select relevant variables of interest from sociodemographic information df
 soc_dem <- socio_demo %>%
   select(medstar_id, sode_hispanic_4cat_f, sode_race, sode_income_9cat_f)
 
-# create dummy variables for race
+# Create dummy variables for race
 soc_dem <- soc_dem %>% 
   mutate(
     american_indian_or_alaska_native               = ifelse(grepl("American Indian or Alaska Native", sode_race),1, 0),
@@ -74,7 +75,7 @@ soc_dem <- soc_dem %>%
     black_or_african_american                      = ifelse(grepl("Black or African American", sode_race),1, 0),
     native_hawaiian_or_other_pacific_islander      = ifelse(grepl("Native Hawaiian or Other Pacific Islander", sode_race),1, 0),
     white                                          = ifelse(grepl("White", sode_race),1, 0),
-    other                                          = ifelse(grepl("Other", sode_race),1, 0),
+    other                                          = ifelse(grepl("Other", sode_race),1, 0)
   )
 
 # Create factor variables and set labels
@@ -94,7 +95,9 @@ soc_dem <- soc_dem %>%
 
 ## MedStar Medic Assessment (Observational Measures Dataset)
 
-Add quick description of where this data comes from and how it was collected. Also, why do we need it. If this is the DETECT tool filled out at the follow-up interview, I think we will also want the results of the DETECT tool filled out at the initial 911 call. Because we want to be able to say, "At the inital 911 response the DETECT tool was [positive/negtive] for EM. The lead panel then reviewed the case and determined that EM [was/was not] occuring. X porportion of the time, the initial DETECT screening and the LEAD panel determination agreed with each other."
+This data comes from the DETECT follow-up interviews. It is a collection of medic EM responses to questions about whether or not they believe abuse has occurred based on provided definitions, signs and symptoms. We will compare these the Medic EM Assessment results to the LEAD Panel Assessment results.
+
+🔴 If this is the DETECT tool filled out at the follow-up interview, I think we will also want the results of the DETECT tool filled out at the initial 911 call. Because we want to be able to say, "At the initial 911 response the DETECT tool was [positive/negtive] for EM. The lead panel then reviewed the case and determined that EM [was/was not] occuring. X porportion of the time, the initial DETECT screening and the LEAD panel determination agreed with each other."
 
 ```{r}
 obs_meas <- observational_measures %>% 
@@ -103,7 +106,7 @@ obs_meas <- observational_measures %>%
 
 ### Any positive determinations across all subtypes
 
-Add a quick description of what this is doing and why.
+Create a factor column 'medic_abuse_any' that indicates if an EM medic believes at least one type of abuse is present or none is present.
 
 ```{r}
 obs_meas <- obs_meas %>%
@@ -125,7 +128,7 @@ obs_meas <- obs_meas %>%
 
 ## LEAD Panel Assessment
 
-Add quick description of where this data comes from and how it was collected. Also, why do we need it.
+This data comes from participant abuse assessments by a Longitudinal, Experts, All Data (LEAD) panel. It will be analysed using variables in the sociodemographic, participant and observational measures datasets.
 
 ```{r}
 # Select relevant variables from LEAD panel assessment df
@@ -142,6 +145,83 @@ secondary <- lpa %>% filter(assessment_type_3cat_f == "Secondary assessment")
 
 # Subset with Post-detect assessment only
 post_detect <- lpa %>% filter(assessment_type_3cat_f == "Post-detect assessment")
+```
+
+## 🔴 Panelist multiple assessment data error
+
+Look at medstar_id 47311d550da4471297501ae2b3b03b02. It looks like Jason completed two initial assessments, which shouldn't happen. My guess is that the second initial assessment should have been a secondary assessment and he accidentally clicked the wrong option in FM Pro. We could check this by:
+1. Check to see if the there is already a secondary assessment for Jason for 47311d550da4471297501ae2b3b03b02.
+2. Check the time stamp on the votes. The secondary assessment should come after the initial assessment (probably on a different day).
+3. If there truly are multiple initial assessments, then we need to check if there is any difference between them. If not, then just keep the final row (in terms of time stamp).
+4. If there ARE differences, this is trickier. I'm leaning towards keeping the final row here too, but we should look at some examples before making a final decision.
+
+### Identify Medstar IDs with data error
+
+Create a function that creates a subset data frame containing Medstar IDs with multiple assessments for the same panelists and identifies the specific issues by adding the following columns:
+
+_same_score_     - For each MedStar ID, are all the scores assigned by the same panelist identical or different.
+
+_over_24_hours_  - For each MedStar ID with multiple assessments for the same panelist, were the assessments performed within one day of                      each other?
+
+_all_na_         - For each MedStar ID with multiple assessments for the same panelist, is any of the assessments filled with missing                         values?
+
+```{r}
+error_check <- function(assessment) {
+  group <- c('physical_abuse_2cat', 'sexual_abuse_2cat', 'emotional_psycho_abuse_2cat', 'neglect_2cat', 
+             'self_neglect_2cat', 'financial_exploitation_2cat', 'abandonment_2cat')
+  multiple_assessment <- lead_panel_assessment %>% filter(assessment_type_3cat_f == assessment) %>% 
+    group_by(medstar_id, panelist_name_10cat_f) %>% 
+    reframe(medstar_id, assessment_type_3cat_f, panelist_name_10cat_f, x_created_timestamp,
+            multiple_count = length(panelist_name_10cat_f), 
+            physical_abuse_2cat, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat, 
+            self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat, xc_assessment_screened_2cat) %>%
+    filter(multiple_count > 1) %>%
+    group_by(medstar_id, panelist_name_10cat_f, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
+             self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat) %>% 
+    mutate(
+      same_score          = n()>1
+    ) %>%
+    ungroup() %>%
+    mutate(
+      all_na              = case_when(
+        if_all(group,     ~is.na(.))    ~ "all",
+        if_all(group,     ~!is.na(.))   ~ "none",
+        TRUE                            ~ "some",
+      )
+    ) %>%
+    ungroup() %>%
+    group_by(medstar_id, panelist_name_10cat_f) %>%
+    mutate(
+      over_24_hours       = ifelse((as.numeric(difftime(last(x_created_timestamp), 
+                                                        first(x_created_timestamp), units = "hours")) > 24), 1,0)
+    )
+  multiple_assessment
+}
+```
+
+#### Initial Assessments
+
+```{r}
+initial_error <- error_check("Initial assessment")
+
+# Create a column that indicates if there are secondary assessments for each MedStar ID with multiple assessments for the same panelists.
+
+
+  
+```
+
+
+#### Secondary Assessments
+```{r}
+
+
+secondary_error <- error_check("Secondary assessment")
+```
+
+```{r}
+# Post-detect assessments
+
+post_detect_error <- error_check("Post-detect assessment")
 ```
 
 # 🔴 Ebie, please review this.
@@ -172,473 +252,205 @@ initial |>
   ) |> filter(self_neglect_2cat_total > 0)
 ```
 
-# 🔴 Potential data error
 
-Look at medstar_id 47311d550da4471297501ae2b3b03b02. It looks like Jason completed two initial assessments, which shouldn't happen. My guess is that the second initial assessment should have been a secondary assessment and he accidentally clicked the wrong option in FM Pro. We could check this by:
-1. Check to see if the there is already a secondary assessment for Jason for 47311d550da4471297501ae2b3b03b02.
-2. Check the time stamp on the votes. The secondary assessment should come after the initial assessment (probably on a different day).
-3. If there truly are multiple initial assessments, then we need to check if there is any difference between them. If not, then just keep the final row (in terms of time stamp).
-4. If there ARE differences, this is trickier. I'm leaning towards keeping the final row here too, but we should look at some examples before making a final decision.
-
-Also, the code below has a lot of repetition. This woulb be a good opportunity to practice writing a function that we can apply to all three dfs. 
+Create summary dataframes for each assessment that include calculated columns indicating the total number of positive votes and the proportion of positive votes for each MedStar ID.
 
 ```{r}
-# Create columns with number of positive votes and proportion of positive votes for each medstar_id
-initial <- initial %>%
-  group_by(medstar_id) %>%
-  reframe(
-    physical_abuse_total          = sum(physical_abuse_2cat),
-    sexual_abuse_total            = sum(sexual_abuse_2cat),
-    emotional_psycho_abuse_total  = sum(emotional_psycho_abuse_2cat),
-    neglect_total                 = sum(neglect_2cat),
-    abandonment_total             = sum(abandonment_2cat),
-    financial_exploitation_total  = sum(financial_exploitation_2cat),
-    self_neglect_total            = sum(self_neglect_2cat),
-    xc_assessment_screened_total  = sum(xc_assessment_screened_2cat),
-    physical_abuse_prop           = ifelse(sum(physical_abuse_2cat)         
-                                           == 0, 0, sum(physical_abuse_2cat)/ n()),
-    sexual_abuse_prop             = ifelse(sum(sexual_abuse_2cat)           
-                                           == 0, 0, sum(sexual_abuse_2cat)/n()),
-    emotional_psycho_abuse_prop   = ifelse(sum(emotional_psycho_abuse_2cat) 
-                                           == 0, 0, sum(emotional_psycho_abuse_2cat)/ n()),
-    neglect_prop                  = ifelse(sum(neglect_2cat)                
-                                           == 0, 0, sum(neglect_2cat)/ n()),
-    abandonment_prop              = ifelse(sum(abandonment_2cat)            
-                                           == 0, 0, sum(abandonment_2cat)/ n()),
-    
-    financial_exploitation_prop   = ifelse(sum(financial_exploitation_2cat) 
-                                           == 0, 0, sum(financial_exploitation_2cat)/ n()),
-    self_neglect_prop             = ifelse(sum(self_neglect_2cat)           
-                                           == 0, 0, sum(self_neglect_2cat)/ n()),
-    xc_assessment_screened_prop   = ifelse(sum(xc_assessment_screened_2cat) 
-                                           == 0, 0, sum(xc_assessment_screened_2cat)/ n()),
-    medstar_id                    = unique(medstar_id),
-    assessment_type_3cat_f        = unique(assessment_type_3cat_f)
-  )
+# Create a positive vote summary function that will be applied to each of the three assessment data frames.
 
-secondary <- secondary %>%
-  group_by(medstar_id) %>%
+pos_votes <- function(assessment) {
+  assessment %>% 
+  group_by(medstar_id) %>% 
   reframe(
-    physical_abuse_total          = sum(physical_abuse_2cat),
-    sexual_abuse_total            = sum(sexual_abuse_2cat),
-    emotional_psycho_abuse_total  = sum(emotional_psycho_abuse_2cat),
-    neglect_total                 = sum(neglect_2cat),
-    abandonment_total             = sum(abandonment_2cat),
-    financial_exploitation_total  = sum(financial_exploitation_2cat),
-    self_neglect_total            = sum(self_neglect_2cat),
-    xc_assessment_screened_total  = sum(xc_assessment_screened_2cat),
-    physical_abuse_prop           = ifelse(sum(physical_abuse_2cat)         
-                                           == 0, 0, sum(physical_abuse_2cat)/ n()),
-    sexual_abuse_prop             = ifelse(sum(sexual_abuse_2cat)           
-                                           == 0, 0, sum(sexual_abuse_2cat)/n()),
-    emotional_psycho_abuse_prop   = ifelse(sum(emotional_psycho_abuse_2cat) 
-                                           == 0, 0, sum(emotional_psycho_abuse_2cat)/ n()),
-    neglect_prop                  = ifelse(sum(neglect_2cat)                
-                                           == 0, 0, sum(neglect_2cat)/ n()),
-    abandonment_prop              = ifelse(sum(abandonment_2cat)            
-                                           == 0, 0, sum(abandonment_2cat)/ n()),
-    
-    financial_exploitation_prop   = ifelse(sum(financial_exploitation_2cat) 
-                                           == 0, 0, sum(financial_exploitation_2cat)/ n()),
-    self_neglect_prop             = ifelse(sum(self_neglect_2cat)           
-                                           == 0, 0, sum(self_neglect_2cat)/ n()),
-    xc_assessment_screened_prop   = ifelse(sum(xc_assessment_screened_2cat) 
-                                           == 0, 0, sum(xc_assessment_screened_2cat)/ n()),
-    medstar_id                    = unique(medstar_id),
-    assessment_type_3cat_f        = unique(assessment_type_3cat_f)
+    across(
+      .cols  = c(physical_abuse_2cat : abandonment_2cat, xc_assessment_screened_2cat),
+      .fns   = ~ sum(.x),
+      .names = "{col}_t"
+    ),
+    assessment_type_3cat_f  = unique(assessment_type_3cat_f),
+    across(
+      .cols  = physical_abuse_2cat_t : xc_assessment_screened_2cat_t,
+      .fns   = ~ case_when(
+        .x   == 0  ~ 0,
+        .x  !=  0  ~ .x/n()
+      ),
+      .names = "{col}_p"
+    )
+  ) %>%
+  rename_with(
+    .cols   = ends_with("_t"), 
+    .fn     = ~ gsub("2cat_t", "total", .x)
+  ) %>% 
+  rename_with(
+    .cols   = ends_with("_p"), 
+    .fn     = ~ gsub("2cat_t_p", "prop", .x)
   )
+}
+```
 
-post_detect <- post_detect %>%
-  group_by(medstar_id) %>%
-  reframe(
-    physical_abuse_total          = sum(physical_abuse_2cat),
-    sexual_abuse_total            = sum(sexual_abuse_2cat),
-    emotional_psycho_abuse_total  = sum(emotional_psycho_abuse_2cat),
-    neglect_total                 = sum(neglect_2cat),
-    abandonment_total             = sum(abandonment_2cat),
-    financial_exploitation_total  = sum(financial_exploitation_2cat),
-    self_neglect_total            = sum(self_neglect_2cat),
-    xc_assessment_screened_total  = sum(xc_assessment_screened_2cat),
-    physical_abuse_prop           = ifelse(sum(physical_abuse_2cat)         
-                                           == 0, 0, sum(physical_abuse_2cat)/ n()),
-    sexual_abuse_prop             = ifelse(sum(sexual_abuse_2cat)           
-                                           == 0, 0, sum(sexual_abuse_2cat)/n()),
-    emotional_psycho_abuse_prop   = ifelse(sum(emotional_psycho_abuse_2cat) 
-                                           == 0, 0, sum(emotional_psycho_abuse_2cat)/ n()),
-    neglect_prop                  = ifelse(sum(neglect_2cat)                
-                                           == 0, 0, sum(neglect_2cat)/ n()),
-    abandonment_prop              = ifelse(sum(abandonment_2cat)            
-                                           == 0, 0, sum(abandonment_2cat)/ n()),
-    
-    financial_exploitation_prop   = ifelse(sum(financial_exploitation_2cat) 
-                                           == 0, 0, sum(financial_exploitation_2cat)/ n()),
-    self_neglect_prop             = ifelse(sum(self_neglect_2cat)           
-                                           == 0, 0, sum(self_neglect_2cat)/ n()),
-    xc_assessment_screened_prop   = ifelse(sum(xc_assessment_screened_2cat) 
-                                           == 0, 0, sum(xc_assessment_screened_2cat)/ n()),
-    medstar_id                    = unique(medstar_id),
-    assessment_type_3cat_f        = unique(assessment_type_3cat_f)
-  )
+```{r}
+# Initial Assessments
+
+initial_pos_votes <- pos_votes(initial)
+```
+
+```{r}
+# Secondary Assessments
+
+secondary_pos_votes <- pos_votes(secondary)
+```
+
+```{r}
+# Post-detect assessments
+
+post_detect_pos_votes <- pos_votes(post_detect)
 ```
 
 #### Any positive determinations for each subtypes
 
-3. Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of EM.
-
-
-```{r}
-# create columns with dichotomous variables indicating if there are any positive determinations for each subtype
-initial <- initial %>%
-  mutate(
-    physical_abuse_any  = case_when(
-      physical_abuse_total == 0  ~ 0,
-      physical_abuse_total  > 0  ~ 1
-    ),
-    sexual_abuse_any  = case_when(
-      sexual_abuse_total == 0  ~ 0,
-      sexual_abuse_total  > 0  ~ 1
-    ),
-    emotional_psycho_abuse_any  = case_when(
-      emotional_psycho_abuse_total == 0  ~ 0,
-      emotional_psycho_abuse_total  > 0  ~ 1
-    ),
-    neglect_any = case_when(
-      neglect_total == 0  ~ 0,
-      neglect_total  > 0  ~ 1
-    ),
-    abandonment_any  = case_when(
-      abandonment_total == 0  ~ 0,
-      abandonment_total  > 0  ~ 1
-    ),
-    financial_exploitation_any  = case_when(
-      financial_exploitation_total == 0  ~ 0,
-      financial_exploitation_total  > 0  ~ 1
-    ),
-    self_neglect_any  = case_when(
-      self_neglect_total == 0  ~ 0,
-      self_neglect_total  > 0  ~ 1
-    ),
-    xc_assessment_screened_any  = case_when(
-      xc_assessment_screened_total == 0  ~ 0,
-      xc_assessment_screened_total  > 0  ~ 1
-    )
-  )
-
-secondary <- secondary %>%
-  mutate(
-    physical_abuse_any = case_when(
-      physical_abuse_total == 0  ~ 0,
-      physical_abuse_total  > 0  ~ 1
-    ),
-    sexual_abuse_any  = case_when(
-      sexual_abuse_total == 0  ~ 0,
-      sexual_abuse_total  > 0  ~ 1
-    ),
-    emotional_psycho_abuse_any  = case_when(
-      emotional_psycho_abuse_total == 0  ~ 0,
-      emotional_psycho_abuse_total  > 0  ~ 1
-    ),
-    neglect_any  = case_when(
-      neglect_total == 0  ~ 0,
-      neglect_total  > 0  ~ 1
-    ),
-    abandonment_any  = case_when(
-      abandonment_total == 0  ~ 0,
-      abandonment_total  > 0  ~ 1
-    ),
-    financial_exploitation_any  = case_when(
-      financial_exploitation_total == 0  ~ 0,
-      financial_exploitation_total  > 0  ~ 1
-    ),
-    self_neglect_any  = case_when(
-      self_neglect_total == 0  ~ 0,
-      self_neglect_total  > 0  ~ 1
-    ),
-    xc_assessment_screened_any  = case_when(
-      xc_assessment_screened_total == 0  ~ 0,
-      xc_assessment_screened_total  > 0  ~ 1
-    )
-  )
-
-post_detect <- post_detect %>%
-  mutate(
-    physical_abuse_any = case_when(
-      physical_abuse_total == 0  ~ 0,
-      physical_abuse_total  > 0  ~ 1
-    ),
-    sexual_abuse_any = case_when(
-      sexual_abuse_total == 0  ~ 0,
-      sexual_abuse_total  > 0  ~ 1
-    ),
-    emotional_psycho_abuse_any = case_when(
-      emotional_psycho_abuse_total == 0  ~ 0,
-      emotional_psycho_abuse_total  > 0  ~ 1
-    ),
-    neglect_any  = case_when(
-      neglect_total == 0  ~ 0,
-      neglect_total  > 0  ~ 1
-    ),
-    abandonment_any  = case_when(
-      abandonment_total == 0  ~ 0,
-      abandonment_total  > 0  ~ 1
-    ),
-    financial_exploitation_any = case_when(
-      financial_exploitation_total == 0  ~ 0,
-      financial_exploitation_total  > 0  ~ 1
-    ),
-    self_neglect_any = case_when(
-      self_neglect_total == 0  ~ 0,
-      self_neglect_total  > 0  ~ 1
-    ),
-    xc_assessment_screened_any = case_when(
-      xc_assessment_screened_total == 0  ~ 0,
-      xc_assessment_screened_total  > 0  ~ 1
-    )
-  )
-```
+3. Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of abuse.
 
 ```{r}
-# Make columns factor variables
-initial <- initial %>% 
-  mutate(
-    across(
-      .cols = physical_abuse_any: xc_assessment_screened_any,
-      .fns  = ~factor(.x, 
+any_pos <- function(assessment_pos_votes) {
+  assessment_pos_votes %>% 
+    mutate(
+      across(
+        .cols   = physical_abuse_total : xc_assessment_screened_total,
+        .fn     = ~ case_when(
+          .x    == 0 ~ 0,
+          .x    >  0 ~ 1
+        ),
+        .names  = "{col}_any"
+      ),
+      across(
+        .cols   = ends_with("_any"),
+        .fns    = ~ factor(.x, 
                       levels = c(0,1),
                       labels = c("No", "Yes")),
       .names = "{col}"
+      )
+    ) %>%
+    rename_with(
+      .cols   = ends_with("_any"), 
+      .fn     = ~ gsub("total_any", "any", .x)
     )
-  )
+  
+}
+```
 
-secondary <- secondary %>% 
-  mutate(
-    across(
-      .cols = c(physical_abuse_any:xc_assessment_screened_any),
-      .fns  = ~factor(.x, 
-                      levels = c(0,1),
-                      labels = c("No", "Yes"))
-    )
-  )
+```{r}
+# Initial Assessments
 
-post_detect <- post_detect %>% 
-  mutate(
-    across(
-      .cols = c(physical_abuse_any:xc_assessment_screened_any),
-      .fns  = ~factor(.x, 
-                      levels = c(0,1),
-                      labels = c("No", "Yes"))
-    )
-  )
+initial_pos_votes <- any_pos(initial_pos_votes)
+```
+
+```{r}
+# Secondary Assessments
+
+secondary_pos_votes <- any_pos(secondary_pos_votes)
+```
+
+```{r}
+# Post-detect assessments
+
+post_detect_pos_votes <- any_pos(post_detect_pos_votes)
 ```
 
 #### Majority vote variable for each abuse type
 
-Final determination will be by majority vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)
+Create columns that indicate the final LEAD Assessment determination based on majority vote. Final determination will be by majority (more than half) vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)
 
 ```{r}
-initial <- initial %>%
-  mutate(
-    physical_abuse_det = case_when(
-      physical_abuse_prop <= 0.5  ~ 0,
-      physical_abuse_prop  > 0.5  ~ 1
-    ),
-    sexual_abuse_det = case_when(
-      sexual_abuse_prop <= 0.5  ~ 0,
-      sexual_abuse_prop  > 0.5  ~ 1
-    ),
-    emotional_psycho_abuse_det = case_when(
-      emotional_psycho_abuse_prop <= 0.5  ~ 0,
-      emotional_psycho_abuse_prop  > 0.5  ~ 1
-    ),
-    neglect_det = case_when(
-      neglect_prop <= 0.5  ~ 0,
-      neglect_prop  > 0.5  ~ 1
-    ),
-    abandonment_det = case_when(
-      abandonment_prop <= 0.5  ~ 0,
-      abandonment_prop  > 0.5  ~ 1
-    ),
-    financial_exploitation_det = case_when(
-      financial_exploitation_prop <= 0.5  ~ 0,
-      financial_exploitation_prop  > 0.5  ~ 1
-    ),
-    self_neglect_det = case_when(
-      self_neglect_prop <= 0.5  ~ 0,
-      self_neglect_prop  > 0.5  ~ 1
-    ),
-    xc_assessment_screened_det = case_when(
-      xc_assessment_screened_prop <= 0.5  ~ 0,
-      xc_assessment_screened_prop  > 0.5  ~ 1
-    )
-  )
-
-secondary <- secondary %>%
-  mutate(
-    physical_abuse_det = case_when(
-      physical_abuse_prop <= 0.5  ~ 0,
-      physical_abuse_prop  > 0.5  ~ 1
-    ),
-    sexual_abuse_det = case_when(
-      sexual_abuse_prop <= 0.5  ~ 0,
-      sexual_abuse_prop  > 0.5  ~ 1
-    ),
-    emotional_psycho_abuse_det = case_when(
-      emotional_psycho_abuse_prop <= 0.5  ~ 0,
-      emotional_psycho_abuse_prop  > 0.5  ~ 1
-    ),
-    neglect_det = case_when(
-      neglect_prop <= 0.5  ~ 0,
-      neglect_prop  > 0.5  ~ 1
-    ),
-    abandonment_det = case_when(
-      abandonment_prop <= 0.5  ~ 0,
-      abandonment_prop  > 0.5  ~ 1
-    ),
-    financial_exploitation_det = case_when(
-      financial_exploitation_prop<= 0.5  ~ 0,
-      financial_exploitation_prop > 0.5  ~ 1
-    ),
-    self_neglect_det = case_when(
-      self_neglect_prop <= 0.5  ~ 0,
-      self_neglect_prop  > 0.5  ~ 1
-    ),
-    xc_assessment_screened_det = case_when(
-      xc_assessment_screened_prop <= 0.5  ~ 0,
-      xc_assessment_screened_prop  > 0.5  ~ 1
-    )
-  )
-
-post_detect <- post_detect %>%
-  mutate(
-    physical_abuse_det = case_when(
-      physical_abuse_prop <= 0.5  ~ 0,
-      physical_abuse_prop  > 0.5  ~ 1
-    ),
-    sexual_abuse_det = case_when(
-      sexual_abuse_prop <= 0.5  ~ 0,
-      sexual_abuse_prop  > 0.5  ~ 1
-    ),
-    emotional_psycho_abuse_det = case_when(
-      emotional_psycho_abuse_prop<= 0.5  ~ 0,
-      emotional_psycho_abuse_prop > 0.5  ~ 1
-    ),
-    neglect_det = case_when(
-      neglect_prop <= 0.5  ~ 0,
-      neglect_prop  > 0.5  ~ 1
-    ),
-    abandonment_det = case_when(
-      abandonment_prop <= 0.5  ~ 0,
-      abandonment_prop  > 0.5   ~ 1
-    ),
-    financial_exploitation_det = case_when(
-      financial_exploitation_prop <= 0.5  ~ 0,
-      financial_exploitation_prop  > 0.5  ~ 1
-    ),
-    self_neglect_det = case_when(
-      self_neglect_prop <= 0.5  ~ 0,
-      self_neglect_prop  > 0.5  ~ 1
-    ),
-    xc_assessment_screened_det = case_when(
-      xc_assessment_screened_prop <= 0.5  ~ 0,
-      xc_assessment_screened_prop  > 0.5  ~ 1
-    )
-  )
-```
-
-```{r}
-# Make columns factor variables
-initial <- initial %>% 
-  mutate(
-    across(
-      .cols = physical_abuse_det: xc_assessment_screened_det,
-      .fns  = ~factor(.x, 
+final_det <- function(assessment_pos_votes) {
+  assessment_pos_votes %>% 
+    mutate(
+      across(
+        .cols   = physical_abuse_prop : xc_assessment_screened_prop,
+        .fn     = ~ case_when(
+          .x    <= 0.5         ~ 0,
+          .x    >  0.5         ~ 1
+        ),
+        .names  = "{col}_det"
+      ),
+      across(
+        .cols   = ends_with("_det"),
+        .fns    = ~ factor(.x, 
                       levels = c(0,1),
                       labels = c("No", "Yes")),
       .names = "{col}"
+      )
+    ) %>%
+    rename_with(
+      .cols   = ends_with("_det"), 
+      .fn     = ~ gsub("prop_det", "det", .x)
     )
-  )
+}
+```
 
-secondary <- secondary %>% 
-  mutate(
-    across(
-      .cols = c(physical_abuse_det:xc_assessment_screened_det),
-      .fns  = ~factor(.x, 
-                      levels = c(0,1),
-                      labels = c("No", "Yes"))
-    )
-  )
+```{r}
+# Initial Assessments
 
-post_detect <- post_detect %>% 
-  mutate(
-    across(
-      .cols = c(physical_abuse_det:xc_assessment_screened_det),
-      .fns  = ~factor(.x, 
-                      levels = c(0,1),
-                      labels = c("No", "Yes"))
-    )
-  )
+initial_pos_votes <- final_det(initial_pos_votes)
+```
+
+```{r}
+# Secondary Assessments
+
+secondary_pos_votes <- final_det(secondary_pos_votes)
+```
+
+```{r}
+# Post-detect assessments
+
+post_detect_pos_votes <- final_det(post_detect_pos_votes)
 ```
 
 #### Any positive determinations across all subtypes
 
-4. Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) across _all_ subtypes of EM.
+Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) across _all_ subtypes of EM.
 
 ```{r}
-initial <- initial %>%
-  mutate(
-    abuse_any = case_when(
-      if_any(physical_abuse_det:self_neglect_det, ~. == "Yes")  ~ 1,
-      if_all(physical_abuse_det:self_neglect_det, ~. == "No")   ~ 0,
-      TRUE                                                      ~ NA
+abuse_any <- function(assessment_pos_votes) {
+  assessment_pos_votes %>%
+    mutate(
+      abuse_any = case_when(
+        if_any(physical_abuse_det : abandonment_det, ~. == "Yes")  ~ 1,
+        if_all(physical_abuse_det : abandonment_det, ~. == "No")   ~ 0,
+        TRUE                                                       ~ NA
+      )
+    ) %>%
+    mutate(
+        abuse_any = factor(
+        abuse_any,
+        levels = c(0, 1),
+        labels = c("No", "Yes")
+      )
     )
-  )%>%
-  mutate(
-    abuse_any = factor(
-      abuse_any,
-      levels = c(0, 1),
-      labels = c("No", "Yes")
-    )
-  )
-
-# Co-erce to factor
-secondary <- secondary %>%
-  mutate(
-    abuse_any = case_when(
-      if_any(physical_abuse_det:self_neglect_det, ~. == "Yes")  ~ 1,
-      if_all(physical_abuse_det:self_neglect_det, ~. == "No")   ~ 0,
-      TRUE                                                      ~ NA
-    )
-  )%>%
-  mutate(
-    abuse_any = factor(
-      abuse_any,
-      levels = c(0, 1),
-      labels = c("No", "Yes")
-    )
-  )
-
-post_detect <- post_detect %>%
-   mutate(
-    abuse_any = case_when(
-      if_any(physical_abuse_det:self_neglect_det, ~. == "Yes")  ~ 1,
-      if_all(physical_abuse_det:self_neglect_det, ~. == "No")   ~ 0,
-      TRUE                                                      ~ NA
-    )
-  )%>%
-  mutate(
-    abuse_any = factor(
-      abuse_any,
-      levels = c(0, 1),
-      labels = c("No", "Yes")
-    )
-  )
+}
 ```
 
+```{r}
+# Initial Assessments
+
+initial_pos_votes <- abuse_any(initial_pos_votes)
+```
 
 ```{r}
-# Merge the initial and secondary data sets, keeping only the secondary for each medstar_id when it is available
-final_determination <- initial[!initial$medstar_id %in% secondary$medstar_id,]
-final_determination <- rbind(final_determination, secondary)
+# Secondary Assessments
+
+secondary_pos_votes <- abuse_any(secondary_pos_votes)
+```
+
+```{r}
+# Post-detect assessments
+
+post_detect_pos_votes <- abuse_any(post_detect_pos_votes)
+```
+
+```{r}
+# Merge the initial_pos_votes and secondary_pos_votes data sets, keeping only the secondary_pos_votes for each medstar_id when it is available
+final_determination <- initial_pos_votes[!initial_pos_votes$medstar_id %in% secondary_pos_votes$medstar_id,]
+final_determination <- rbind(final_determination, secondary_pos_votes)
 ```
 
 ## Merge observational measures, sociodemographic and LEAD dateframes
