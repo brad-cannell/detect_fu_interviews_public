@@ -18,11 +18,12 @@ library(purrr)
 library(stringr)
 library(mice)
 library(lubridate)
+library(writexl)
 ```
 
 # Load cleaned data
 
-Load the participant, self report, LEAD panel assessment and sociodemographic information datasets
+Load the participant, self report, LEAD panel assessment,observational measures and sociodemographic information datasets
 
 ```{r}
 #| warning: false
@@ -36,9 +37,12 @@ participant <- readr::read_rds("../data/cleaned_rds_files/participant_import.rds
 
 Prepare and then merge the relevant variables in the self report, LEAD panel assessment and sociodemographic information data sets into one data frame.
 
-## Participant data
+## 🔴 Participant data
 
 This data was collected by MedStar at the initial 911 response. It includes the results of the initial DETECT screening. We will need those screening results below to compare with LEAD panel findings. 
+
+We will need the results of the DETECT tool filled out at the initial 911 call because we want to be able to say, "At the initial 911 response the DETECT tool was [positive/negtive] for EM. The lead panel then reviewed the case and determined that EM [was/was not] occuring. X porportion of the time, the initial DETECT screening and the LEAD panel determination agreed with each other."
+
 
 ```{r}
 #| eval: false
@@ -54,8 +58,10 @@ participant |>
 
 ```{r}
 # Keep only the columns of interest
-participant <- participant |> 
-  select(medstar_id, xc_detect_positive_summary_count:xc_detect_status_2cat_f)
+parti <- participant |> 
+  select(medstar_id, xc_detect_status_2cat_f)
+
+# Should these be added as well? xc_detect_positive_summary_count, x_caregiver_lack_knowledge_2cat_f : x_disarry_hoarding_3cat_f
 ```
 
 ## Sociodemographic Information
@@ -97,8 +103,6 @@ soc_dem <- soc_dem %>%
 
 This data comes from the DETECT follow-up interviews. It is a collection of medic EM responses to questions about whether or not they believe abuse has occurred based on provided definitions, signs and symptoms. We will compare these the Medic EM Assessment results to the LEAD Panel Assessment results.
 
-🔴 If this is the DETECT tool filled out at the follow-up interview, I think we will also want the results of the DETECT tool filled out at the initial 911 call. Because we want to be able to say, "At the initial 911 response the DETECT tool was [positive/negtive] for EM. The lead panel then reviewed the case and determined that EM [was/was not] occuring. X porportion of the time, the initial DETECT screening and the LEAD panel determination agreed with each other."
-
 ```{r}
 obs_meas <- observational_measures %>% 
   select(medstar_id, at_physical_4cat_f: at_self_4cat_f)
@@ -133,21 +137,20 @@ This data comes from participant abuse assessments by a Longitudinal, Experts, A
 ```{r}
 # Select relevant variables from LEAD panel assessment df
 lpa <- lead_panel_assessment %>%
-  select(medstar_id, panelist_name_10cat_f:xc_assessment_screened_2cat_f)
+  select(medstar_id, panelist_name_10cat_f, x_created_timestamp, assessment_type_3cat_f : xc_assessment_screened_2cat_f)
 ```
 
 ```{r}
 # Subset with initial assessment only
-initial <- lpa %>% filter(assessment_type_3cat_f == "Initial assessment")
+initial_e <- lpa %>% filter(assessment_type_3cat_f == "Initial assessment")
 
 # Subset with Secondary assessment only
-secondary <- lpa %>% filter(assessment_type_3cat_f == "Secondary assessment")
+secondary_e <- lpa %>% filter(assessment_type_3cat_f == "Secondary assessment")
 
 # Subset with Post-detect assessment only
-post_detect <- lpa %>% filter(assessment_type_3cat_f == "Post-detect assessment")
+post_detect_e <- lpa %>% filter(assessment_type_3cat_f == "Post-detect assessment")
 ```
-
-## 🔴 Panelist multiple assessment data error
+### 🔴 Panelist multiple assessment data error
 
 Look at medstar_id 47311d550da4471297501ae2b3b03b02. It looks like Jason completed two initial assessments, which shouldn't happen. My guess is that the second initial assessment should have been a secondary assessment and he accidentally clicked the wrong option in FM Pro. We could check this by:
 1. Check to see if the there is already a secondary assessment for Jason for 47311d550da4471297501ae2b3b03b02.
@@ -155,27 +158,32 @@ Look at medstar_id 47311d550da4471297501ae2b3b03b02. It looks like Jason complet
 3. If there truly are multiple initial assessments, then we need to check if there is any difference between them. If not, then just keep the final row (in terms of time stamp).
 4. If there ARE differences, this is trickier. I'm leaning towards keeping the final row here too, but we should look at some examples before making a final decision.
 
-### Identify Medstar IDs with data error
+#### Identify Medstar IDs with data error
 
-Create a function that creates a subset data frame containing Medstar IDs with multiple assessments for the same panelists and identifies the specific issues by adding the following columns:
+Create a function that identifies the specific issues and indicates whether a row should be excluded or not by adding the following columns:
 
 _same_score_     - For each MedStar ID, are all the scores assigned by the same panelist identical or different.
 
 _over_24_hours_  - For each MedStar ID with multiple assessments for the same panelist, were the assessments performed within one day of                      each other?
+_most_recent_    - For each MedStar ID with multiple assessments for the same panelist, was the entry for the specified row the most recent?
 
-_all_na_         - For each MedStar ID with multiple assessments for the same panelist, is any of the assessments filled with missing                         values?
+_all_na_         - Are all, some or none of the assessment values missing for the specified row?
+_remove_         - Should this row be removed or is further review required to determine this based on the rules below?
+
+                  1. Identical duplicates: Keep the most recent row.
+                  2. Additional entries with all values missing : Remove rows with all missing vote values
+
 
 ```{r}
 error_check <- function(assessment) {
   group <- c('physical_abuse_2cat', 'sexual_abuse_2cat', 'emotional_psycho_abuse_2cat', 'neglect_2cat', 
              'self_neglect_2cat', 'financial_exploitation_2cat', 'abandonment_2cat')
-  multiple_assessment <- lead_panel_assessment %>% filter(assessment_type_3cat_f == assessment) %>% 
+  multiple_assessment <- assessment %>%
     group_by(medstar_id, panelist_name_10cat_f) %>% 
-    reframe(medstar_id, assessment_type_3cat_f, panelist_name_10cat_f, x_created_timestamp,
-            multiple_count = length(panelist_name_10cat_f), 
-            physical_abuse_2cat, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat, 
-            self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat, xc_assessment_screened_2cat) %>%
-    filter(multiple_count > 1) %>%
+    mutate(
+            multiple_count = length(panelist_name_10cat_f)
+            ) %>%
+    ungroup() %>%
     group_by(medstar_id, panelist_name_10cat_f, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
              self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat) %>% 
     mutate(
@@ -193,40 +201,75 @@ error_check <- function(assessment) {
     group_by(medstar_id, panelist_name_10cat_f) %>%
     mutate(
       over_24_hours       = ifelse((as.numeric(difftime(last(x_created_timestamp), 
-                                                        first(x_created_timestamp), units = "hours")) > 24), 1,0)
+                                                        first(x_created_timestamp), units = "hours")) > 24), 1,0),
+      most_recent         = ifelse(x_created_timestamp == max(x_created_timestamp), "Yes", "No"),
+      remove  = case_when(
+        multiple_count > 1 & same_score == FALSE & all(all_na != "none") & any(all_na != "all")          ~ "Individual review",
+        multiple_count > 1 & same_score == FALSE & any(all_na == "some")                                 ~ "Individual review",
+        multiple_count > 1 & same_score == FALSE & all(all_na == "none")                                 ~ "Individual review",
+        multiple_count == 1                                                                              ~ "No",
+        multiple_count > 1 & same_score == TRUE & most_recent == "Yes"                                   ~ "No",
+        multiple_count > 1 & same_score == FALSE & all_na == "none"                                      ~ "No",
+        multiple_count > 1 & same_score == TRUE & most_recent == "No"                                    ~ "Yes",
+        multiple_count > 1 & same_score == FALSE & all_na == "all"                                       ~ "Yes"
+     )
     )
   multiple_assessment
 }
 ```
 
-#### Initial Assessments
-
 ```{r}
-initial_error <- error_check("Initial assessment")
+# Initial Assessments
 
-# Create a column that indicates if there are secondary assessments for each MedStar ID with multiple assessments for the same panelists.
+initial <- error_check(initial_e)
 
-
-  
+initial %>% filter(multiple_count > 1) 
 ```
 
-
-#### Secondary Assessments
 ```{r}
 
+# Secondary Assessments
 
-secondary_error <- error_check("Secondary assessment")
+secondary <- error_check(secondary_e)
+
+secondary %>% filter(multiple_count > 1)
 ```
 
 ```{r}
 # Post-detect assessments
 
-post_detect_error <- error_check("Post-detect assessment")
+post_detect <- error_check(post_detect_e)
+
+post_detect %>% filter(multiple_count > 1)
 ```
 
-# 🔴 Ebie, please review this.
 
-### Create overall EM determination columns
+### Create subsets for the 3 assessment types with the multiple assessment rows removed
+
+Create a function that will remove the rows with issues.
+
+```{r}
+fix_error <- function(assessment) {
+  assessment %>% filter(remove == "No" | remove == "Individual review") 
+            
+                                          
+    
+}
+
+```
+
+```{r}
+# Initial assessment
+initial <- fix_error(initial)
+
+# Secondary assessment
+secondary <- fix_error(secondary)
+
+# Post-detect assessment
+post_detect <- fix_error(post_detect)
+```
+
+### 🔴 Create overall EM determination columns
 
 For each medstar_id reviewed by the LEAD panel, we want to calculate:
 
@@ -236,28 +279,11 @@ For each medstar_id reviewed by the LEAD panel, we want to calculate:
 
 ### Total and proportion of positive votes for each Medstar iD
 
-# 🔴 Ebie, please review this.
-
-The code below is not actually add new columns to the df called "initial". It is creating a new df (still called initial) that has different columns of summary information. We should either use `mutate` to add the summary columns to initial or we should name this new df something else.
-
-```{r}
-initial |> 
-  group_by(medstar_id) |> 
-  mutate(
-    across(
-      .cols  = physical_abuse_2cat:abandonment_2cat,
-      .fns   = ~ sum(.x),
-      .names = "{col}_total"
-    )
-  ) |> filter(self_neglect_2cat_total > 0)
-```
-
-
 Create summary dataframes for each assessment that include calculated columns indicating the total number of positive votes and the proportion of positive votes for each MedStar ID.
 
-```{r}
-# Create a positive vote summary function that will be applied to each of the three assessment data frames.
+#### Create a positive vote summary function that will be applied to each of the three assessment data frames.
 
+```{r}
 pos_votes <- function(assessment) {
   assessment %>% 
   group_by(medstar_id) %>% 
@@ -306,7 +332,7 @@ secondary_pos_votes <- pos_votes(secondary)
 post_detect_pos_votes <- pos_votes(post_detect)
 ```
 
-#### Any positive determinations for each subtypes
+### Any positive determinations for each subtypes
 
 3. Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of abuse.
 
@@ -356,7 +382,7 @@ secondary_pos_votes <- any_pos(secondary_pos_votes)
 post_detect_pos_votes <- any_pos(post_detect_pos_votes)
 ```
 
-#### Majority vote variable for each abuse type
+### Majority vote variable for each abuse type
 
 Create columns that indicate the final LEAD Assessment determination based on majority vote. Final determination will be by majority (more than half) vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)
 
@@ -405,13 +431,13 @@ secondary_pos_votes <- final_det(secondary_pos_votes)
 post_detect_pos_votes <- final_det(post_detect_pos_votes)
 ```
 
-#### Any positive determinations across all subtypes
+### Any positive determinations across all subtypes
 
 Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) across _all_ subtypes of EM.
 
 ```{r}
-abuse_any <- function(assessment_pos_votes) {
-  assessment_pos_votes %>%
+abuse_any <- function(assessment_final_det) {
+  assessment_final_det %>%
     mutate(
       abuse_any = case_when(
         if_any(physical_abuse_det : abandonment_det, ~. == "Yes")  ~ 1,
@@ -453,15 +479,41 @@ final_determination <- initial_pos_votes[!initial_pos_votes$medstar_id %in% seco
 final_determination <- rbind(final_determination, secondary_pos_votes)
 ```
 
-## Merge observational measures, sociodemographic and LEAD dateframes
+## Merge participant, observational measures, sociodemographic and LEAD dateframes
 
 ```{r}
 # Merge subset dfs into a new df
 
-final_determination <- purrr::reduce(list(final_determination, soc_dem, obs_meas), dplyr::left_join, by = 'medstar_id')
-final_det_initial   <- purrr::reduce(list(initial, soc_dem, obs_meas), dplyr::left_join, by = 'medstar_id')
-final_det_sec       <- purrr::reduce(list(secondary, soc_dem, obs_meas), dplyr::left_join, by = 'medstar_id')
-final_det_post      <- purrr::reduce(list(post_detect, soc_dem, obs_meas), dplyr::left_join, by = 'medstar_id')
+final_determination <- purrr::reduce(list(final_determination, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
+final_det_initial   <- purrr::reduce(list(initial_pos_votes, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
+final_det_sec       <- purrr::reduce(list(secondary_pos_votes, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
+final_det_post      <- purrr::reduce(list(post_detect_pos_votes, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
+```
+
+## Participants interviewed between 05/2022 and 05/2023 with positive screening based on LEAD panel abuse determination 
+
+This subset will be contacted for interviews for sharing their experiences.
+
+```{r}
+# Medic F/U assessment Medic abuse determination timestamp
+med_time <- observational_measures %>% 
+  select(medstar_id, x_created_timestamp)
+
+# Add names from participant data frame since some are missing in the  LEAD assessment data frame. And include column showing participant's willingness to receive another phone call.
+names <- participant %>% 
+  select(medstar_id, name_full, x_do_not_call_2cat_f, phone)
+
+# Merge data sets and create participant list
+interview_list <- purrr::reduce(list(final_det_initial, names, med_time), dplyr::left_join, by = 'medstar_id') %>% 
+  filter(
+  as_date(x_created_timestamp) >= as_date("2022-05-01") & 
+    as_date(x_created_timestamp) <= as_date("2023-05-31") &
+    abuse_any == "Yes"
+) %>% 
+  select(medstar_id, name_full, x_created_timestamp, abuse_any, x_do_not_call_2cat_f, phone)
+
+# Save list as an Excel sheet
+write_xlsx(interview_list, "interview_list.xlsx")
 ```
 
 # Analaysis
@@ -654,7 +706,7 @@ income_tab <- width(income_tab, width = 3)
 income_tab
 ```
 
-#### MedStar Medic vs LEAD Abuse Determination
+#### MedStar Medic and Detect Status at Initial 911 Call vs LEAD Abuse Determination
 
 ```{r}
 # Create caption/ title
@@ -671,10 +723,10 @@ medic_tab
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Overall MedStar Medic Abuse Abuse Determinations by Overall LEAD Determinations"
+cap_1  <- "Summary Statistics for Overall MedStar Medic Abuse Abuse Determinations and Detect status at Initial 911 Call by Overall LEAD Determinations"
 
 
-mvl_tab <- table1(~ medic_abuse_any | abuse_any,
+mvl_tab <- table1(~ medic_abuse_any + xc_detect_status_2cat_f | abuse_any,
                data = fd_na,
                caption = cap_1)
 mvl_tab <- t1flex(mvl_tab, tablefn = c("qflextable", "flextable", "regulartable"))
