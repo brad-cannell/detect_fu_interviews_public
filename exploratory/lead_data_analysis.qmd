@@ -221,26 +221,26 @@ error_check <- function(assessment) {
 ```{r}
 # Initial Assessments
 
-initial <- error_check(initial_e)
+initial_e <- error_check(initial_e)
 
-initial %>% filter(multiple_count > 1) 
+initial_e %>% filter(multiple_count > 1) 
 ```
 
 ```{r}
 
 # Secondary Assessments
 
-secondary <- error_check(secondary_e)
+secondary_e <- error_check(secondary_e)
 
-secondary %>% filter(multiple_count > 1)
+secondary_e %>% filter(multiple_count > 1 & remove == "Individual review")
 ```
 
 ```{r}
 # Post-detect assessments
 
-post_detect <- error_check(post_detect_e)
+post_detect_e <- error_check(post_detect_e)
 
-post_detect %>% filter(multiple_count > 1)
+post_detect_e %>% filter(multiple_count > 1 & remove == "Individual review")
 ```
 
 
@@ -260,13 +260,13 @@ fix_error <- function(assessment) {
 
 ```{r}
 # Initial assessment
-initial <- fix_error(initial)
+initial <- fix_error(initial_e)
 
 # Secondary assessment
-secondary <- fix_error(secondary)
+secondary <- fix_error(secondary_e)
 
 # Post-detect assessment
-post_detect <- fix_error(post_detect)
+post_detect <- fix_error(post_detect_e)
 ```
 
 ### 🔴 Create overall EM determination columns
@@ -587,7 +587,7 @@ sum_table
 
 ## Missing data summary
 
-```{r, fig.width = 15}
+```{r, fig.width = 20}
 fd_m <- final_determination %>% 
   select(
     physical_abuse_det: at_self_4cat_f,  
