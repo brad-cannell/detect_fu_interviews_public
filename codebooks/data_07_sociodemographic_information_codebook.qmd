@@ -17,8 +17,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 
 ```{r}
 #| warning: false
-sociodemographic_information_import.rds <- file.choose()
-socdem <- readRDS(sociodemographic_information_import.rds)
+socdem <- readRDS("../data/cleaned_rds_files/sociodemographic_information_import.rds")
 ```
 
 # Set column attributes
@@ -36,7 +35,7 @@ for(i in socdem_vars) {
 ```{r}
 # Choose variables that will not have summary statistics
 no_stats <- socdem %>%
-  select(1:9,13:16)
+  select(x_primary_key : name_full, x_record_month : xc_case_id)
 
 no_stats_vars <- colnames(no_stats)
 ```
@@ -216,6 +215,36 @@ sociodemographic_information <- socdem %>%
     cb_add_col_attributes( 
       sode_race, 
       description = "SI_5. Which of the following racial categories describes you? You may select more than one."
+    ) %>%
+  
+    cb_add_col_attributes( 
+      american_indian_or_alaska_native, 
+      description = "sode_race dummy variable for american inidian or alaska native category"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      asian, 
+      description = "sode_race dummy variable for asian category"
+    ) %>%
+
+    cb_add_col_attributes( 
+      black_or_african_american, 
+      description = "sode_race dummy variable for black or african american category"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      native_hawaiian_or_other_pacific_islander, 
+      description = "sode_race dummy variable for native hawaiian or other pacific islander category"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      white, 
+      description = "sode_race dummy variable for white category"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      other, 
+      description = "sode_race dummy variable for other category"
     ) %>%
   
     cb_add_col_attributes( 

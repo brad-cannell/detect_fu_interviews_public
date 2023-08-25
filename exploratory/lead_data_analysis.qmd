@@ -71,38 +71,11 @@ parti <- participant |>
 
 This data was collected during the DETECT follow-up interview. It includes participant sociodemographic information like race, household income and others. We will compare LEAD screening results across different sociodemographic categories. 
 
-# 🔴 Ideally, we should do this data cleaning in a file for the sociodemographic data.
-
 ```{r}
 # Select relevant variables of interest from sociodemographic information df
 soc_dem <- socio_demo %>%
-  select(medstar_id, sode_hispanic_4cat_f, sode_race, sode_income_9cat_f)
+  select(medstar_id, sode_hispanic_4cat_f, sode_race : other, sode_income_9cat_f)
 
-# Create dummy variables for race
-soc_dem <- soc_dem %>% 
-  mutate(
-    american_indian_or_alaska_native          = ifelse(grepl("American Indian or Alaska Native", sode_race),1, 0),
-    asian                                     = ifelse(grepl("Asian", sode_race),1, 0),
-    black_or_african_american                 = ifelse(grepl("Black or African American", sode_race),1, 0),
-    native_hawaiian_or_other_pacific_islander = ifelse(grepl("Native Hawaiian or Other Pacific Islander", sode_race),1, 0),
-    white                                     = ifelse(grepl("White", sode_race),1, 0),
-    other                                     = ifelse(grepl("Other", sode_race),1, 0)
-  )
-
-# Create factor variables and set labels
-soc_dem <- soc_dem %>% 
-  mutate(
-    across(
-      .cols = american_indian_or_alaska_native:other,
-      .fns  = ~ factor(
-        .x,
-        levels = c(0,1), 
-        labels = c("No", "Yes")
-      ),
-      .names = "{col}"
-    )
-  )
-    
 ```
 
 ## MedStar Medic Assessment (Observational Measures Dataset)
@@ -169,6 +142,8 @@ Look at medstar_id 47311d550da4471297501ae2b3b03b02. It looks like Jason complet
 
 Create a function that identifies the specific issues and indicates whether a row should be excluded or not by adding the following columns:
 
+_multiple_count_ - Indicate the number of rows for each panelist under each MedStar ID.
+
 _same_score_     - For each MedStar ID, are all the scores assigned by the same panelist identical or different.
 
 _over_24_hours_  - For each MedStar ID with multiple assessments for the same panelist, were the assessments performed within one day of each other?
@@ -229,19 +204,45 @@ error_check <- function(assessment) {
       )
     )
   
+  # For each MedStar ID with multiple assessments for the same panelist, was the entry for the specified row the most recent?
+  multiple_assessment <- multiple_assessment |>
+    mutate(
+      most_recent = ifelse(x_created_timestamp == max(x_created_timestamp), "Yes", "No")
+    )
+  
   # Should this row be removed or is further review required to determine this 
   # based on the rules below?
   multiple_assessment <- multiple_assessment |>
     mutate(
-      most_recent = ifelse(x_created_timestamp == max(x_created_timestamp), "Yes", "No"),
       remove  = case_when(
+        # Case when the error is present and the scores are not identical. All of the rows being compared have one or more missing
+        # scores and at least one of the rows being compared does not have all of the scores missing. Marks such cases
+        # for individual review
         multiple_count > 1 & same_score == FALSE & all(all_na != "none") & any(all_na != "all") ~ "Individual review",
+        
+        # Case when the error is present, the scores are not identical and at least one of the rows being compared has some but not all 
+        # scores missing. Any of the other rows being compared could have none or all missing values. Marks such cases for
+        # individual reveiw.
         multiple_count > 1 & same_score == FALSE & any(all_na == "some")                        ~ "Individual review",
+        
+        # Case when the error is present, the scores are not identical and all the rows being compared have no missing scores.
         multiple_count > 1 & same_score == FALSE & all(all_na == "none")                        ~ "Individual review",
+        
+        # case when there is no error
         multiple_count == 1                                                                     ~ "No",
+        
+        # Marks only the most recent of identical rows where error is present for keeping while the other rows are removed.
         multiple_count > 1 & same_score == TRUE & most_recent == "Yes"                          ~ "No",
+        
+        # Case when there is an error and the scores being compared are not the same. Marks rows where there are no missing scores
+        # for keeping
         multiple_count > 1 & same_score == FALSE & all_na == "none"                             ~ "No",
+       
+        # Case when error is present but all the rows are identical in terms of assigned scores. Marks rows that are not the most
+        # recent for removal
         multiple_count > 1 & same_score == TRUE & most_recent == "No"                           ~ "Yes",
+       
+        # Case when the error is present and the scores are not identical. Marks rows where all the scores are missing for removal
         multiple_count > 1 & same_score == FALSE & all_na == "all"                              ~ "Yes"
       )
     )
@@ -269,7 +270,7 @@ initial_e %>% filter(multiple_count > 1)
 
 secondary_e <- error_check(secondary_e)
 
-secondary_e %>% filter(multiple_count > 1 & remove == "Individual review")
+secondary_e %>% filter(multiple_count > 1)
 ```
 
 ```{r}
@@ -277,7 +278,7 @@ secondary_e %>% filter(multiple_count > 1 & remove == "Individual review")
 
 post_detect_e <- error_check(post_detect_e)
 
-post_detect_e %>% filter(multiple_count > 1 & remove == "Individual review")
+post_detect_e %>% filter(multiple_count > 1)
 ```
 
 
@@ -287,9 +288,11 @@ Create a function that will remove the rows with issues.
 
 ```{r}
 fix_error <- function(assessment) {
-  assessment %>% filter(remove == "No" | remove == "Individual review") 
-            
-                                          
+  # Remove rows marked by the error_check function for removal.
+  assessment <-  assessment %>% filter(!(remove == "Yes")) 
+  
+  # Remove rows marked by the error_check function for individual review that are not the most recent.
+  assessment <-  assessment %>% filter(!(remove == "Individual review" & most_recent == "No") | remove == "No") 
     
 }
 
@@ -516,15 +519,99 @@ final_determination <- initial_pos_votes[!initial_pos_votes$medstar_id %in% seco
 final_determination <- rbind(final_determination, secondary_pos_votes)
 ```
 
+## Set labels
+
+```{r}
+# Overall final determination
+label(final_determination$physical_abuse_det)         <- "LEAD physical abuse determination"
+label(final_determination$sexual_abuse_det)           <- "LEAD sexual abuse determination"
+label(final_determination$emotional_psycho_abuse_det) <- "LEAD emotional-pshcyo abuse determination"
+label(final_determination$neglect_det)                <- "LEAD neglect determination"
+label(final_determination$self_neglect_det)           <- "LEAD self_neglect determination"
+label(final_determination$financial_exploitation_det) <- "LEAD financial exploitation determination"
+label(final_determination$abandonment_det)            <- "LEAD abandonment determination"
+label(final_determination$abuse_any)                  <- "LEAD any abuse determination"
+
+# Initial positive votes
+label(initial_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
+label(initial_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
+label(initial_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-pshcyo abuse determination"
+label(initial_pos_votes$neglect_det)                <- "LEAD neglect determination"
+label(initial_pos_votes$self_neglect_det)           <- "LEAD self_neglect determination"
+label(initial_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
+label(initial_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
+label(initial_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
+
+# Secondary positive votes
+label(secondary_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
+label(secondary_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
+label(secondary_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-pshcyo abuse determination"
+label(secondary_pos_votes$neglect_det)                <- "LEAD neglect determination"
+label(secondary_pos_votes$self_neglect_det)           <- "LEAD self_neglect determination"
+label(secondary_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
+label(secondary_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
+label(secondary_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
+
+# Post-DETECT positive votes
+label(post_detect_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
+label(post_detect_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
+label(post_detect_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-pshcyo abuse determination"
+label(post_detect_pos_votes$neglect_det)                <- "LEAD neglect determination"
+label(post_detect_pos_votes$self_neglect_det)           <- "LEAD self_neglect determination"
+label(post_detect_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
+label(post_detect_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
+label(post_detect_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
+
+# Socio-demographic variables
+label(soc_dem$sode_hispanic_4cat_f)                      <- "Ethnicity (Hispanic)"
+label(soc_dem$american_indian_or_alaska_native)          <- "American Indian or Alaska Native"
+label(soc_dem$asian)                                     <- "Asian"
+label(soc_dem$black_or_african_american)                 <- "Black or African American"
+label(soc_dem$native_hawaiian_or_other_pacific_islander) <- "Native Hawaiian or Other Pacific Islander"
+label(soc_dem$white)                                     <- "White"
+label(soc_dem$other)                                     <- "Other"
+label(soc_dem$sode_income_9cat_f)                        <- "Household Income"
+
+# Observational measures variables
+label(obs_meas$at_physical_4cat_f)   <- "Medic EM physical abuse assessment"
+label(obs_meas$at_sexual_4cat_f)     <- "Medic EM sexual abuse assessment"
+label(obs_meas$at_emotional_4cat_f)  <- "Medic EM emotional abuse assessment"
+label(obs_meas$at_neglect_4cat_f)    <- "Medic EM neglect assessment"
+label(obs_meas$at_abandon_4cat_f)    <- "Medic EM abandonment assessment"
+label(obs_meas$at_financial_4cat_f)  <- "Medic EM financial abuse assessment"
+label(obs_meas$at_self_4cat_f)       <- "Medic EM self-neglect assessment"
+label(obs_meas$medic_abuse_any)      <- "Medic EM any abuse assessment"
+label(parti$age)                     <- "Age (in years)"
+label(parti$xc_detect_status_2cat_f) <- "Abuse determination at initial 911 call"
+```
+
 ## Merge participant, observational measures, sociodemographic and LEAD dateframes
 
 ```{r}
 # Merge subset dfs into a new df
-
 final_determination <- purrr::reduce(list(final_determination, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
 final_det_initial   <- purrr::reduce(list(initial_pos_votes, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
 final_det_sec       <- purrr::reduce(list(secondary_pos_votes, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
 final_det_post      <- purrr::reduce(list(post_detect_pos_votes, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
+```
+
+## Create dataframe containing "any abuse" determination across the 3 assessments
+
+```{r}
+initial_compare <- initial_pos_votes %>% 
+  select(medstar_id, abuse_any) %>%
+  rename(abuse_any_initial = abuse_any)
+
+secondary_compare <- secondary_pos_votes %>% 
+  select(medstar_id, abuse_any) %>%
+  rename(abuse_any_sec = abuse_any)
+
+post_compare <- post_detect_pos_votes %>% 
+  select(medstar_id, abuse_any) %>%
+  rename(abuse_any_post = abuse_any)
+
+
+assessment_compare <- purrr::reduce(list(initial_compare, secondary_compare, post_compare), dplyr::left_join, by = 'medstar_id')
 ```
 
 ## Participants interviewed between 05/2022 and 05/2023 with positive screening based on LEAD panel abuse determination 
@@ -540,8 +627,13 @@ med_time <- observational_measures %>%
 names <- participant %>% 
   select(medstar_id, name_full, x_do_not_call_2cat_f, phone)
 
+# Add any_abuse variable from final_det_initial df.
+
+abuse <- final_det_initial %>%
+  select(medstar_id, abuse_any)
+
 # Merge data sets and create participant list
-interview_list <- purrr::reduce(list(final_det_initial, names, med_time), dplyr::left_join, by = 'medstar_id') %>% 
+interview_list <- purrr::reduce(list(abuse, names, med_time), dplyr::left_join, by = 'medstar_id') %>% 
   filter(
   as_date(x_created_timestamp) >= as_date("2022-05-01") & 
     as_date(x_created_timestamp) <= as_date("2023-05-31") &
@@ -550,7 +642,7 @@ interview_list <- purrr::reduce(list(final_det_initial, names, med_time), dplyr:
   select(medstar_id, name_full, x_created_timestamp, abuse_any, x_do_not_call_2cat_f, phone)
 
 # Save list as an Excel sheet
-write_xlsx(interview_list, "interview_list.xlsx")
+# write_xlsx(interview_list, "interview_list.xlsx")
 ```
 
 # Analaysis
@@ -615,12 +707,74 @@ sum_table <- data.frame(
 # Set caption
 
 sum_table <- set_caption(sum_table, "Summary of Unique Medstar IDs for the LEAD Assessment Data")
-sum_table <- bold(sum_table, i = 4, bold = TRUE)
-sum_table <- width(sum_table, width = 2)
+sum_table <- width(sum_table, width = 1.5)
 
 
 sum_table
 ```
+
+## Percent Similarity of determinations between the different assessments
+
+Create a table that shows the percent similarity between each of the three assessment types and each of the other types using the dataframe containing "any abuse" determination across the 3 assessments. 
+
+Answers the question: When comparing the one assessment type to the other, what is the percentage of determinations that were the same in another assessment type, using the the smaller variable as the denominator?
+
+### Function
+```{r}
+# Create function that computes the percent similarity between two columns in the assessment_compare data frame rounded to two decimal places
+# The "second" argument is the variable with the shorter length
+similarity <- function(first, second){
+  round(length(which(assessment_compare[[first]] == assessment_compare[[second]]))/length(which(!is.na(assessment_compare[[second]]) == TRUE))*100, digits = 2) 
+}
+```
+
+### Values
+```{r}
+# Create values for the table
+
+# initial column
+ii = similarity("abuse_any_initial", "abuse_any_initial")
+si = similarity("abuse_any_initial", "abuse_any_sec")
+pi = similarity("abuse_any_initial", "abuse_any_post")
+
+# Secondary column
+is = si
+ss = similarity("abuse_any_sec", "abuse_any_sec")
+ps = similarity("abuse_any_post", "abuse_any_sec")
+
+# Post-detect column
+ip = pi
+sp = ps
+pp = similarity("abuse_any_post", "abuse_any_post")
+```
+
+### Format table
+```{r}
+sim_table <- data.frame(
+                        Value = c("Initial", "Secondary", "Post-DETECT"),
+                        Initial     = c(ii, si, pi),
+                        Secondary   = c(is, ss, ps), 
+                        Post_detect = c(ip, sp, pp) 
+                        ) %>%
+  flextable()
+# Set caption
+sim_table <- set_caption(sim_table, "Table Showing the Percent Similarity of Determinations Between the Different Assessment Types")
+
+# format line
+std_border = fp_border(color="black")
+
+# Set header labels 
+
+sim_table <- set_header_labels(sim_table, Value = "")
+sim_table <- set_header_labels(sim_table, Post_detect = "Post-DETECT")
+
+sim_table <- width(sim_table, width = 1.5)
+sim_table <- vline(sim_table, j = 1, border = std_border)
+
+sim_table
+```
+
+
 
 ## Missing data summary
 
@@ -636,15 +790,13 @@ fd_m <- final_determination %>%
 
 Before we analyze race, we want to know the number and proportion of determinations overall. Secondarily, we will repeat the analysis by race/ethnicity (and probably a bunch of other characteristics). Let's don't drop any rows yet that have NA for race/ethnicity. Only drop rows that have NA for determinations (hopefully, there aren't any).
 
-## Sumary Statistics Tables
-
 ### Determinations Overall
 
 #### Final determinations for the secondary assessment except when not available (initial assessment in this case)
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Abuse Determinations Overall - Secondary (Initial When Unavailable)"
+cap_1  <- "Abuse Determinations Overall - Secondary LEAD Assessment (Initial When Unavailable)"
 
 
 overall_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det + abuse_any, 
@@ -652,6 +804,7 @@ overall_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho
                caption = cap_1)
 overall_tab <- t1flex(overall_tab, tablefn = c("qflextable", "flextable", "regulartable"))
 overall_tab <- width(overall_tab, width = 3)
+overall_tab <- bold(overall_tab, bold = FALSE, part = "all")
 overall_tab
 ```
 
@@ -660,7 +813,7 @@ overall_tab
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Abuse Determinations Overall - Intial Assessment"
+cap_1  <- "Abuse Determinations Overall - Initial LEAD Assessment"
 
 
 initial_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det + xc_assessment_screened_det, 
@@ -668,6 +821,7 @@ initial_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho
                caption = cap_1)
 initial_tab <- t1flex(initial_tab, tablefn = c("qflextable", "flextable", "regulartable"))
 initial_tab <- width(initial_tab, width = 3)
+initial_tab <- bold(initial_tab, bold = FALSE, part = "all")
 initial_tab
 ```
 
@@ -675,14 +829,15 @@ initial_tab
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Abuse Determinations Overall - Secondary Assessment"
+cap_1  <- "Abuse Determinations Overall - Secondary LEAD Assessment"
 
 
-sec_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det + xc_assessment_screened_det, 
+sec_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det, 
                data = final_det_sec, 
                caption = cap_1)
 sec_tab <- t1flex(sec_tab, tablefn = c("qflextable", "flextable", "regulartable"))
 sec_tab <- width(sec_tab, width = 3)
+sec_tab <- bold(sec_tab, bold = FALSE, part = "all")
 sec_tab
 ```
 
@@ -690,14 +845,15 @@ sec_tab
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Abuse Determinations Overall - Post-Detect Assessment"
+cap_1  <- "Abuse Determinations Overall - Post-Detect LEAD Assessment"
 
 
-post_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det + xc_assessment_screened_det, 
+post_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det, 
                data = final_det_post, 
                caption = cap_1)
 post_tab <- t1flex(post_tab, tablefn = c("qflextable", "flextable", "regulartable"))
 post_tab <- width(post_tab, width = 3)
+post_tab <- bold(post_tab, bold = FALSE, part = "all")
 post_tab
 ```
 
@@ -716,15 +872,16 @@ The data set includes the Secondary Assessment (initial When unavailable)
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Race/ Ethnicity by Abuse Determination"
+cap_1  <- "Race/ Ethnicity by LEAD Assessment Abuse Determination"
 
 
-abuse_any_tab <- table1(~ sode_hispanic_4cat_f + american_indian_or_alaska_native + asian + black_or_african_american + native_hawaiian_or_other_pacific_islander + white + other| abuse_any, 
+race_tab <- table1(~ sode_hispanic_4cat_f + american_indian_or_alaska_native + asian + black_or_african_american + native_hawaiian_or_other_pacific_islander + white + other| abuse_any, 
                data = fd_na, 
                caption = cap_1)
-abuse_any_tab <- t1flex(abuse_any_tab, tablefn = c("qflextable", "flextable", "regulartable"))
-abuse_any_tab <- width(abuse_any_tab, width = 3)
-abuse_any_tab
+race_tab <- t1flex(race_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+race_tab <- width(race_tab, width = 1.5)
+race_tab <- bold(race_tab, bold = FALSE, part = "all")
+race_tab
 ```
 
 #### Abuse Determination Overall by Household Income
@@ -732,14 +889,15 @@ The data set includes the Secondary Assessment (initial When unavailable)
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Household Income by Abuse Determination"
+cap_1  <- "Household Income by LEAD Assessment Abuse Determination"
 
 
 income_tab <- table1(~ sode_income_9cat_f | abuse_any, 
                data = fd_na, 
                caption = cap_1)
 income_tab <- t1flex(income_tab, tablefn = c("qflextable", "flextable", "regulartable"))
-income_tab <- width(income_tab, width = 3)
+income_tab <- width(income_tab, width = 1.5)
+income_tab <- bold(income_tab, bold = FALSE, part = "all")
 income_tab
 ```
 
@@ -747,7 +905,7 @@ income_tab
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for MedStar Medic Abuse Determinations"
+cap_1  <- "MedStar Medic EM Abuse Determinations"
 
 
 medic_tab <- table1(~ at_physical_4cat_f + at_sexual_4cat_f + at_emotional_4cat_f + at_neglect_4cat_f + at_abandon_4cat_f + at_financial_4cat_f + at_self_4cat_f + medic_abuse_any,
@@ -755,18 +913,98 @@ medic_tab <- table1(~ at_physical_4cat_f + at_sexual_4cat_f + at_emotional_4cat_
                caption = cap_1)
 medic_tab <- t1flex(medic_tab, tablefn = c("qflextable", "flextable", "regulartable"))
 medic_tab <- width(medic_tab, width = 3)
+medic_tab <- bold(medic_tab, bold = FALSE, part = "all")
 medic_tab
 ```
 
 ```{r}
 # Create caption/ title
-cap_1  <- "Summary Statistics for Overall MedStar Medic Abuse Abuse Determinations and Detect status at Initial 911 Call by Overall LEAD Determinations"
+cap_1  <- "Overall MedStar Medic Abuse Determinations and Detect status at Initial 911 Call by Overall LEAD Determinations"
 
 
 mvl_tab <- table1(~ medic_abuse_any + xc_detect_status_2cat_f | abuse_any,
                data = fd_na,
                caption = cap_1)
 mvl_tab <- t1flex(mvl_tab, tablefn = c("qflextable", "flextable", "regulartable"))
-mvl_tab <- width(mvl_tab, width = 3)
+mvl_tab <- width(mvl_tab, width = 1.5)
+mvl_tab <- bold(mvl_tab, bold = FALSE, part = "all")
 mvl_tab
+```
+
+
+# Create Word Document
+
+```{r, echo = FALSE}
+# create Word file and object
+lead_doc <- read_docx()
+
+# Add title
+text_style <- fp_text(font.size = 28)
+par_style <- fp_par(text.align = "center")
+
+lead_doc <- body_add_fpar(lead_doc, fpar( ftext("LEAD Data Analysis Tables", prop = text_style), 
+                                              fp_p = par_style ) ) %>%
+  body_add_par(value = "")
+
+# Add number and proportion of assessements completed by type of assesement Table
+lead_doc <- lead_doc %>% 
+  body_add_flextable(sum_table, align = "left") %>%
+  body_add_par(value = "")
+
+# Add similarity percentage table
+lead_doc <- lead_doc %>%
+  body_add_par("The table below answers the question: When comparing one assessment type to the other, what is the percentage of determinations that were the same in another assessment type, using the smaller variable as the denominator?")%>%
+  body_add_par(value = "") %>%
+  body_add_flextable(sim_table, align = "left") %>%
+  body_add_par(value = "")
+
+# Add final determinations for the secondary assessment except when not available (initial assessment in this case) table
+lead_doc <- lead_doc %>% 
+  body_add_par("LEAD abuse determination was by majority vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)")%>%
+  body_add_par(value = "") %>%
+  body_add_flextable(overall_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add final determinations for the intial assessment table
+lead_doc <- lead_doc %>% 
+  body_add_flextable(initial_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add final determinations for the secondary assessment table
+lead_doc <- lead_doc %>% 
+  body_add_flextable(sec_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add final determinations for the post detect assessment table
+lead_doc <- lead_doc %>% 
+  body_add_flextable(post_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add Abuse Determination Overall by Race/ Ethnicity table
+lead_doc <- lead_doc %>% 
+  body_add_par("LEAD abuse determination was by majority vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)")%>%
+  body_add_par(value = "") %>%
+  body_add_flextable(race_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add Abuse Determination Overall by Household Income Table
+lead_doc <- lead_doc %>% 
+  body_add_par("LEAD abuse determination was by majority vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)")%>%
+  body_add_par(value = "") %>%
+  body_add_flextable(income_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add MedStar Medic EM Abuse Determinations Table
+lead_doc <- lead_doc %>% 
+  body_add_flextable(medic_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add MedStar Medic and Detect Status at Initial 911 Call vs LEAD Abuse Determination Table
+lead_doc <- lead_doc %>% 
+  body_add_par("LEAD abuse determination was by majority vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)")%>%
+  body_add_par(value = "") %>%
+  body_add_flextable(mvl_tab, align = "left") 
+
+# print the word document
+print(lead_doc, target = "LEAD_data_analysis_tables.docx")
 ```
