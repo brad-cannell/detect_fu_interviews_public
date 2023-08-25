@@ -9,6 +9,7 @@ library(purrr)
 library(stringr)
 library(tidyverse)
 library(expss)
+library(janitor)
 ```
 
 # Load the data
@@ -17,8 +18,7 @@ Load the data table into the global environment as a data frame using the raw cs
 
 ```{r}
 
-sociodemographic_information_import.csv <- file.choose()
-sociodemographic_information <- read_csv(sociodemographic_information_import.csv)
+sociodemographic_information <- read_csv("../data/filemaker_pro_exports/sociodemographic_information_import.csv")
 
 ``` 
 
@@ -28,40 +28,15 @@ Here we will convert all variable names to snake case so that everything is unif
 
 ```{r}
 # Convert all variable names to snake case
-walk(
-  # Grab the names of all data frames in the global environment
-  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
-  .f = function(x) {
-    # Grab individual df from environment
-    df <- get(x)
-    # Grab the variables names
-    var_names <- names(df)
-    # Convert variable names to snake case
-    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
-    # Convert variable names to lower case
-    var_names <- str_to_lower(var_names)
-    # Fix medstar_id
-    var_names[var_names == "medstar_i_d"] <- "medstar_id"
-    # assign back to the dataframe
-    names(df) <- var_names
-    # Replace df with new names in global environment
-    assign(x, df, envir = .GlobalEnv)
-  }
-)
 
-```
-
-## Change column name
-
-```{r}
-colnames(sociodemographic_information)[26]  <- "xc_case_id"
+sociodemographic_information <- clean_names(sociodemographic_information)
 ```
 
 ## Coerce categorical variables to factor variables
 
 ### Sociodemographic Information
 
-Create factor variables and match levels to codebook for all categorical variables except sode_race. For sode_race, several participants have multiple values. During analysis, the researchers may want to collapse some categories of race/ethnicity, so it can be coded correctly at that time. 
+Create factor variables and match levels to codebook for all categorical variables except sode_race.
 
 ```{r}
 soc_dem <- sociodemographic_information %>%
@@ -310,15 +285,50 @@ soc_dem <- soc_dem %>%
   )
 ```
 
+Create dummy variables for the sode_race variable
+
+```{r}
+soc_dem <- soc_dem %>% 
+  mutate(
+    american_indian_or_alaska_native          = ifelse(grepl("American Indian or Alaska Native", sode_race), 1, 0),
+    asian                                     = ifelse(grepl("Asian", sode_race),1, 0),
+    black_or_african_american                 = ifelse(grepl("Black or African American", sode_race), 1, 0),
+    native_hawaiian_or_other_pacific_islander = ifelse(grepl("Native Hawaiian or Other Pacific Islander", sode_race), 1, 0),
+    white                                     = ifelse(grepl("White", sode_race), 1, 0),
+    other                                     = ifelse(grepl("Other", sode_race), 1, 0)
+  )
+
+# Create factor variables and set labels
+soc_dem <- soc_dem %>% 
+  mutate(
+    across(
+      .cols = american_indian_or_alaska_native:other,
+      .fns  = ~ factor(
+        .x,
+        levels = c(0,1), 
+        labels = c("No", "Yes")
+      ),
+      .names = "{col}"
+    )
+  )
+```
+
 ### Remove variables that have recoded forms
 
 ```{r}
-sociodemographic_information <- soc_dem %>% select(-c(11:13,15:21,27,28,53))
+soc_dem <- soc_dem %>% select(-c("sode_marital" : "sode_hispanic", "sode_school" : "hsi_contact", 
+                                 "sogi_identity", "sogi_orientation", "sode_people_def"))
+```
+
+### Re-order columns
+
+```{r}
+sociodemographic_information <- soc_dem %>% relocate(c("american_indian_or_alaska_native" : "other"), .after = sode_race)
 ```
 
 # Save as rds file
 
 ```{r}
-  saveRDS(sociodemographic_information, "sociodemographic_information_import.rds")
+saveRDS(sociodemographic_information, "sociodemographic_information_import.rds")
 
 ```

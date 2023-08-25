@@ -18,8 +18,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 
 ```{r}
 #| warning: false
-self_report_import.rds <- file.choose()
-sr <- readRDS(self_report_import.rds)
+sr <- readRDS("../data/cleaned_rds_files/self_report_import.rds")
 ```
 
 # Set column attributes
