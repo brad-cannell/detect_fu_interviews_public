@@ -525,9 +525,9 @@ final_determination <- rbind(final_determination, secondary_pos_votes)
 # Overall final determination
 label(final_determination$physical_abuse_det)         <- "LEAD physical abuse determination"
 label(final_determination$sexual_abuse_det)           <- "LEAD sexual abuse determination"
-label(final_determination$emotional_psycho_abuse_det) <- "LEAD emotional-pshcyo abuse determination"
+label(final_determination$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
 label(final_determination$neglect_det)                <- "LEAD neglect determination"
-label(final_determination$self_neglect_det)           <- "LEAD self_neglect determination"
+label(final_determination$self_neglect_det)           <- "LEAD self-neglect determination"
 label(final_determination$financial_exploitation_det) <- "LEAD financial exploitation determination"
 label(final_determination$abandonment_det)            <- "LEAD abandonment determination"
 label(final_determination$abuse_any)                  <- "LEAD any abuse determination"
@@ -535,9 +535,9 @@ label(final_determination$abuse_any)                  <- "LEAD any abuse determi
 # Initial positive votes
 label(initial_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
 label(initial_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
-label(initial_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-pshcyo abuse determination"
+label(initial_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
 label(initial_pos_votes$neglect_det)                <- "LEAD neglect determination"
-label(initial_pos_votes$self_neglect_det)           <- "LEAD self_neglect determination"
+label(initial_pos_votes$self_neglect_det)           <- "LEAD self-neglect determination"
 label(initial_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
 label(initial_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
 label(initial_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
@@ -545,9 +545,9 @@ label(initial_pos_votes$abuse_any)                  <- "LEAD any abuse determina
 # Secondary positive votes
 label(secondary_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
 label(secondary_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
-label(secondary_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-pshcyo abuse determination"
+label(secondary_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
 label(secondary_pos_votes$neglect_det)                <- "LEAD neglect determination"
-label(secondary_pos_votes$self_neglect_det)           <- "LEAD self_neglect determination"
+label(secondary_pos_votes$self_neglect_det)           <- "LEAD self-neglect determination"
 label(secondary_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
 label(secondary_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
 label(secondary_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
@@ -555,9 +555,9 @@ label(secondary_pos_votes$abuse_any)                  <- "LEAD any abuse determi
 # Post-DETECT positive votes
 label(post_detect_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
 label(post_detect_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
-label(post_detect_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-pshcyo abuse determination"
+label(post_detect_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
 label(post_detect_pos_votes$neglect_det)                <- "LEAD neglect determination"
-label(post_detect_pos_votes$self_neglect_det)           <- "LEAD self_neglect determination"
+label(post_detect_pos_votes$self_neglect_det)           <- "LEAD self-neglect determination"
 label(post_detect_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
 label(post_detect_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
 label(post_detect_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
@@ -595,7 +595,8 @@ final_det_sec       <- purrr::reduce(list(secondary_pos_votes, soc_dem, obs_meas
 final_det_post      <- purrr::reduce(list(post_detect_pos_votes, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
 ```
 
-## Create dataframe containing "any abuse" determination across the 3 assessments
+## Create dataframe containing "any abuse" determinations across the 3 assessments
+This will be used to check the percent similarity of the final abuse determinations across the assessments.
 
 ```{r}
 initial_compare <- initial_pos_votes %>% 
@@ -611,7 +612,19 @@ post_compare <- post_detect_pos_votes %>%
   rename(abuse_any_post = abuse_any)
 
 
-assessment_compare <- purrr::reduce(list(initial_compare, secondary_compare, post_compare), dplyr::left_join, by = 'medstar_id')
+assessment_compare <- purrr::reduce(list(initial_compare, secondary_compare, post_compare), dplyr::left_join, by = 'medstar_id') %>%
+  mutate(
+    same_is = ifelse(is.na(abuse_any_sec), NA, 
+      ifelse(abuse_any_initial == abuse_any_sec, 1,0)
+      ),
+    same_ip = ifelse(is.na(abuse_any_post), NA, 
+                      ifelse(abuse_any_initial == abuse_any_post, 1,0)
+    ),
+    same_ii = ifelse(is.na(abuse_any_initial), NA, 
+                      ifelse(abuse_any_initial == abuse_any_initial, 1,0)
+    )
+  )
+
 ```
 
 ## Participants interviewed between 05/2022 and 05/2023 with positive screening based on LEAD panel abuse determination 
@@ -692,7 +705,7 @@ cat("Proportion of MedStar ID's with an post-DETECT assessment =", unique_medsta
 ### Summary table
 ```{r}
 sum_table <- data.frame(
-                        Value = c("Unique MedStar ID's at intitial assessment", 
+                        Value = c("Unique MedStar ID's at initial assessment", 
                                   "Unique MedStar ID's at secondary assessment", 
                                   "Unique MedStar ID's at post-DETECT assessment", 
                                   "Total unique MedStar ID's across all assessments"),
@@ -720,45 +733,30 @@ Create a table that shows the percent similarity between each of the three asses
 Answers the question: When comparing the one assessment type to the other, what is the percentage of determinations that were the same in another assessment type, using the the smaller variable as the denominator?
 
 ### Function
+This function takes the name of a variable in the assessment_compare df that indicates whether or not the abuse determinations are the same for specified variables as an input. It computes the percent of abuse determinations that are the same.  
 ```{r}
-# Create function that computes the percent similarity between two columns in the assessment_compare data frame rounded to two decimal places
-# The "second" argument is the variable with the shorter length
-similarity <- function(first, second){
-  round(length(which(assessment_compare[[first]] == assessment_compare[[second]]))/length(which(!is.na(assessment_compare[[second]]) == TRUE))*100, digits = 2) 
+similarity <- function(column){
+  round(length(which(assessment_compare[[column]] == 1))/length(which(!is.na(assessment_compare[[column]]) == TRUE))*100, digits = 2)  
 }
 ```
 
 ### Values
 ```{r}
 # Create values for the table
-
-# initial column
-ii = similarity("abuse_any_initial", "abuse_any_initial")
-si = similarity("abuse_any_initial", "abuse_any_sec")
-pi = similarity("abuse_any_initial", "abuse_any_post")
-
-# Secondary column
-is = si
-ss = similarity("abuse_any_sec", "abuse_any_sec")
-ps = similarity("abuse_any_post", "abuse_any_sec")
-
-# Post-detect column
-ip = pi
-sp = ps
-pp = similarity("abuse_any_post", "abuse_any_post")
+ii = similarity("same_ii")
+is = similarity("same_is")
+ip = similarity("same_ip")
 ```
 
 ### Format table
 ```{r}
 sim_table <- data.frame(
                         Value = c("Initial", "Secondary", "Post-DETECT"),
-                        Initial     = c(ii, si, pi),
-                        Secondary   = c(is, ss, ps), 
-                        Post_detect = c(ip, sp, pp) 
+                        Initial     = c(ii, is, ip) 
                         ) %>%
   flextable()
 # Set caption
-sim_table <- set_caption(sim_table, "Table Showing the Percent Similarity of Determinations Between the Different Assessment Types")
+sim_table <- set_caption(sim_table, "Table Showing the Percent Similarity Between the Initial Assessment Determination and the Other Assessment Types")
 
 # format line
 std_border = fp_border(color="black")
@@ -768,7 +766,7 @@ std_border = fp_border(color="black")
 sim_table <- set_header_labels(sim_table, Value = "")
 sim_table <- set_header_labels(sim_table, Post_detect = "Post-DETECT")
 
-sim_table <- width(sim_table, width = 1.5)
+sim_table <- width(sim_table, width = 2)
 sim_table <- vline(sim_table, j = 1, border = std_border)
 
 sim_table
@@ -816,7 +814,7 @@ overall_tab
 cap_1  <- "Abuse Determinations Overall - Initial LEAD Assessment"
 
 
-initial_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det + xc_assessment_screened_det, 
+initial_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det, 
                data = final_det_initial, 
                caption = cap_1)
 initial_tab <- t1flex(initial_tab, tablefn = c("qflextable", "flextable", "regulartable"))
@@ -946,14 +944,14 @@ lead_doc <- body_add_fpar(lead_doc, fpar( ftext("LEAD Data Analysis Tables", pro
                                               fp_p = par_style ) ) %>%
   body_add_par(value = "")
 
-# Add number and proportion of assessements completed by type of assesement Table
+# Add number and proportion of assessments completed by type of assessment table
 lead_doc <- lead_doc %>% 
   body_add_flextable(sum_table, align = "left") %>%
   body_add_par(value = "")
 
 # Add similarity percentage table
 lead_doc <- lead_doc %>%
-  body_add_par("The table below answers the question: When comparing one assessment type to the other, what is the percentage of determinations that were the same in another assessment type, using the smaller variable as the denominator?")%>%
+  body_add_par("The table below answers the question: When comparing the initial assessment abuse determinations to the other assessments, what is the percentage of determinations that were the same?")%>%
   body_add_par(value = "") %>%
   body_add_flextable(sim_table, align = "left") %>%
   body_add_par(value = "")
