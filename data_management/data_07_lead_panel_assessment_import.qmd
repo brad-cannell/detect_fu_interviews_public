@@ -31,6 +31,18 @@ Here we will convert all variable names to snake case so that everything is unif
 lpa <- clean_names(lpa)
 ```
 
+## Fix incorrect panelist name
+Replace instances where panelist name is "Jason Knebl" with the name "Janice Knebl"
+```{r}
+lpa <- lpa %>%
+  mutate(
+    panelist_name = case_when(
+      panelist_name == "Jason Knebl"  ~ "Janice Knebl",
+      TRUE                            ~ panelist_name
+    ) 
+  )
+```
+
 ## Coerce categorical variables to factor variables
 
 ```{r}
@@ -90,10 +102,35 @@ lpa <- lpa %>%
 
 ```
 
+## Include panelist discipline variables
+Create two new variables _panelist-discipline_ and _healthcare-worker_ that describe the LEAD panelists' professions. This is based on the Panelists names and disciplines file.
+
+```{r}
+lpa <- lpa %>% 
+  mutate(
+    panelist_discipline = case_when(
+      panelist_name_10cat_f == "Samantha Fant" |
+      panelist_name_10cat_f == "Jordan Rolfe" |
+      panelist_name_10cat_f == "Hannah Bell"  |
+      panelist_name_10cat_f == "Tarrant County District Attorney's Office"                                            
+                                                   ~ "Assistant district attorney",
+      panelist_name_10cat_f == "Stephanie Large"   ~ "Geriatric nurse practitioner",
+      panelist_name_10cat_f == "Jason Burnett"     ~ "Elder mistreatment researcher",
+      panelist_name_10cat_f == "Kristen Reuter"    ~ "Geriatric social worker",
+      panelist_name_10cat_f == "Janice Knebl" | 
+        panelist_name_10cat_f == "John Halphen"    ~ "Geriatrician"
+    ),
+    healthcare_worker = case_when(
+      panelist_discipline == "Geriatrician" | panelist_discipline == "Geriatric nurse practitioner" ~ 1,
+      TRUE                                                                                          ~ 0
+    )
+  )
+```
+
 ### Remove variables that have recoded forms
 
 ```{r}
-lpa <- lpa %>% select(-c(13, 16:23,25))
+lpa <- lpa %>% select(-c(panelist_name, assessment_type : self_neglect, xc_assessment_screened))
 ```
 
 # Save as rds file

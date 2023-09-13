@@ -188,9 +188,25 @@ lead_panel_assessment <- lpa %>%
     ) %>%
   
     cb_add_col_attributes( 
+      panelist_discipline, 
+      description = "Panelist's professional discipline"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      healthcare_worker, 
+      description   = "Does the panelist's discipline fall under the classification of healthcare worker?",
+      value_labesls = c(
+        "Yes" = 1,
+        "No"  = 0
+      ),
+      col_type = "Categorical"
+    ) %>%
+  
+    cb_add_col_attributes( 
       xc_assessment_screened_2cat_f, 
       description = "Calculation determining if the participant screened 'positive' or 'negative'"
     )
+
 ```
 
 # Pass data frame to the codebook() function
