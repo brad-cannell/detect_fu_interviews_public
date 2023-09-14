@@ -19,11 +19,12 @@ library(stringr)
 library(mice)
 library(lubridate)
 library(writexl)
+library(readxl)
 ```
 
 # Load cleaned data
 
-Load the participant, self report, LEAD panel assessment,observational measures and sociodemographic information datasets
+Load the participant, self report, LEAD panel assessment,LEAD panel meeting attendance, observational measures and sociodemographic information datasets
 
 ```{r}
 #| warning: false
@@ -31,6 +32,7 @@ socio_demo <- readRDS("../data/cleaned_rds_files/sociodemographic_information_im
 observational_measures <- readRDS("../data/cleaned_rds_files/observational_measures_import.rds")
 lead_panel_assessment <- readRDS("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
 participant <- readr::read_rds("../data/cleaned_rds_files/participant_import.rds")
+lead_attendance <- read_excel("../data/lead_panel_meeting_attendance_reports/Combined LEAD panel meeting attendance.xlsx")
 ```
 
 # Data preparation
@@ -116,7 +118,7 @@ This data comes from participant abuse assessments by a Longitudinal, Experts, A
 ```{r}
 # Select relevant variables from LEAD panel assessment df
 lpa <- lead_panel_assessment %>%
-  select(medstar_id, panelist_name_10cat_f, x_created_timestamp, assessment_type_3cat_f : xc_assessment_screened_2cat_f)
+  select(medstar_id, panelist_name_10cat_f, panelist_discipline, healthcare_worker, x_created_timestamp,x_assessment_month, x_assessment_year, assessment_type_3cat_f : xc_assessment_screened_2cat_f)
 ```
 
 ```{r}
@@ -172,7 +174,7 @@ error_check <- function(assessment) {
     ) %>%
     ungroup()
   
-  # For each MedStar ID, are all the scores assigned by the same panelist identical or different.
+  # For each MedStar ID, are all the scores assigned by the same panelist identical or different (for each row, are there any other rows that are exactly the same in the group?).
   multiple_assessment <- multiple_assessment |> 
     group_by(
       medstar_id, panelist_name_10cat_f, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
@@ -600,16 +602,29 @@ This will be used to check the percent similarity of the final abuse determinati
 
 ```{r}
 initial_compare <- initial_pos_votes %>% 
-  select(medstar_id, abuse_any) %>%
-  rename(abuse_any_initial = abuse_any)
+  select(medstar_id, physical_abuse_det : abandonment_det, abuse_any) %>%
+  rename(abuse_any_initial = abuse_any) %>%
+    rename_with(
+      .cols   = c(ends_with("_det")), 
+      .fn     = ~ gsub("det", "det_init", .x)
+    )
+
 
 secondary_compare <- secondary_pos_votes %>% 
-  select(medstar_id, abuse_any) %>%
-  rename(abuse_any_sec = abuse_any)
+  select(medstar_id, physical_abuse_det : abandonment_det, abuse_any) %>%
+  rename(abuse_any_sec = abuse_any) %>%
+    rename_with(
+      .cols   = c(ends_with("_det")), 
+      .fn     = ~ gsub("det", "det_sec", .x)
+    )
 
 post_compare <- post_detect_pos_votes %>% 
-  select(medstar_id, abuse_any) %>%
-  rename(abuse_any_post = abuse_any)
+  select(medstar_id, physical_abuse_det : abandonment_det, abuse_any) %>%
+  rename(abuse_any_post = abuse_any) %>%
+    rename_with(
+      .cols   = c(ends_with("_det")), 
+      .fn     = ~ gsub("det", "det_post", .x)
+    )
 
 
 assessment_compare <- purrr::reduce(list(initial_compare, secondary_compare, post_compare), dplyr::left_join, by = 'medstar_id') %>%
@@ -626,6 +641,7 @@ assessment_compare <- purrr::reduce(list(initial_compare, secondary_compare, pos
   )
 
 ```
+
 
 ## Participants interviewed between 05/2022 and 05/2023 with positive screening based on LEAD panel abuse determination 
 
@@ -658,7 +674,109 @@ interview_list <- purrr::reduce(list(abuse, names, med_time), dplyr::left_join, 
 # write_xlsx(interview_list, "interview_list.xlsx")
 ```
 
+## LEAD panelist data metrics
+
+Prepare the data to extract LEAD panel metric requested by Dr. Pickering.
+
+### Paticipation of unique panelists per month across all assessment types
+
+```{r}
+# Merge the initial, secondary and post-DETECT datasets to create a dataset of all the LEAD data for selected variables excluding the rows with errors.
+lead_cleaned <- purrr::reduce(list(initial, secondary, post_detect), rbind) %>% select(-c(multiple_count: remove))
+
+# Create a date column combining month and year and including a placeholder value for day
+lead_cleaned <- lead_cleaned %>%
+  mutate(
+    day = 1,
+    x_assessment_month_num = dplyr::recode(x_assessment_month,
+                                    January   = 1,
+                                    February  = 2,
+                                    March     = 3,
+                                    April     = 4,
+                                    May       = 5,
+                                    June      = 6,
+                                    July      = 7,
+                                    August    = 8,
+                                    September = 9,
+                                    October   = 10,
+                                    November  = 11,
+                                    December  = 12
+    )
+  ) %>% 
+  mutate(
+    assessment_date = make_date(year  = x_assessment_year,
+                                month = x_assessment_month_num, day = day)
+  )
+
+# Create a data frame containing only the participation dates and names of unique panelists
+panelist_participation <- lead_cleaned %>% 
+  group_by(assessment_date) %>%
+  reframe(
+    unique_panelist = unique(panelist_name_10cat_f),
+    attendance = length(unique(panelist_name_10cat_f))
+  )
+# Create a data frame that shows the number of unique panelists per month that participated in LEAD meetings
+unique_panelist_participation <- panelist_participation %>% 
+  select(assessment_date, attendance) %>% unique()
+```
+
+### Average meeting attendance
+
+Average meeting attendance is the number of unique people who filled out a secondary assessment each month.
+
+```{r}
+# Create a dataframe containing only the months and names of unique panelists that voted in the secondary assessment.
+sec_meeting_attendance <- lead_cleaned %>%
+  filter(assessment_type_3cat_f == "Secondary assessment") %>%
+  group_by(assessment_date) %>%
+  reframe(
+    unique_panelist = unique(panelist_name_10cat_f),
+    attendance = length(unique(panelist_name_10cat_f))
+  )
+
+unique_secondary_attendance <- sec_meeting_attendance %>% 
+  select(assessment_date, attendance) %>% unique()
+```
+
+### Average meeting length from 7/22/2020 to 5/24/2023
+
+```{r}
+# Create meeting_date column and re-format attendance_duration variable as numerical
+lead_attendance <- lead_attendance %>% 
+  mutate(
+    meeting_date        = as_date(meeting_start_time),
+    attendance_duration_mins = as.numeric(gsub(" min.*", "", attendance_duration)
+                                     )
+    )
+
+
+# Find average meeting length using the longest attendance duration per date. 
+meeting_duration <- lead_attendance %>% group_by(meeting_date) %>% 
+  reframe(
+    meeting_time = max(attendance_duration_mins)
+  )
+```
+
+### Unique panelists per assessment type
+
+Create data frames to extract information on the unique panelists that voted in each assessment and across all assessments. 
+
+```{r}
+initial_panelists     <- initial %>% ungroup() %>% select(panelist_name_10cat_f) %>% unique()
+secondary_panelists   <- secondary %>% ungroup() %>% select(panelist_name_10cat_f) %>% unique() 
+post_panelists        <- post_detect %>% ungroup() %>% select(panelist_name_10cat_f) %>% unique() 
+```
+
 # Analaysis
+
+## Missing data summary
+
+```{r, fig.width = 20}
+fd_m <- final_determination %>% 
+  select(
+    physical_abuse_det: at_self_4cat_f,  
+    )%>% md.pattern(., plot = T, rotate.names = T)
+```
 
 ## Number and proportion of assessements completed by type of assesement
 
@@ -733,7 +851,7 @@ Create a table that shows the percent similarity between each of the three asses
 Answers the question: When comparing the one assessment type to the other, what is the percentage of determinations that were the same in another assessment type, using the the smaller variable as the denominator?
 
 ### Function
-This function takes the name of a variable in the assessment_compare df that indicates whether or not the abuse determinations are the same for specified variables as an input. It computes the percent of abuse determinations that are the same.  
+This function takes the name of a variable in the assessment_compare df that indicates whether or not the abuse determinations are the same for specified variables as an input. It computes the percent of abuse determinations that are the same rounded to 2 decimal places.  
 ```{r}
 similarity <- function(column){
   round(length(which(assessment_compare[[column]] == 1))/length(which(!is.na(assessment_compare[[column]]) == TRUE))*100, digits = 2)  
@@ -772,17 +890,246 @@ sim_table <- vline(sim_table, j = 1, border = std_border)
 sim_table
 ```
 
+## LEAD data metrics requested by Dr. Pickering
 
+### Metrics
 
-## Missing data summary
+I understand people could vote 3 times as they got additional information/discussion -- how many people did that? interpreted as: How many LEAD panelists voted in all three assessments (initial, secondary, post-detect)
 
-```{r, fig.width = 20}
-fd_m <- final_determination %>% 
-  select(
-    physical_abuse_det: at_self_4cat_f,  
-    )%>% md.pattern(., plot = T, rotate.names = T)
+```{r}
+voted_in_all <- Reduce(intersect, list(initial_panelists, secondary_panelists, post_panelists)) %>% nrow()
+cat("Total number of unique panelists that voted in all three assessments =", voted_in_all)
+```
+The number of unique panelists that voted in the initial assessment
+
+```{r}
+initial_voters <- initial_panelists %>% nrow()
+cat("Number of unique panelists that voted in the initial assessment =", initial_voters)
+```
+The number of unique panelists that voted in the secondary assessment
+
+```{r}
+secondary_voters <- secondary_panelists %>% nrow()
+cat("Number of unique panelists that voted in the secondary assessment =", secondary_voters)
 ```
 
+The number of unique panelists that voted in the post-DETECTl assessment
+
+```{r}
+post_voters <- post_panelists %>% nrow()
+cat("Number of unique panelists that voted in the post-DETECT assessment =", post_voters)
+```
+
+The number of people who were asked to be on LEAD and the number who agreed. Everyone who was asked agreed.  
+
+```{r}
+all_voters <- Reduce(union, list(initial_panelists, secondary_panelists, post_panelists)) %>% nrow()
+cat("Total number of unique panelists across all three assessments =", all_voters)
+```
+
+Average meeting attendance. The average meeting attendance is the number of unique people who filled out a secondary assessment each month.
+
+```{r}
+cat("Average meeting attendance =", mean(unique_secondary_attendance$attendance))
+```
+Average meeting length from 7/22/2020 to 5/24/2023
+
+```{r}
+cat("Average meeting length =", mean(meeting_duration$meeting_time))
+```
+
+### Plot
+Create a plot that shows the number of unique panelists that participated per month over time.
+
+```{r}
+participation <- ggplot(aes(x = assessment_date, y = attendance), data = unique_panelist_participation) + geom_line() +
+  labs(title = "Number of Unique Panelists Per Month Over Time ", x = "Time", 
+       y = "Number of Unique Panelists Per Month")
+
+participation
+
+ggsave("participation_plot.png")
+```
+
+### Abuse types of the dissimilar cases
+For the cases that did not have congruence – what type of cases were they? (physical, self-neglect, etc)
+
+#### Initial vs Secondary
+
+##### Create dummy variables that indicate the type of case 
+
+```{r}
+# Dissimilar cases between the initial and secondary assessments
+sec_dissimilar <- assessment_compare %>% filter(same_is == 0) %>% select(-c(same_ip, same_ii, ends_with("_post")))
+```
+
+```{r}
+sec_dissimilar <- sec_dissimilar %>% 
+  mutate(
+    non_con_phys = ifelse(physical_abuse_det_init != physical_abuse_det_sec, 1, 0),
+    non_con_sex  = ifelse(sexual_abuse_det_init != sexual_abuse_det_sec, 1, 0),
+    non_con_emo  = ifelse(emotional_psycho_abuse_det_init != emotional_psycho_abuse_det_sec, 1, 0),
+    non_con_neg  = ifelse(neglect_det_init != neglect_det_sec, 1, 0),
+    non_con_self = ifelse(self_neglect_det_init != self_neglect_det_sec, 1, 0),
+    non_con_fin  = ifelse(financial_exploitation_det_init != financial_exploitation_det_sec, 1, 0),
+    non_con_aban = ifelse(abandonment_det_init != abandonment_det_sec, 1, 0),
+    total        = rowSums(
+      across(
+        .cols = non_con_phys : non_con_aban
+      )
+    )
+  )
+```
+
+##### Values
+```{r}
+# Create values for the table
+phys = sec_dissimilar %>% filter(non_con_phys == 1) %>% nrow()
+sex = sec_dissimilar %>% filter(non_con_sex == 1) %>% nrow()
+emo = sec_dissimilar %>% filter(non_con_emo == 1) %>% nrow()
+neg = sec_dissimilar %>% filter(non_con_neg == 1) %>% nrow()
+self = sec_dissimilar %>% filter(non_con_self == 1) %>% nrow()
+fin = sec_dissimilar %>% filter(non_con_fin == 1) %>% nrow()
+aban = sec_dissimilar %>% filter(non_con_aban == 1) %>% nrow()
+```
+
+##### Format table
+```{r}
+case_table <- data.frame(
+                        Value = c("Physical abuse", "Sexual abuse", "Emotional abuse", "Neglect",
+                                  "Self-neglect", "Financial abuse","Abandonment"),
+                        Count     = c(phys, sex, emo, neg, self, fin, aban),
+                        Proportion = c(phys/21, sex/21, emo/21, neg/21, self/21, fin/21, aban/21)
+                        ) %>%
+  flextable()
+# Set caption
+case_table <- set_caption(case_table, "Non-congruent Cases Between Initial Assessment Determination and Secondary Assessment (Total non-congruent cases = 21)")
+
+
+# Set header labels 
+
+case_table <- set_header_labels(case_table, Value = "Abuse Types")
+
+case_table <- width(case_table, width = 2)
+
+case_table <- add_footer_lines(case_table, values = c("In one case, 2 types of abuse (emotional and financial) were detected simultaneously."))
+
+case_table <- italic(case_table, italic = TRUE, part = "footer")
+
+case_table
+
+```
+
+#### Initial vs Post-DETECT
+
+##### Create dummy variables that indicate the type of case 
+
+```{r}
+# Dissimilar cases between the initial and secondary assessments
+post_dissimilar <- assessment_compare %>% filter(same_ip == 0) %>% select(-c(same_is, same_ii, ends_with("_sec")))
+```
+
+```{r}
+post_dissimilar <- post_dissimilar %>% 
+  mutate(
+    non_con_phys = ifelse(physical_abuse_det_init != physical_abuse_det_post, 1, 0),
+    non_con_sex  = ifelse(sexual_abuse_det_init != sexual_abuse_det_post, 1, 0),
+    non_con_emo  = ifelse(emotional_psycho_abuse_det_init != emotional_psycho_abuse_det_post, 1, 0),
+    non_con_neg  = ifelse(neglect_det_init != neglect_det_post, 1, 0),
+    non_con_self = ifelse(self_neglect_det_init != self_neglect_det_post, 1, 0),
+    non_con_fin  = ifelse(financial_exploitation_det_init != financial_exploitation_det_post, 1, 0),
+    non_con_aban = ifelse(abandonment_det_init != abandonment_det_post, 1, 0),
+    total        = rowSums(
+      across(
+        .cols = non_con_phys : non_con_aban
+      )
+    )
+  )
+```
+
+##### Values
+```{r}
+# Create values for the table
+phys2 = post_dissimilar %>% filter(non_con_phys == 1) %>% nrow()
+sex2 = post_dissimilar %>% filter(non_con_sex == 1) %>% nrow()
+emo2 = post_dissimilar %>% filter(non_con_emo == 1) %>% nrow()
+neg2 = post_dissimilar %>% filter(non_con_neg == 1) %>% nrow()
+self2 = post_dissimilar %>% filter(non_con_self == 1) %>% nrow()
+fin2 = post_dissimilar %>% filter(non_con_fin == 1) %>% nrow()
+aban2 = post_dissimilar %>% filter(non_con_aban == 1) %>% nrow()
+```
+
+##### Format table
+```{r}
+case2_table <- data.frame(
+                        Value = c("Physical abuse", "Sexual abuse", "Emotional abuse", "Neglect",
+                                  "Self-neglect", "Financial abuse","Abandonment"),
+                        Count     = c(phys2, sex2, emo2, neg2, self2, fin2, aban2),
+                        Proportion = c(phys2/12, sex2/12, emo2/12, neg2/12, self2/12, fin2/12, aban2/12)
+                        ) %>%
+  flextable()
+# Set caption
+case2_table <- set_caption(case2_table, "Non-congruent Cases Between Initial Assessment Determination and Post-DETECT Assessment (Total non-congruent cases = 12)")
+
+
+# Set header labels 
+
+case2_table <- set_header_labels(case2_table, Value = "Abuse Types")
+
+case2_table <- width(case2_table, width = 2)
+
+case2_table
+```
+
+### Panelist Disciplines of Non-Congruent Cases
+
+For cases that did not have congruence (or at least initially) – were there certain disciplines that tended to diverge from the others?
+
+Interpreted as: In the initial assessment, which disciplines had a tendency to vote differently from the rest?
+
+```{r}
+# Subset cases where the initial final abuse lead determination is different from either the secondary determination or the post-DETECT determination in the assessment_compare data frame
+non_congruent <- assessment_compare %>% 
+  filter(same_is == 0 | same_ip == 0)
+ 
+# Subset non-congruent cases in the initial data frame
+ncd <- initial %>% 
+  filter(medstar_id %in% non_congruent$medstar_id) 
+
+
+# Create a subset data frame that contains the cleaned LEAD data for only the initial assessment cases and indicates whether or not the abuse votes were the same. 
+# Determine which MedStar IDs did not have voter congruence by comparing the number of observations when the data is grouped by medstar_id and the abuse columns to when the data is only grouped by medstar_id.
+
+initial_non_con <- lead_cleaned %>% filter(assessment_type_3cat_f == "Initial assessment") %>% 
+  group_by(
+    medstar_id, physical_abuse_2cat, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
+    self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat
+  ) %>%
+  mutate(
+    identical_length = n()
+  ) %>%
+  ungroup() %>%
+  group_by(medstar_id) %>%
+  mutate(
+    voter_length = n()
+  ) %>% 
+  ungroup() %>%
+  mutate(
+    congruent_votes = case_when(
+      identical_length == voter_length  ~ 1,
+      identical_length != voter_length  ~ 0
+  
+    )
+  ) %>%
+  filter(congruent_votes == 0)
+
+        
+
+
+#
+
+
+```
 
 # 🔴 NOTE
 
@@ -805,7 +1152,6 @@ overall_tab <- width(overall_tab, width = 3)
 overall_tab <- bold(overall_tab, bold = FALSE, part = "all")
 overall_tab
 ```
-
 
 #### Final determinations for the intial assessment
 
@@ -854,7 +1200,6 @@ post_tab <- width(post_tab, width = 3)
 post_tab <- bold(post_tab, bold = FALSE, part = "all")
 post_tab
 ```
-
 
 ### Race/ Ethnicity stratified by abuse determination
 
@@ -929,8 +1274,7 @@ mvl_tab <- bold(mvl_tab, bold = FALSE, part = "all")
 mvl_tab
 ```
 
-
-# Create Word Document
+# Create LEAD  Data Analysis Word Document
 
 ```{r, echo = FALSE}
 # create Word file and object
@@ -1004,5 +1348,41 @@ lead_doc <- lead_doc %>%
   body_add_flextable(mvl_tab, align = "left") 
 
 # print the word document
-print(lead_doc, target = "LEAD_data_analysis_tables.docx")
+# print(lead_doc, target = "LEAD_data_analysis_tables.docx")
 ```
+
+# Export LEAD data feasibility metrics tables and plots into a Word file
+
+```{r}
+# create Word file and object
+feas_doc <- read_docx()
+
+# Add the Non-congruent Cases Between Initial Assessment Determination and Secondary Assessment table
+feas_doc <- feas_doc %>% 
+  body_add_flextable(case_table, align = "left") %>%
+  body_add_par(value = "")
+
+# Add the Non-congruent Cases Between Initial Assessment Determination and Post-DETECT Assessment table
+feas_doc <- feas_doc %>% 
+  body_add_flextable(case2_table, align = "left") %>%
+  body_add_par(value = "")
+
+# Add the final abuse determination for the initial assessment table
+feas_doc <- feas_doc %>% 
+  body_add_flextable(initial_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add the final abuse determination for the secondary assessment table
+feas_doc <- feas_doc %>% 
+  body_add_flextable(sec_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# Add the final abuse determination for the post-DETECT assessment table
+feas_doc <- feas_doc %>% 
+  body_add_flextable(post_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# print the word document
+# print(feas_doc, target = "LEAD_data_metric_tables.docx")
+```
+
