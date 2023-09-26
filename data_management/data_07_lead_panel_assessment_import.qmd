@@ -51,7 +51,7 @@ lpa <- lpa %>%
   mutate(
     panelist_name_10cat_f = factor(
       panelist_name,
-      levels = c("Hannah Bell", "Janice Knebl", "Jason Burnett", "Jason Knebl", 
+      levels = c("Hannah Bell", "Janice Knebl", "Jason Burnett", 
                  "John Halphen", "Jordan Rolfe", "Kristen Reuter",
                  "Samantha Fant", "Stephanie Large", 
                  "Tarrant County District Attorney's Office"
