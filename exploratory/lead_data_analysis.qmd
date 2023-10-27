@@ -35,6 +35,16 @@ participant <- readr::read_rds("../data/cleaned_rds_files/participant_import.rds
 lead_attendance <- read_excel("../data/lead_panel_meeting_attendance_reports/Combined LEAD panel meeting attendance.xlsx")
 ```
 
+# Load User Defined Function Files
+```{r}
+# Create summary of unique cases
+source("../user_defined_functions/unique_case_count.R")
+
+# Create summary of dissenting votes by discipline
+source("../user_defined_functions/vote_agreement.R")
+```
+
+
 # Data preparation
 
 Prepare and then merge the relevant variables in the self report, LEAD panel assessment and sociodemographic information data sets into one data frame.
@@ -118,7 +128,7 @@ This data comes from participant abuse assessments by a Longitudinal, Experts, A
 ```{r}
 # Select relevant variables from LEAD panel assessment df
 lpa <- lead_panel_assessment %>%
-  select(medstar_id, panelist_name_10cat_f, panelist_discipline, healthcare_worker, x_created_timestamp,x_assessment_month, x_assessment_year, assessment_type_3cat_f : xc_assessment_screened_2cat_f)
+  select(medstar_id, panelist_name_10cat_f, panelist_discipline_5cat_f, healthcare_worker_2cat_f, x_created_timestamp, x_assessment_month, x_assessment_year, assessment_type_3cat_f : xc_assessment_screened_2cat_f)
 ```
 
 ```{r}
@@ -140,202 +150,139 @@ Look at medstar_id 47311d550da4471297501ae2b3b03b02. It looks like Jason complet
 3. If there truly are multiple initial assessments, then we need to check if there is any difference between them. If not, then just keep the final row (in terms of time stamp).
 4. If there ARE differences, this is trickier. I'm leaning towards keeping the final row here too, but we should look at some examples before making a final decision.
 
-#### Identify Medstar IDs with data error
 
-Create a function that identifies the specific issues and indicates whether a row should be excluded or not by adding the following columns:
+##### Identify Medstar IDs with data error and remove rows based on certain criteria.
 
-_multiple_count_ - Indicate the number of rows for each panelist under each MedStar ID.
-
-_same_score_     - For each MedStar ID, are all the scores assigned by the same panelist identical or different.
-
-_over_24_hours_  - For each MedStar ID with multiple assessments for the same panelist, were the assessments performed within one day of each other?
-_most_recent_    - For each MedStar ID with multiple assessments for the same panelist, was the entry for the specified row the most recent?
-
-_all_na_         - Are all, some or none of the assessment values missing for the specified row?
-_remove_         - Should this row be removed or is further review required to determine this based on the rules below?
-
-                  1. Identical duplicates: Keep the most recent row.
-                  2. Additional entries with all values missing : Remove rows with all missing vote values
+Write code that identifies the specific issues, indicates whether a row should be excluded or not and then removes the identified rows based on the following criteria:
+  1. Identical duplicates: Keep the most recent row.
+  2. Additional entries with all values missing : Remove rows with all missing vote values
+  3. Additional entries where not all values are missing: Keep only the most recent
 
 ```{r}
-error_check <- function(assessment) {
-  
-  # Create a vector of abuse type columns. Will be used for grouping below.
-  group <- c('physical_abuse_2cat', 'sexual_abuse_2cat', 'emotional_psycho_abuse_2cat', 'neglect_2cat', 
-             'self_neglect_2cat', 'financial_exploitation_2cat', 'abandonment_2cat')
-  
-  # Add a column to the data frame -- multiple_count -- that is equal to the 
-  # number of rows in the data frame for each combination of medstar ID and
-  # panelist name.
-  multiple_assessment <- assessment %>%
-    group_by(medstar_id, panelist_name_10cat_f) %>% 
-    mutate(
-      multiple_count = length(panelist_name_10cat_f)
-    ) %>%
-    ungroup()
-  
-  # For each MedStar ID, are all the scores assigned by the same panelist identical or different (for each row, are there any other rows that are exactly the same in the group?).
-  multiple_assessment <- multiple_assessment |> 
-    group_by(
-      medstar_id, panelist_name_10cat_f, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
-      self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat
-    ) %>%
-    mutate(
-      same_score = n() > 1
-    ) %>%
-    ungroup()
-  
-  # Are all, some. or none of the assessment values missing for the specified row?
-  multiple_assessment <- multiple_assessment |> 
-    mutate(
-      all_na = case_when(
-        if_all(all_of(group), ~ is.na(.))  ~ "all",
-        if_all(all_of(group), ~ !is.na(.)) ~ "none",
-        TRUE                               ~ "some"
-      )
-    ) %>%
-    ungroup()
-  
-  # For each MedStar ID with multiple assessments for the same panelist, were 
-  # the assessments performed within one day of each other?
-  multiple_assessment <- multiple_assessment |>
-    group_by(medstar_id, panelist_name_10cat_f) %>%
-    mutate(
-      over_24_hours = ifelse(
-        (as.numeric(difftime(last(x_created_timestamp), first(x_created_timestamp), units = "hours")) > 24), 1, 0
-      )
+  # Create a vector of columns that will be used for grouping below.
+group <- c('assessment_type_3cat_f', 'physical_abuse_2cat', 'sexual_abuse_2cat', 'emotional_psycho_abuse_2cat', 'neglect_2cat', 
+           'self_neglect_2cat', 'financial_exploitation_2cat', 'abandonment_2cat')
+
+# Add a column to the data frame -- multiple_count -- that is equal to the number of rows in the data frame for each combination of medstar ID 
+# and panelist name.
+multiple_assessment <- lpa %>%
+  group_by(medstar_id, panelist_name_10cat_f, assessment_type_3cat_f) %>% 
+  mutate(
+    multiple_count = length(panelist_name_10cat_f)
+  ) %>%
+  ungroup()
+
+# For each MedStar ID, are all the scores assigned by the same panelist identical or different (identifies whether or not there is more than one row per group).
+multiple_assessment <- multiple_assessment |> 
+  group_by(
+    medstar_id, panelist_name_10cat_f, assessment_type_3cat_f, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
+    self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat
+  ) %>%
+  mutate(
+    same_score = case_when(
+      multiple_count   >1 & n() > 1  ~ TRUE,
+      multiple_count   >1 & n() == 1 ~ FALSE,
+      TRUE                           ~ NA 
     )
-  
-  # For each MedStar ID with multiple assessments for the same panelist, was the entry for the specified row the most recent?
-  multiple_assessment <- multiple_assessment |>
-    mutate(
-      most_recent = ifelse(x_created_timestamp == max(x_created_timestamp), "Yes", "No")
+  ) %>%
+  ungroup()
+
+# Are all, some. or none of the assessment values missing for the specified row?
+multiple_assessment <- multiple_assessment |> 
+  mutate(
+    all_na = case_when(
+      if_all(all_of(group), ~ is.na(.))  ~ "all",
+      if_all(all_of(group), ~ !is.na(.)) ~ "none",
+      TRUE                               ~ "some"
     )
-  
-  # Should this row be removed or is further review required to determine this 
-  # based on the rules below?
-  multiple_assessment <- multiple_assessment |>
-    mutate(
-      remove  = case_when(
-        # Case when the error is present and the scores are not identical. All of the rows being compared have one or more missing
-        # scores and at least one of the rows being compared does not have all of the scores missing. Marks such cases
-        # for individual review
-        multiple_count > 1 & same_score == FALSE & all(all_na != "none") & any(all_na != "all") ~ "Individual review",
-        
-        # Case when the error is present, the scores are not identical and at least one of the rows being compared has some but not all 
-        # scores missing. Any of the other rows being compared could have none or all missing values. Marks such cases for
-        # individual reveiw.
-        multiple_count > 1 & same_score == FALSE & any(all_na == "some")                        ~ "Individual review",
-        
-        # Case when the error is present, the scores are not identical and all the rows being compared have no missing scores.
-        multiple_count > 1 & same_score == FALSE & all(all_na == "none")                        ~ "Individual review",
-        
-        # case when there is no error
-        multiple_count == 1                                                                     ~ "No",
-        
-        # Marks only the most recent of identical rows where error is present for keeping while the other rows are removed.
-        multiple_count > 1 & same_score == TRUE & most_recent == "Yes"                          ~ "No",
-        
-        # Case when there is an error and the scores being compared are not the same. Marks rows where there are no missing scores
-        # for keeping
-        multiple_count > 1 & same_score == FALSE & all_na == "none"                             ~ "No",
-       
-        # Case when error is present but all the rows are identical in terms of assigned scores. Marks rows that are not the most
-        # recent for removal
-        multiple_count > 1 & same_score == TRUE & most_recent == "No"                           ~ "Yes",
-       
-        # Case when the error is present and the scores are not identical. Marks rows where all the scores are missing for removal
-        multiple_count > 1 & same_score == FALSE & all_na == "all"                              ~ "Yes"
-      )
+  ) %>%
+  ungroup()
+
+# For each MedStar ID with multiple assessments for the same panelist, were 
+# the assessments performed within one day of each other?
+multiple_assessment <- multiple_assessment |>
+  group_by(medstar_id, panelist_name_10cat_f, assessment_type_3cat_f) %>%
+  mutate(
+    over_24_hours = ifelse(
+      (as.numeric(difftime(last(x_created_timestamp), first(x_created_timestamp), units = "hours")) > 24), 1, 0
     )
-  
-  # Return result
-  multiple_assessment
-}
+  )
 
-# For testing
-# error_check(initial_e) |> 
-#   filter(multiple_count > 1)
-```
+# For each MedStar ID with multiple assessments for the same panelist, was the entry for the specified row the most recent?
+multiple_assessment <- multiple_assessment |>
+  mutate(
+    most_recent = ifelse(x_created_timestamp == max(x_created_timestamp), "Yes", "No")
+  )
 
-```{r}
-# Initial Assessments
+# Should this row be removed or is further review required to determine this 
+# based on the rules below?
+multiple_assessment <- multiple_assessment |>
+  mutate(
+    remove  = case_when(
+      # Case when the error is present and the scores are not identical. All of the rows being compared have one or more missing
+      # scores and at least one of the rows being compared does not have all of the scores missing. Marks such cases
+      # for individual review
+      multiple_count > 1 & same_score == FALSE & all(all_na != "none") & any(all_na != "all") ~ "Individual review",
+      
+      # Case when the error is present, the scores are not identical and at least one of the rows being compared has some but not all 
+      # scores missing. Any of the other rows being compared could have none or all missing values. Marks such cases for
+      # individual reveiw.
+      multiple_count > 1 & same_score == FALSE & any(all_na == "some")                        ~ "Individual review",
+      
+      # Case when the error is present, the scores are not identical and all the rows being compared have no missing scores.
+      multiple_count > 1 & same_score == FALSE & all(all_na == "none")                        ~ "Individual review",
+      
+      # case when there is no error
+      multiple_count == 1                                                                     ~ "No",
+      
+      # Marks only the most recent of identical rows where error is present for keeping while the other rows are removed.
+      multiple_count > 1 & same_score == TRUE & most_recent == "Yes"                          ~ "No",
+      
+      # Case when there is an error and the scores being compared are not the same. Marks rows where there are no missing scores
+      # for keeping
+      multiple_count > 1 & same_score == FALSE & all_na == "none"                             ~ "No",
+      
+      # Case when error is present but all the rows are identical in terms of assigned scores. Marks rows that are not the most
+      # recent for removal
+      multiple_count > 1 & same_score == TRUE & most_recent == "No"                           ~ "Yes",
+      
+      # Case when the error is present and the scores are not identical. Marks rows where all the scores are missing for removal
+      multiple_count > 1 & same_score == FALSE & all_na == "all"                              ~ "Yes"
+    )
+  ) %>% 
+  ungroup()
+# Remove rows marked for removal.
+lpac <-  multiple_assessment %>% filter(!(remove == "Yes")) 
 
-initial_e <- error_check(initial_e)
-
-initial_e %>% filter(multiple_count > 1) 
-```
-
-```{r}
-
-# Secondary Assessments
-
-secondary_e <- error_check(secondary_e)
-
-secondary_e %>% filter(multiple_count > 1)
-```
-
-```{r}
-# Post-detect assessments
-
-post_detect_e <- error_check(post_detect_e)
-
-post_detect_e %>% filter(multiple_count > 1)
-```
+# Remove rows marked for individual review that are not the most recent.
+lpac <-  lpac %>% filter(!(remove == "Individual review" & most_recent == "No") | remove == "No")
 
 
-### Create subsets for the 3 assessment types with the multiple assessment rows removed
-
-Create a function that will remove the rows with issues.
-
-```{r}
-fix_error <- function(assessment) {
-  # Remove rows marked by the error_check function for removal.
-  assessment <-  assessment %>% filter(!(remove == "Yes")) 
-  
-  # Remove rows marked by the error_check function for individual review that are not the most recent.
-  assessment <-  assessment %>% filter(!(remove == "Individual review" & most_recent == "No") | remove == "No") 
-    
-}
-
-```
-
-```{r}
-# Initial assessment
-initial <- fix_error(initial_e)
-
-# Secondary assessment
-secondary <- fix_error(secondary_e)
-
-# Post-detect assessment
-post_detect <- fix_error(post_detect_e)
 ```
 
 ### 🔴 Create overall EM determination columns
 
-For each medstar_id reviewed by the LEAD panel, we want to calculate:
+Create a data frame that summarizes the lead panel data by including columns that indicate:
+  - The total number of positive votes
+  - The proportion of positive votes
+  - Whether there are any positive votes for each type of abuse for each assessment.
+  - Whether there are any positive votes across all subtypes of abuse for each assessment.
+  - The final LEAD Assessment determination based on majority vote for each assessment.
 
-1. Create a column containing the number of positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of EM.
-
-2. Create a column containing the proportion (denominator is number of non-missing votes) of positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of EM.
-
-### Total and proportion of positive votes for each Medstar iD
-
-Create summary dataframes for each assessment that include calculated columns indicating the total number of positive votes and the proportion of positive votes for each MedStar ID.
-
-#### Create a positive vote summary function that will be applied to each of the three assessment data frames.
+#### The total number of  positive votes and the proportion of positive votes for each MedStar ID
 
 ```{r}
-pos_votes <- function(assessment) {
-  assessment %>% 
-  group_by(medstar_id) %>% 
+pos_votes <- lpac %>% 
+  group_by(medstar_id, assessment_type_3cat_f) %>% 
   reframe(
+    # compute the sum of positive votes for each MedStar ID in each assessment
     across(
       .cols  = c(physical_abuse_2cat : abandonment_2cat, xc_assessment_screened_2cat),
       .fns   = ~ sum(.x),
       .names = "{col}_t"
     ),
     assessment_type_3cat_f  = unique(assessment_type_3cat_f),
+    # compute the proportion of positive votes for each MedStar ID
     across(
       .cols  = physical_abuse_2cat_t : xc_assessment_screened_2cat_t,
       .fns   = ~ case_when(
@@ -345,6 +292,7 @@ pos_votes <- function(assessment) {
       .names = "{col}_p"
     )
   ) %>%
+  # rename the new columns
   rename_with(
     .cols   = ends_with("_t"), 
     .fn     = ~ gsub("2cat_t", "total", .x)
@@ -353,34 +301,14 @@ pos_votes <- function(assessment) {
     .cols   = ends_with("_p"), 
     .fn     = ~ gsub("2cat_t_p", "prop", .x)
   )
-}
 ```
 
-```{r}
-# Initial Assessments
-
-initial_pos_votes <- pos_votes(initial)
-```
+#### Dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of abuse.
 
 ```{r}
-# Secondary Assessments
 
-secondary_pos_votes <- pos_votes(secondary)
-```
-
-```{r}
-# Post-detect assessments
-
-post_detect_pos_votes <- pos_votes(post_detect)
-```
-
-### Any positive determinations for each subtypes
-
-3. Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) for each subtype of abuse.
-
-```{r}
-any_pos <- function(assessment_pos_votes) {
-  assessment_pos_votes %>% 
+  any_pos <- pos_votes %>% 
+    group_by(assessment_type_3cat_f) %>%
     mutate(
       across(
         .cols   = physical_abuse_total : xc_assessment_screened_total,
@@ -393,93 +321,52 @@ any_pos <- function(assessment_pos_votes) {
       across(
         .cols   = ends_with("_any"),
         .fns    = ~ factor(.x, 
-                      levels = c(0,1),
-                      labels = c("No", "Yes")),
-      .names = "{col}"
+                           levels = c(0,1),
+                           labels = c("No", "Yes")),
+        .names = "{col}"
       )
     ) %>%
     rename_with(
       .cols   = ends_with("_any"), 
       .fn     = ~ gsub("total_any", "any", .x)
-    )
-  
-}
-```
-
-```{r}
-# Initial Assessments
-
-initial_pos_votes <- any_pos(initial_pos_votes)
-```
-
-```{r}
-# Secondary Assessments
-
-secondary_pos_votes <- any_pos(secondary_pos_votes)
-```
-
-```{r}
-# Post-detect assessments
-
-post_detect_pos_votes <- any_pos(post_detect_pos_votes)
-```
-
-### Majority vote variable for each abuse type
-
-Create columns that indicate the final LEAD Assessment determination based on majority vote. Final determination will be by majority (more than half) vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)
-
-```{r}
-final_det <- function(assessment_pos_votes) {
-  assessment_pos_votes %>% 
-    mutate(
-      across(
-        .cols   = physical_abuse_prop : xc_assessment_screened_prop,
-        .fn     = ~ case_when(
-          .x    <= 0.5         ~ 0,
-          .x    >  0.5         ~ 1
-        ),
-        .names  = "{col}_det"
-      ),
-      across(
-        .cols   = ends_with("_det"),
-        .fns    = ~ factor(.x, 
-                      levels = c(0,1),
-                      labels = c("No", "Yes")),
-      .names = "{col}"
-      )
     ) %>%
-    rename_with(
-      .cols   = ends_with("_det"), 
-      .fn     = ~ gsub("prop_det", "det", .x)
+    ungroup()
+```
+
+#### The final LEAD Assessment determination based on majority vote
+
+```{r}
+final_det <- any_pos %>% 
+  group_by(assessment_type_3cat_f) %>%
+  mutate(
+    across(
+      .cols   = physical_abuse_prop : xc_assessment_screened_prop,
+      .fn     = ~ case_when(
+        .x    <= 0.5         ~ 0,
+        .x    >  0.5         ~ 1
+      ),
+      .names  = "{col}_det"
+    ),
+    across(
+      .cols   = ends_with("_det"),
+      .fns    = ~ factor(.x, 
+                    levels = c(0,1),
+                    labels = c("No", "Yes")),
+    .names = "{col}"
     )
-}
+  ) %>%
+  rename_with(
+    .cols   = ends_with("_det"), 
+    .fn     = ~ gsub("prop_det", "det", .x)
+  ) %>%
+    ungroup()
 ```
 
-```{r}
-# Initial Assessments
-
-initial_pos_votes <- final_det(initial_pos_votes)
-```
+#### Dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) across _all_ subtypes of EM.
 
 ```{r}
-# Secondary Assessments
-
-secondary_pos_votes <- final_det(secondary_pos_votes)
-```
-
-```{r}
-# Post-detect assessments
-
-post_detect_pos_votes <- final_det(post_detect_pos_votes)
-```
-
-### Any positive determinations across all subtypes
-
-Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) across _all_ subtypes of EM.
-
-```{r}
-abuse_any <- function(assessment_final_det) {
-  assessment_final_det %>%
+  final_det <- final_det %>%
+    group_by(assessment_type_3cat_f) %>%
     mutate(
       abuse_any = case_when(
         if_any(physical_abuse_det : abandonment_det, ~. == "Yes")  ~ 1,
@@ -488,81 +375,27 @@ abuse_any <- function(assessment_final_det) {
       )
     ) %>%
     mutate(
-        abuse_any = factor(
+      abuse_any = factor(
         abuse_any,
         levels = c(0, 1),
         labels = c("No", "Yes")
       )
-    )
-}
-```
-
-```{r}
-# Initial Assessments
-
-initial_pos_votes <- abuse_any(initial_pos_votes)
-```
-
-```{r}
-# Secondary Assessments
-
-secondary_pos_votes <- abuse_any(secondary_pos_votes)
-```
-
-```{r}
-# Post-detect assessments
-
-post_detect_pos_votes <- abuse_any(post_detect_pos_votes)
-```
-
-```{r}
-# Merge the initial_pos_votes and secondary_pos_votes data sets, keeping only the secondary_pos_votes for each medstar_id when it is available
-final_determination <- initial_pos_votes[!initial_pos_votes$medstar_id %in% secondary_pos_votes$medstar_id,]
-final_determination <- rbind(final_determination, secondary_pos_votes)
+    ) %>%
+    ungroup()
 ```
 
 ## Set labels
 
 ```{r}
 # Overall final determination
-label(final_determination$physical_abuse_det)         <- "LEAD physical abuse determination"
-label(final_determination$sexual_abuse_det)           <- "LEAD sexual abuse determination"
-label(final_determination$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
-label(final_determination$neglect_det)                <- "LEAD neglect determination"
-label(final_determination$self_neglect_det)           <- "LEAD self-neglect determination"
-label(final_determination$financial_exploitation_det) <- "LEAD financial exploitation determination"
-label(final_determination$abandonment_det)            <- "LEAD abandonment determination"
-label(final_determination$abuse_any)                  <- "LEAD any abuse determination"
-
-# Initial positive votes
-label(initial_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
-label(initial_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
-label(initial_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
-label(initial_pos_votes$neglect_det)                <- "LEAD neglect determination"
-label(initial_pos_votes$self_neglect_det)           <- "LEAD self-neglect determination"
-label(initial_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
-label(initial_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
-label(initial_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
-
-# Secondary positive votes
-label(secondary_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
-label(secondary_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
-label(secondary_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
-label(secondary_pos_votes$neglect_det)                <- "LEAD neglect determination"
-label(secondary_pos_votes$self_neglect_det)           <- "LEAD self-neglect determination"
-label(secondary_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
-label(secondary_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
-label(secondary_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
-
-# Post-DETECT positive votes
-label(post_detect_pos_votes$physical_abuse_det)         <- "LEAD physical abuse determination"
-label(post_detect_pos_votes$sexual_abuse_det)           <- "LEAD sexual abuse determination"
-label(post_detect_pos_votes$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
-label(post_detect_pos_votes$neglect_det)                <- "LEAD neglect determination"
-label(post_detect_pos_votes$self_neglect_det)           <- "LEAD self-neglect determination"
-label(post_detect_pos_votes$financial_exploitation_det) <- "LEAD financial exploitation determination"
-label(post_detect_pos_votes$abandonment_det)            <- "LEAD abandonment determination"
-label(post_detect_pos_votes$abuse_any)                  <- "LEAD any abuse determination"
+label(final_det$physical_abuse_det)         <- "LEAD physical abuse determination"
+label(final_det$sexual_abuse_det)           <- "LEAD sexual abuse determination"
+label(final_det$emotional_psycho_abuse_det) <- "LEAD emotional-psycho abuse determination"
+label(final_det$neglect_det)                <- "LEAD neglect determination"
+label(final_det$self_neglect_det)           <- "LEAD self-neglect determination"
+label(final_det$financial_exploitation_det) <- "LEAD financial exploitation determination"
+label(final_det$abandonment_det)            <- "LEAD abandonment determination"
+label(final_det$abuse_any)                  <- "LEAD any abuse determination"
 
 # Socio-demographic variables
 label(soc_dem$sode_hispanic_4cat_f)                      <- "Ethnicity (Hispanic)"
@@ -587,6 +420,41 @@ label(parti$age)                     <- "Age (in years)"
 label(parti$xc_detect_status_2cat_f) <- "Abuse determination at initial 911 call"
 ```
 
+## Create a separate data frame for each assessment type
+
+```{r}
+# Initial
+initial_pos_votes <- final_det %>% filter(assessment_type_3cat_f == "Initial assessment")
+
+# Secondary
+secondary_pos_votes <- final_det %>% filter(assessment_type_3cat_f == "Secondary assessment")
+
+# Post-DETECT
+post_detect_pos_votes <- final_det %>% filter(assessment_type_3cat_f == "Post-detect assessment")
+```
+
+## Merge the initial_pos_votes and secondary_pos_votes data sets, keeping only the secondary_pos_votes for each medstar_id when it is available
+
+```{r}
+final_determination <- initial_pos_votes[!initial_pos_votes$medstar_id %in% secondary_pos_votes$medstar_id,]
+final_determination <- rbind(final_determination, secondary_pos_votes)
+```
+
+## Participants who with a positive abuse LEAD Panel Assessment determination for any abuse type.
+
+```{r}
+part_id <- participant %>% select(medstar_id, name_full)
+
+any_pos_abuse <- final_determination %>% select(medstar_id, assessment_type_3cat_f, abuse_any) %>% filter(abuse_any == "Yes")
+
+pos_det <- purrr::reduce(list(part_id, any_pos_abuse), dplyr::right_join, by = 'medstar_id')
+
+# Save list as an Excel sheet
+# write_xlsx(pos_det, "LEAD_positive_determination_list.xlx")
+```
+
+
+
 ## Merge participant, observational measures, sociodemographic and LEAD dateframes
 
 ```{r}
@@ -597,10 +465,18 @@ final_det_sec       <- purrr::reduce(list(secondary_pos_votes, soc_dem, obs_meas
 final_det_post      <- purrr::reduce(list(post_detect_pos_votes, soc_dem, obs_meas, parti), dplyr::left_join, by = 'medstar_id')
 ```
 
+## Merge the separate assessment type data frames into one.
+```{r}
+# Create a data frame that is a combination of the three dataframes containing the final abuse determination summaries for all 3 assessment types.
+lead_panel_det <- rbind(initial_pos_votes, secondary_pos_votes, post_detect_pos_votes)
+
+```
+
 ## Create dataframe containing "any abuse" determinations across the 3 assessments
 This will be used to check the percent similarity of the final abuse determinations across the assessments.
 
 ```{r}
+# Create a subset data frame with only the needed columns and rename columns to distinguish the initial assessment columns from those of the other assessments
 initial_compare <- initial_pos_votes %>% 
   select(medstar_id, physical_abuse_det : abandonment_det, abuse_any) %>%
   rename(abuse_any_initial = abuse_any) %>%
@@ -609,7 +485,7 @@ initial_compare <- initial_pos_votes %>%
       .fn     = ~ gsub("det", "det_init", .x)
     )
 
-
+# Create a subset data frame with only the needed columns and rename columns to distinguish the secondary assessment columns from those of the other assessments
 secondary_compare <- secondary_pos_votes %>% 
   select(medstar_id, physical_abuse_det : abandonment_det, abuse_any) %>%
   rename(abuse_any_sec = abuse_any) %>%
@@ -618,6 +494,7 @@ secondary_compare <- secondary_pos_votes %>%
       .fn     = ~ gsub("det", "det_sec", .x)
     )
 
+# Create a subset data frame with only the needed columns and rename columns to distinguish the post-DETECT assessment columns from those of the other assessments
 post_compare <- post_detect_pos_votes %>% 
   select(medstar_id, physical_abuse_det : abandonment_det, abuse_any) %>%
   rename(abuse_any_post = abuse_any) %>%
@@ -626,7 +503,7 @@ post_compare <- post_detect_pos_votes %>%
       .fn     = ~ gsub("det", "det_post", .x)
     )
 
-
+# Merge the above 3 data frames into one data frame
 assessment_compare <- purrr::reduce(list(initial_compare, secondary_compare, post_compare), dplyr::left_join, by = 'medstar_id') %>%
   mutate(
     same_is = ifelse(is.na(abuse_any_sec), NA, 
@@ -681,11 +558,11 @@ Prepare the data to extract LEAD panel metric requested by Dr. Pickering.
 ### Paticipation of unique panelists per month across all assessment types
 
 ```{r}
-# Merge the initial, secondary and post-DETECT datasets to create a dataset of all the LEAD data for selected variables excluding the rows with errors.
-lead_cleaned <- purrr::reduce(list(initial, secondary, post_detect), rbind) %>% select(-c(multiple_count: remove))
+# Remove the columns used for identifying rows with the data error.
+lpac <- lpac %>% select(-c(multiple_count: remove))
 
 # Create a date column combining month and year and including a placeholder value for day
-lead_cleaned <- lead_cleaned %>%
+lpac <- lpac %>%
   mutate(
     day = 1,
     x_assessment_month_num = dplyr::recode(x_assessment_month,
@@ -709,7 +586,7 @@ lead_cleaned <- lead_cleaned %>%
   )
 
 # Create a data frame containing only the participation dates and names of unique panelists
-panelist_participation <- lead_cleaned %>% 
+panelist_participation <- lpac %>% 
   group_by(assessment_date) %>%
   reframe(
     unique_panelist = unique(panelist_name_10cat_f),
@@ -726,7 +603,7 @@ Average meeting attendance is the number of unique people who filled out a secon
 
 ```{r}
 # Create a dataframe containing only the months and names of unique panelists that voted in the secondary assessment.
-sec_meeting_attendance <- lead_cleaned %>%
+sec_meeting_attendance <- lpac %>%
   filter(assessment_type_3cat_f == "Secondary assessment") %>%
   group_by(assessment_date) %>%
   reframe(
@@ -762,9 +639,12 @@ meeting_duration <- lead_attendance %>% group_by(meeting_date) %>%
 Create data frames to extract information on the unique panelists that voted in each assessment and across all assessments. 
 
 ```{r}
-initial_panelists     <- initial %>% ungroup() %>% select(panelist_name_10cat_f) %>% unique()
-secondary_panelists   <- secondary %>% ungroup() %>% select(panelist_name_10cat_f) %>% unique() 
-post_panelists        <- post_detect %>% ungroup() %>% select(panelist_name_10cat_f) %>% unique() 
+initial_panelists     <- lpac %>% filter(assessment_type_3cat_f == "Initial assessment") %>% ungroup() %>%
+  select(panelist_name_10cat_f) %>% unique()
+secondary_panelists   <- lpac %>% filter(assessment_type_3cat_f == "Secondary assessment") %>% ungroup() %>%
+  select(panelist_name_10cat_f) %>% unique() 
+post_panelists        <- lpac %>% filter(assessment_type_3cat_f == "Post-detect assessment")%>% ungroup() %>%
+  select(panelist_name_10cat_f) %>% unique() 
 ```
 
 # Analaysis
@@ -780,65 +660,13 @@ fd_m <- final_determination %>%
 
 ## Number and proportion of assessements completed by type of assesement
 
-How many unique MedStar IDs went to the LEAD panel for review?
-
-```{r, include=FALSE}
-unique_medstar_ids <- unique(lpa$medstar_id) |> length()
-cat("Unique MedStar ID's =", unique_medstar_ids)
-```
-
-### Initial assessment
-
-```{r, include=FALSE}
-unique_medstar_ids_initial <- unique(initial$medstar_id) |> length()
-cat("Unique MedStar ID's at intitial assessment =", unique_medstar_ids_initial)
-```
-
-```{r, include=FALSE}
-cat("Proportion of MedStar ID's with an intitial assessment =", unique_medstar_ids_initial/unique_medstar_ids)
-```
-
-### Secondary assessment
-
-```{r, include=FALSE}
-unique_medstar_ids_secondary <- unique(secondary$medstar_id) |> length()
-cat("Unique MedStar ID's at secondary assessment =", unique_medstar_ids_secondary)
-```
-
-```{r, include=FALSE}
-cat("Proportion of MedStar ID's with an secondary assessment =", unique_medstar_ids_secondary/unique_medstar_ids)
-```
-
-### Post-DETECT assessment
-
-```{r, include=FALSE}
-unique_medstar_ids_post_detect <- unique(post_detect$medstar_id) |> length()
-cat("Unique MedStar ID's at post-DETECT assessment =", unique_medstar_ids_post_detect)
-```
-
-```{r, include=FALSE}
-cat("Proportion of MedStar ID's with an post-DETECT assessment =", unique_medstar_ids_post_detect/unique_medstar_ids)
-```
-
-### Summary table
 ```{r}
-sum_table <- data.frame(
-                        Value = c("Unique MedStar ID's at initial assessment", 
-                                  "Unique MedStar ID's at secondary assessment", 
-                                  "Unique MedStar ID's at post-DETECT assessment", 
-                                  "Total unique MedStar ID's across all assessments"),
-                        Count = c(unique_medstar_ids_initial, unique_medstar_ids_secondary,
-                                  unique_medstar_ids_post_detect, unique_medstar_ids),
-                        Proportion = c((unique_medstar_ids_initial/unique_medstar_ids), 
-                                       (unique_medstar_ids_secondary/unique_medstar_ids), 
-                                       (unique_medstar_ids_post_detect/unique_medstar_ids), 
-                                       1)
-                        ) %>%
+sum_table <- unique_case(lpac, medstar_id, assessment_type_3cat_f) %>%
   flextable()
 # Set caption
 
 sum_table <- set_caption(sum_table, "Summary of Unique Medstar IDs for the LEAD Assessment Data")
-sum_table <- width(sum_table, width = 1.5)
+sum_table <- width(sum_table, width = 1.8)
 
 
 sum_table
@@ -1081,55 +909,193 @@ case2_table <- width(case2_table, width = 2)
 case2_table
 ```
 
+### LEAD Panelist Votes
+
+For each LEAD panel member, how many initial votes did they have? How many secondary votes did they have? How often did their initial vote change at the secondary vote?
+
+
+#### Prepare the data
+```{r}
+init_sec <- lpac %>%
+  # Select only the needed columns
+  select(c(medstar_id, assessment_type_3cat_f, panelist_name_10cat_f, physical_abuse_2cat : abandonment_2cat))
+
+# Create a subset data frame with only the initial assessment rows and rename the abuse columns to distinguish them from those of the secondary assessment
+initial_panelist_votes <- init_sec %>%
+  filter(assessment_type_3cat_f ==  "Initial assessment") %>%
+  select(-c(assessment_type_3cat_f)) %>%
+  rename_with(
+    .cols   = c(ends_with("_2cat")), 
+    .fn     = ~ gsub("2cat", "2cat_init", .x)
+  )
+
+# Create a subset data frame with only the secondary assessment rows and rename the abuse columns to distinguish them from those of the initial assessment
+sec_panelist_votes <- init_sec %>%
+  filter(assessment_type_3cat_f ==  "Secondary assessment") %>%
+  select(-c(assessment_type_3cat_f)) %>%
+  rename_with(
+    .cols   = c(ends_with("_2cat")), 
+    .fn     = ~ gsub("2cat", "2cat_sec", .x)
+  )
+
+# Merge the two above data frames into one
+panelist_votes <- purrr::reduce(list(sec_panelist_votes, initial_panelist_votes), dplyr::left_join, 
+                                by = c('medstar_id', "panelist_name_10cat_f"))
+
+# Create columns that compare the secondary and initial vote for each abuse type
+panelist_votes<- panelist_votes %>%
+  mutate(
+    phys_agree = ifelse(physical_abuse_2cat_sec == physical_abuse_2cat_init, 1, 0),
+    sex_agree = ifelse(sexual_abuse_2cat_sec == sexual_abuse_2cat_init, 1, 0),
+    emo_agree = ifelse(emotional_psycho_abuse_2cat_sec == emotional_psycho_abuse_2cat_init, 1, 0),
+    neg_agree = ifelse(neglect_2cat_sec == neglect_2cat_init, 1, 0),
+    self_agree = ifelse(self_neglect_2cat_sec == self_neglect_2cat_init, 1, 0),
+    fin_agree = ifelse(financial_exploitation_2cat_sec == financial_exploitation_2cat_init, 1, 0),
+    aban_agree = ifelse(abandonment_2cat_sec == abandonment_2cat_init, 1, 0)
+  )
+```
+
+#### Create the dataframe
+
+```{r}
+type_perc_change <- function(a_agree, a_type) {
+  # Create data frame that will be used to compute the vote change frequency per abuse type for each panelist
+  tab1 <- as.data.frame(addmargins(table(panelist_votes$panelist_name_10cat_f, panelist_votes[[a_agree]]), c(2)))
+    
+  # Make the data frames tidy
+  df1 <- tab1 %>%
+    pivot_wider(names_from = Var2, values_from = Freq) %>%
+    rename(panelist_name = Var1, 
+          n_votes = Sum,
+          n_changed_votes = "0") %>%
+    select(-c("1")) %>%
+    #mutate(
+      # create column for the percentage of votes that were changed from the initial to secondary assessment
+      #perc_changed = paste0(format(round((n_changed_votes/n_votes)*100, digits = 2), nsmall = 2), " %")
+    #) %>%
+    #select(-c(n_votes, n_changed_votes)) %>%
+    mutate(
+      abuse_type = a_type
+    )
+    
+  # Create data frame containing the number of initial and secondary votes per abuse type for each panelist
+  tab2 <- as.data.frame(table(lpac$panelist_name_10cat_f, lpac$assessment_type_3cat_f,
+                              lpac$physical_abuse_2cat))
+
+  # Make the data frames tidy
+  df2 <- tab2 %>%
+    pivot_wider(names_from = Var3, values_from = Freq) %>%
+    rename(yes = "1",
+          no = "0") %>%
+    mutate(n_votes = yes + no) %>%
+    select(-c(yes, no)) %>%
+    pivot_wider(names_from = Var2, values_from = n_votes) %>%
+    select(-c("Post-detect assessment")) %>%
+    rename(panelist_name = Var1, 
+          initial_n_votes = "Initial assessment",
+          sec_n_votes = "Secondary assessment")
+
+  # Merge the percent changed vote and vote count per assessment data frames
+  comb_df <- left_join(df2, df1, by = "panelist_name")
+}
+
+# Physical abuse
+phys_disc <- type_perc_change("phys_agree", "Physical Abuse")
+  
+# Sexual abuse
+sex_disc <- type_perc_change("sex_agree", "Sexual Abuse")
+  
+# Emotional-psychological abuse
+emo_disc <- type_perc_change("emo_agree", "Emotional-Psychological Abuse")
+
+# Neglect
+neg_disc <- type_perc_change("neg_agree", "Neglect")
+  
+# Self-neglect
+self_disc <- type_perc_change("self_agree", "Self-neglect")
+  
+# Financial Explotation
+fin_disc <- type_perc_change("fin_agree", "Financial Exploitation")
+  
+# Abandonment
+aban_disc <- type_perc_change("aban_agree", "Abandonment")
+  
+# Merge dataframes for each abuse type to create one data frame for all abuse types
+panelist_vote_sum <- purrr::reduce(list(phys_disc, sex_disc, emo_disc, neg_disc, self_disc, fin_disc, aban_disc), rbind)
+  
+# Compute "Overall" rows for each panelist from sum of votes and dissenting votes for all the abuse types 
+panelist_vote_sum <- panelist_vote_sum %>%
+group_by(panelist_name) %>%
+bind_rows(
+  reframe(
+    .,
+    across(
+      .cols = c(initial_n_votes, sec_n_votes, n_changed_votes, n_votes),
+      .fns  = ~sum(.x)
+    ),
+    abuse_type = "Overall",
+    panelist_name = panelist_name
+  )
+) %>%
+distinct()
+  
+# Replace the vote count per abuse type and the number of changed votes columns with a column that shows the number of changed votes as a percentage of the vote count per abuse type
+panelist_vote_sum <- panelist_vote_sum %>%
+  mutate(
+    # create column for the percentage of votes that were changed from the initial to secondary assessment
+    perc_changed = paste0(format(round((n_changed_votes/n_votes)*100, digits = 2), nsmall = 2), " %")
+  ) %>%
+    select(-c(n_votes, n_changed_votes)) %>%
+  # remove "%" after "NaN"
+  mutate(perc_changed = str_replace(perc_changed, "NaN %", "NaN"))
+```
+
+#### Format the table
+
+```{r}
+# Set border formatting
+std_border = fp_border(color="black")
+
+# Convert the data frame into a flextable that groups the data by abuse type
+pan_vote <- as_grouped_data(panelist_vote_sum, groups = "abuse_type") %>%
+  as_flextable(hide_grouplabel = TRUE) %>%
+  
+  # Set the table caption
+  set_caption("Initial and Secondary Assessment Vote Counts for Each LEAD Panelist and Percentage of Initial Votes that Changed at the Secondary Assessment for Cases that were Voted on In Both Assessments") %>%
+  
+  # Set table borders
+  surround(i = ~ !is.na(abuse_type),
+           border = std_border) %>%
+  border_outer(part="all", border = std_border) %>%
+  vline(border = std_border ) %>%
+  
+  # Rename and format the header labels
+  set_header_labels(panelist_name   = "Panelist Name",
+                    initial_n_votes = "N Initial Votes",
+                    sec_n_votes     = "N Seconday Votes",
+                    perc_changed     = "Percentage of Changed Votes") %>%
+  bold(bold = TRUE, part="header") %>%
+  
+  # Adjust the table width
+  width(width = 1.5)
+
+pan_vote
+
+```
+
 ### Panelist Disciplines of Non-Congruent Cases
 
 For cases that did not have congruence (or at least initially) – were there certain disciplines that tended to diverge from the others?
 
-Interpreted as: In the initial assessment, which disciplines had a tendency to vote differently from the rest?
-
 ```{r}
-# Subset cases where the initial final abuse lead determination is different from either the secondary determination or the post-DETECT determination in the assessment_compare data frame
-non_congruent <- assessment_compare %>% 
-  filter(same_is == 0 | same_ip == 0)
- 
-# Subset non-congruent cases in the initial data frame
-ncd <- initial %>% 
-  filter(medstar_id %in% non_congruent$medstar_id) 
+panelist_vote_agree <- panelist_vote_agreement(lpac)
 
+panelist_vote_agree_flex <- flextable(panelist_vote_agree)
 
-# Create a subset data frame that contains the cleaned LEAD data for only the initial assessment cases and indicates whether or not the abuse votes were the same. 
-# Determine which MedStar IDs did not have voter congruence by comparing the number of observations when the data is grouped by medstar_id and the abuse columns to when the data is only grouped by medstar_id.
-
-initial_non_con <- lead_cleaned %>% filter(assessment_type_3cat_f == "Initial assessment") %>% 
-  group_by(
-    medstar_id, physical_abuse_2cat, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
-    self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat
-  ) %>%
-  mutate(
-    identical_length = n()
-  ) %>%
-  ungroup() %>%
-  group_by(medstar_id) %>%
-  mutate(
-    voter_length = n()
-  ) %>% 
-  ungroup() %>%
-  mutate(
-    congruent_votes = case_when(
-      identical_length == voter_length  ~ 1,
-      identical_length != voter_length  ~ 0
-  
-    )
-  ) %>%
-  filter(congruent_votes == 0)
-
-        
-
-
-#
-
-
+panelist_vote_agree_flex
 ```
+
+
 
 # 🔴 NOTE
 
@@ -1160,7 +1126,8 @@ overall_tab
 cap_1  <- "Abuse Determinations Overall - Initial LEAD Assessment"
 
 
-initial_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det, 
+initial_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + self_neglect_det +
+                        financial_exploitation_det + abandonment_det + abuse_any, 
                data = final_det_initial, 
                caption = cap_1)
 initial_tab <- t1flex(initial_tab, tablefn = c("qflextable", "flextable", "regulartable"))
@@ -1176,7 +1143,8 @@ initial_tab
 cap_1  <- "Abuse Determinations Overall - Secondary LEAD Assessment"
 
 
-sec_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det, 
+sec_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + self_neglect_det +
+                        financial_exploitation_det + abandonment_det + abuse_any, 
                data = final_det_sec, 
                caption = cap_1)
 sec_tab <- t1flex(sec_tab, tablefn = c("qflextable", "flextable", "regulartable"))
@@ -1192,7 +1160,8 @@ sec_tab
 cap_1  <- "Abuse Determinations Overall - Post-Detect LEAD Assessment"
 
 
-post_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + abandonment_det + financial_exploitation_det + self_neglect_det, 
+post_tab <- table1(~ physical_abuse_det + sexual_abuse_det + emotional_psycho_abuse_det + neglect_det + self_neglect_det +
+                        financial_exploitation_det + abandonment_det + abuse_any, 
                data = final_det_post, 
                caption = cap_1)
 post_tab <- t1flex(post_tab, tablefn = c("qflextable", "flextable", "regulartable"))
@@ -1345,10 +1314,21 @@ lead_doc <- lead_doc %>%
 lead_doc <- lead_doc %>% 
   body_add_par("LEAD abuse determination was by majority vote of the secondary assessment (if one was done) or initial assessment (if a secondary assessment wasn't done)")%>%
   body_add_par(value = "") %>%
-  body_add_flextable(mvl_tab, align = "left") 
+  body_add_flextable(mvl_tab, align = "left")
+
+# Add the percentage dissenting votes for the panelist discipline table
+lead_doc <- lead_doc %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(panelist_vote_agree_flex, align = "left") %>%
+  body_add_par(value = "")
+
+# Add the LEAD panelists votes table 
+lead_doc <- lead_doc %>%
+  body_add_flextable(pan_vote, align = "left") %>%
+  body_add_par(value = "")
 
 # print the word document
-# print(lead_doc, target = "LEAD_data_analysis_tables.docx")
+ print(lead_doc, target = "LEAD_data_analysis_tables.docx")
 ```
 
 # Export LEAD data feasibility metrics tables and plots into a Word file
@@ -1382,7 +1362,15 @@ feas_doc <- feas_doc %>%
   body_add_flextable(post_tab, align = "left") %>%
   body_add_par(value = "")
 
+# Add the percentage dissenting votes for each panelist discipline tables
+feas_doc <- feas_doc %>%
+  body_add_flextable(ini_diss, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(sec_diss, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(post_diss, align = "left") %>%
+  body_add_par(value = "")
+
 # print the word document
 # print(feas_doc, target = "LEAD_data_metric_tables.docx")
 ```
-

@@ -51,7 +51,7 @@ lpa <- lpa %>%
   mutate(
     panelist_name_10cat_f = factor(
       panelist_name,
-      levels = c("Hannah Bell", "Janice Knebl", "Jason Burnett", "Jason Knebl", 
+      levels = c("Hannah Bell", "Janice Knebl", "Jason Burnett", 
                  "John Halphen", "Jordan Rolfe", "Kristen Reuter",
                  "Samantha Fant", "Stephanie Large", 
                  "Tarrant County District Attorney's Office"
@@ -99,7 +99,6 @@ lpa <- lpa %>%
       levels = c(0, 1)
       )
     )
-
 ```
 
 ## Include panelist discipline variables
@@ -125,12 +124,28 @@ lpa <- lpa %>%
       TRUE                                                                                          ~ 0
     )
   )
+
+# Co-erce categorical variables into factor variables
+lpa<- lpa %>%
+  mutate(
+    panelist_discipline_5cat_f = factor(
+      panelist_discipline
+    )
+  )
+
+lpa<- lpa %>%
+  mutate(
+    healthcare_worker_2cat_f = factor(
+      healthcare_worker,
+      levels = c(0, 1)
+    )
+  )
 ```
 
 ### Remove variables that have recoded forms
 
 ```{r}
-lpa <- lpa %>% select(-c(panelist_name, assessment_type : self_neglect, xc_assessment_screened))
+lpa <- lpa %>% select(-c(panelist_name, assessment_type : self_neglect, xc_assessment_screened, panelist_discipline, healthcare_worker))
 ```
 
 # Save as rds file
