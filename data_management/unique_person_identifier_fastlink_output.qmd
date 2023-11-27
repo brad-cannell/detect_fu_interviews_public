@@ -1,0 +1,103 @@
+---
+title: "unique_person_identifier_probabilistic_matching fast link output"
+format: html
+---
+
+## Purpose
+
+The code in this file is to create fastlink output that will be used to identify unique people with different MedStar IDs in the DETECT FU Interview study and assign unique identifiers to them. The fastlink package will be used to apply probabilistic matching methods to achieve this.
+
+
+## Load Packages
+```{r, warning = FALSE}
+library(fastLink)
+library(dplyr)
+library(tidyverse)
+library(readr)
+library(lubridate)
+```
+
+## Load Participant data frame
+
+The variables in this data frame will be used to identify unique people with different MedStar IDs in the DETECT FU Interview study.
+
+```{r}
+par <- read_rds("../data/cleaned_rds_files/participant_import.rds")
+```
+
+# Consolidate exact matches
+
+The dataset is too large (92160 observations) which causes issues when running FastLink. Only unique observations for exact matches for name_first, name_last, sex_3cat_f, dob, and address will be included.
+
+```{r}
+par_consolidate <- par %>%
+  group_by(name_first, name_last, dob, sex_3cat_f, address) %>%
+  mutate(
+    # Column that shows the number of times each unique observation
+    count               = n(),
+    # Column that assigns an ID to each unique observation
+    exact_match_id = cur_group_id()
+  ) %>%
+  group_by(x_created_timestamp) %>%
+  arrange() %>%
+  ungroup() %>%
+  group_by(name_first, name_last, dob, sex_3cat_f, address) %>%
+  mutate(
+    # Column that gives each visit a number that represents the chronological order
+    visit_no = row_number()
+  ) %>%
+  ungroup() %>%
+  select(name_first, name_last, dob, sex_3cat_f, address, exact_match_id, visit_no) %>% 
+  filter(visit_no == 1)
+```
+
+## Prepare variables for matching
+
+Extract new variables that will be used for matching.  
+```{r}
+par_match <- par_consolidate %>%
+  # Split the single date of birth variable into 3 variables - month, day and year
+  mutate_at(vars(dob), list(birth_year = year, birth_month = month, birth_day = day)) %>%
+  mutate(
+    birth_day = as.numeric(birth_day)
+  ) %>%  
+  
+  # Create street name and house number variables from address variable
+  extract(address, c('house_number'), regex = "(\\d+)", remove = FALSE) %>%
+  mutate(
+    street_name = map_chr(str_extract_all(address, "[A-Za-z_.-]+"), ~ str_c(.x, collapse=" ")),
+    house_number = as.numeric(house_number)
+  ) %>%
+  # Select the matching variables
+  select(name_first, name_last, name_initials, birth_year, birth_month, birth_day, sex_3cat_f, house_number, visit_no, exact_match_id)
+  
+```
+
+## Run FastLink function
+
+```{r}
+fl_out <- fastLink(
+  dfA = par_match,
+  dfB = rbind(par_match,
+              as.data.frame(matrix(NA,nrow=1,ncol=ncol(par_match), 
+                                   dimnames = list(list(), colnames(par_match))))
+  ),
+  varnames = c("name_first", "name_last", "birth_year", "birth_month", "birth_day", "sex_3cat_f", "house_number"),
+  stringdist.match = c("name_first", "name_last"),
+  numeric.match = c("birth_year", "birth_month", "birth_day", "house_number"),
+  partial.match = c("name_first", "name_last"),
+  dedupe.matches = FALSE,
+  return.all = FALSE,
+  threshold.match = 0.54
+)
+
+```
+
+# Save RDS files
+
+```{r}
+saveRDS(fl_out, "fast_link_output.rds")
+```
+
+
+

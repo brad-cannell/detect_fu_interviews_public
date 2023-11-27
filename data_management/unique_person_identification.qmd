@@ -1,0 +1,556 @@
+---
+title: "Unique ID Creation"
+format: html
+---
+
+# Load Packages
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(fastLink)
+library(stringdist)
+library(purrr)
+library(stringr)
+library(igraph)
+```
+
+# Load the participant dataset and the fastlink output
+
+```{r}
+flo <- read_rds("../data/fastlink_output/fast_link_output.rds")
+par <- read_rds("../data/cleaned_rds_files/participant_import.rds")
+```
+
+# Group exact matches to reduce the number of stacked pair matches
+```{r}
+par_exact_id <- par %>%
+  group_by(name_first, name_last, dob, sex_3cat_f, address) %>%
+  mutate(
+    # Column that shows the frequency of each unique observation
+    count               = n(),
+    # Column that assigns an ID to each unique observation based on exact matching
+    exact_match_id = cur_group_id()
+  ) %>%
+  group_by(x_created_timestamp) %>%
+  arrange() %>%
+  ungroup() %>%
+  group_by(name_first, name_last, dob, sex_3cat_f, address) %>%
+  mutate(
+    # Column that gives each visit a number that represents the chronological order
+    visit_no = row_number()
+  ) %>%
+  ungroup() 
+  
+```
+
+```{r}
+# Filter out only the first visit for each exact id to reduce the number of matches. 
+par_exact_id_1 <- par_exact_id %>%
+  select(medstar_id, name_first, name_middle_initial, name_last, dob, sex_3cat_f, address, phone, exact_match_id, visit_no, x_created_timestamp) %>%
+  filter(visit_no == 1) %>%
+  
+  ## Split the single date of birth variable into 3 variables - month, day and year
+  mutate_at(vars(dob), list(birth_year = year, birth_month = month, birth_day = day)) %>%
+  mutate(
+    birth_day = as.numeric(birth_day)
+  ) 
+
+```
+
+### Match Check
+
+A function was written by Dr. Cannell to permit examination of potential matches with posterior probabilities.
+
+```{r}
+fmr_fastlink_stack_matches <- function(.x, df) {
+  
+  # ===========================================================================
+  # Error checks
+  # ===========================================================================
+  if (!("fastLink" %in% class(.x))) {
+    stop('.x must be of class "fastLink"')
+  }
+  
+  
+  # ===========================================================================
+  # Create data frame of potential matches to compare
+  # ===========================================================================
+  potential_matches <- tibble::tibble(
+    row = .x$matches$inds.b,
+    matching_row = .x$matches$inds.a,
+    posterior_probability = .x$posterior
+  )
+  
+  # Keep only unique combinations of rows (e.g., not 1-3 and 3-1)
+  potential_matches <- potential_matches %>%
+    dplyr::mutate(
+      combo = purrr::map2_chr(
+        .x = row,
+        .y = matching_row,
+        .f = function(x, y) {
+          min <- min(x, y)
+          max <- max(x, y)
+          out <- paste(min, max, sep = "_")
+          out
+        }
+      ),
+      dup = duplicated(combo)
+    ) %>%
+    dplyr::filter(!dup) %>%
+    dplyr::select(-combo, -dup)
+  
+  
+  # ===========================================================================
+  # Manipulate the potential matches data frame
+  # Stack row and matching row on top of each other
+  # Add a pair number to each row and matching row
+  # ===========================================================================
+  stacked_potential_matches <- tibble::tibble(
+    row = c(rbind(potential_matches[["row"]], potential_matches[["matching_row"]])),
+    pair = rep(seq(1, length(row) / 2), each = 2),
+    posterior_probability = rep(potential_matches[["posterior_probability"]], each = 2)
+  )
+  
+  
+  # ===========================================================================
+  # Add substantive variables of interest to matched pairs for review
+  # ===========================================================================
+  out <- stacked_potential_matches %>% 
+    dplyr::left_join(
+      df %>% 
+        dplyr::mutate(row = dplyr::row_number()),
+      by = "row"
+    )
+  
+  
+  # ===========================================================================
+  # Return data frame of potential matches to compare
+  # ===========================================================================
+  out
+}
+
+```
+
+```{r}
+stacked_out <- fmr_fastlink_stack_matches(flo, par_exact_id_1) %>%
+  relocate(exact_match_id, .after = "row")
+```
+
+```{r}
+a <- par %>% select(medstar_id) %>% unique() %>% nrow()
+b <- par_exact_id %>% select(exact_match_id) %>% unique() %>% nrow()
+c <- par_exact_id %>% filter((is.na(name_first) == T) & (is.na(name_last) == T)) %>%
+  select(exact_match_id) %>% unique() %>% nrow()
+d <- stacked_out %>% select(medstar_id) %>% unique() %>% nrow()
+```
+
+```{r}
+cat("The total number of unique medstar IDs in the original participant data set is", a)
+```
+
+```{r}
+cat("The total number of unique person IDs based on exact matching in the original participant data set is", b)
+```
+
+```{r}
+cat("The total number of medstar IDs with missing names which are needed to create fastLink matches is", c)
+```
+
+```{r}
+cat("The total number of medstar IDs in the stacked matched pairs is", d)
+```
+# Review the Potential Matches
+
+## Assumptions
+The following assumptions were made while reviewing the potential matches:
+Name
+
+The first and last name were taken into consideration in every case. Since the majority of middle initials were missing, they were only considered if they were present. There were names with typographical errors and sometimes nicknames not very similar to their full versions were used e.g Betsy vs Elizabeth or Bill vs William. People with hyphenated last names or last names with multiple parts sometimes included only one part or the other. Some names are more rare and more weight was given to the name if it was rare.
+
+DOB
+The presence of typos was assumed in cases were all other values were the same but the dob differed by a few months a year or a few days. If only one digit was different, the presence of a typo was also assumed. In cases were the dob was the same but only the first name was different, the possibility of the observations being for twins was considered. Related people with the same name could live in the same house and this was also taken into consideration.
+
+
+Address
+
+Addresses were not always uniformly formatted e.g "St" could be used in place of "Street". People could have also moved houses as a result of the incident that led to the 911 call. Some addresses were for group homes rather than single family homes so unrelated people could have the same address. There were also typos.
+
+Phone number
+
+There were typos present in many of the phone numbers but many were similar enough and when other factors were considered, a determination was made.
+
+Time stamp
+
+In cases where the address was missing, if the other values were the same, it was assumed that such observations were for the same person if they had a time stamp that fell within the same day.
+
+## Create a flag column to determine whether or not the stacked pairs need to be manually reviewed
+
+```{r}
+stacked_out_review <- stacked_out %>%
+  # Create indices for each pair
+  group_by(pair) %>% 
+  mutate(pair_index = row_number()) %>%
+  relocate(pair_index, .after = "pair") %>%
+  
+  # Create a column that indicates whether the pairs have the same exact_match_id or not
+  mutate(same = +(n_distinct(exact_match_id) == 1)) %>% 
+  ungroup %>%
+  
+  # Convert 999-999-9999 phone number to NA
+  mutate(
+    phone = case_when(
+      phone == "999-999-9999" ~ NA,
+      TRUE                    ~ phone
+    )
+  ) %>%
+
+  # Create a column that indicates whether or not the phone number is missing
+  group_by(pair) %>%
+  mutate(
+    phone_na = case_when(
+      any(is.na(phone)) ~ 1,
+      TRUE              ~ 0
+      )
+  ) %>%
+  
+  # Create a column that indicates the level of similarity of the phone numbers
+    mutate(
+      phone          = as.character(phone),
+      phone_sim_dist = stringsim(phone[pair_index == 1], phone[pair_index == 2], 
+                                  method = c("osa", "lv", "dl", "hamming", "lcs", "qgram", "cosine", "jaccard", "jw",
+                                              "soundex")),
+      phone_sim = case_when(
+        phone_sim_dist == 1                         ~ "same",
+        phone_sim_dist < 1 & phone_sim_dist >= 0.83 ~ "similar",
+        phone_sim_dist < 0.83                       ~ "different"
+      )
+    ) %>%
+  ungroup() %>%
+  
+  # Create columns that indicates whether or not the names are similar
+  unite(name_full, c(name_first, name_last), sep = " ", remove = FALSE) %>%
+  group_by(pair) %>%
+  mutate(
+    name_full_sim_dist = stringsim(name_full[pair_index == 1], name_full[pair_index == 2], 
+                               method = c("osa", "lv", "dl", "hamming", "lcs", "qgram", "cosine", "jaccard", "jw",
+           "soundex")),
+    name_full_sim = case_when(
+      name_full_sim_dist >= 0.65                            ~ "Highly likely",
+      name_full_sim_dist >= 0.4 & name_full_sim_dist < 0.65 ~ "Possibly",
+      name_full_sim_dist < 0.4                              ~ "Not likely"
+      
+    )
+  )%>% 
+  ungroup %>%
+
+  # Create a column that indicates whether or not the initials are the same 
+  mutate(
+    across(
+      .cols  = c(name_first, name_last),
+      .fns   = ~ map_chr(str_extract(.x, "[A-Z]+"), ~ str_c(.x, collapse=" ")),
+      .names = "{col}_initial"
+    )
+) %>%
+  unite(name_initials, c(name_first_initial, name_last_initial), sep = " ", remove = TRUE) %>%
+  group_by(pair) %>%
+  mutate(same_initials = +(n_distinct(name_initials) == 1)) %>% 
+  ungroup %>%
+  
+  # Create a column that indicates whether or not the initials are the same if the last name has two parts
+  mutate(
+    name_first_initial = map_chr(str_extract(name_first, "[A-Z]+"), ~ str_c(.x, collapse=" ")),
+    name_last_initial = map_chr(str_extract(name_last, "(?<=( |-))[A-Z]+"), ~ str_c(.x, collapse=" "))
+  ) %>%
+  unite(name_initials_alt, c(name_first_initial, name_last_initial), sep = " ", remove = TRUE) %>%
+  group_by(pair) %>%
+  mutate(
+    same_initials_alt = case_when(
+      name_initials[pair_index == 1] == name_initials_alt[pair_index == 2]  ~ 1,
+      name_initials[pair_index == 2] == name_initials_alt[pair_index == 1]  ~ 1,
+      TRUE                                                                  ~ 0
+    ) 
+    )%>%
+  
+  # Create a column that indicates the similarity of the dobs
+  group_by(pair) %>%
+  mutate(dob_similarity = stringsim(dob[pair_index == 1], dob[pair_index == 2],
+                                    method = c("jw"))
+    
+  ) %>%
+  mutate(
+    same_dob = case_when(
+      dob_similarity == 1                         ~ "same",
+      dob_similarity < 1 & dob_similarity >= 0.83 ~ "similar",
+      dob_similarity < 0.83                       ~ "different",
+    ),
+  # Create a column that indicates the same birth year
+    same_birth_year = +(n_distinct(birth_year) == 1)
+           ) %>% 
+  ungroup %>%
+  
+  # Create a column that indicates whether or not the sex is the same  
+  group_by(pair) %>%
+  mutate(same_sex = +(n_distinct(sex_3cat_f) == 1)) %>% 
+  ungroup %>%
+  
+ # Create a column that indicates whether or not the address is the same  
+  group_by(pair) %>%
+    mutate(
+      address_sim_dist = stringsim(address[pair_index == 1], address[pair_index == 2], 
+                                  method = c("osa", "lv", "dl", "hamming", "lcs", "qgram", "cosine", "jaccard", "jw",
+                                              "soundex")),
+      address_sim = case_when(
+        address_sim_dist >= 0.63                            ~ "Highly likely",
+        address_sim_dist >= 0.4 & address_sim_dist < 0.63   ~ "Possibly",
+        address_sim_dist < 0.4                              ~ "Not likely"
+      )
+    ) %>% 
+  ungroup() %>%
+  
+  # Create a column that indicates whether or not one but not both of the values or a column are missing in a pair 
+  # dob
+  group_by(pair) %>%
+  mutate(
+    one_na_dob = case_when(
+      !all(is.na(dob)) & any(is.na(dob))  ~ 1,
+      TRUE                                ~ 0
+    )
+  ) %>%
+  ungroup() %>%
+  
+  # address
+  group_by(pair) %>%
+  mutate(
+    one_na_address = case_when(
+      !all(is.na(address)) & any(is.na(address))  ~ 1,
+      TRUE                                        ~ 0
+    )
+  ) %>%
+  ungroup() %>%
+  
+  # sex
+  group_by(pair) %>%
+  mutate(
+    one_na_sex = case_when(
+      !all(is.na(sex_3cat_f)) & any(is.na(sex_3cat_f))  ~ 1,
+      TRUE                                              ~ 0
+    )
+  ) %>%
+  ungroup() %>%
+  
+  # Create date column from x_created_timestamp
+  mutate(
+    x_created_timestamp_date = as.Date(x_created_timestamp)
+  ) %>%
+  # Create column to show if the timestamp is the same or different
+  group_by(pair) %>%
+  mutate(
+    same_timestamp = +(n_distinct(x_created_timestamp_date) == 1)
+  ) %>%
+  ungroup() %>%
+  
+  # Create a column that flags which columns need manual review
+  mutate(
+    flag = case_when(
+      same == 1                                                                           ~ "exact match",
+      (same == 0 & name_full_sim == "Highly likely" & same_dob == "same" & 
+        same_sex == 1 & address_sim == "Highly likely") |
+        (same == 0 & name_full_sim == "Possibly" & (same_initials == 1 | 
+        same_initials_alt == 1) & same_sex == 1 & same_dob == "same" & 
+        address_sim == "Highly likely") | 
+        (same == 0 & name_full_sim == "Highly likely" & same_dob == "same" & 
+        same_timestamp == 1) |
+        (same == 0 & name_full_sim == "Highly likely" & same_dob == "same" & 
+           phone_sim == "same")|
+        (same == 0 & (name_full_sim == "Highly likely" | same_initials == 1 | 
+                        same_initials_alt == 1) & address_sim == "Highly likely" & 
+           ((phone_na == 0 & phone_sim == "same") | same_timestamp == 1)) | 
+           (same == 0 & name_full_sim == "Highly likely" & same_timestamp == 1 & 
+              same_dob == "same")                                                         ~ "Likely same",
+      same == 0 & name_full_sim == "Highly likely"  & same_dob != "different" & 
+        same_sex == 1 & address_sim != "Highly likely" & phone_sim == "same" & 
+        phone_na == 0                                                                     ~ "Likely same, diff address",
+      same == 0 & name_full_sim == "Highly likely" & same_dob == "same" & 
+        same_sex == 0 & address_sim == "Highly likely"                                    ~ "Likely same, diff sex",
+      same == 0 & name_full_sim == "Highly likely" & (same_dob == "similar" | 
+        same_birth_year == 1) & address_sim == "Highly likely"                            ~ "Likely same, similar dob",
+      (same == 0 & (name_first == "Jane" | name_first == "John") & name_last == "Doe" &
+        (is.na(dob) == T |  same_dob != "same" | address_sim != "Highly likely")) |
+        (same == 0 & same_dob != "same" & address_sim == "Not likely" & 
+           phone_sim != "same")                                                           ~ "Likely not the same",
+      (same == 0 & one_na_address == 1 & phone_na == 1) |
+        (same == 0 & one_na_dob == 1)                                                     ~ "Cannot be determined",
+      TRUE                                                                                ~ "Needs Manual Review"
+)
+  ) %>%
+  mutate(
+    flag = factor(flag,
+         levels = c("exact match", "Likely same", "Likely same, diff address", "Likely same, diff sex", "Likely same, similar dob", "Needs Manual Review", "Likely not the same", "Cannot be determined"))
+  ) 
+
+```
+
+Note: Very few with the same initials or alternate initials had very different first names.
+## Filter rows for manual review
+```{r}
+manual_review <- stacked_out_review %>% filter(flag == "Needs Manual Review" & posterior_probability > 0.7 & 
+                                                 (same_initials == 1 | same_initials_alt == 1 | name_full_sim == "Highly likely") & 
+                                                 dob_similarity > 0.7 & address_sim != "Not likely") %>% 
+  select(pair, name_full, address, dob, sex_3cat_f, phone, phone_sim, posterior_probability, x_created_timestamp)
+```
+
+The following pairs flagged as needing manual review were determined to be the same after review:
+
+Same name + same address + slightly different dob / dob difference around a year
+1318, 5010, 6304, 11903, 17227, 17420, 19107, 23090, 28676, 28781, 34312, 34701, 34772, 42813, 50551, 50814, 50840, 50992
+
+Same name + same dob + slightly different address
+4583, 4660, 5029, 5137, 10865, 11341, 11370, 11467, 11620, 11661, 12032, 17082, 17137, 17331,  17383, 17481, 17846, 17965, 20457, 23524, 23851, 34313, 34551, 34882, 40223, 40280, 40421, 50862, 50993, 55575
+
+
+Same name + same dob + slightly different phone (typo) 
+4845, 5461, 11443, 17996, 50650
+
+Same uncommon name + same dob
+5441, 28747, 29582, 34728, 34817, 40232
+
+Slightly different name + same dob + same address
+23915, 29578, 30883, 34332, 34881, 35079, 50729,  52243
+
+Slightly different name + slightly different dob
+39997, 50682
+
+Pairs with names that were not detected as being similar but have the same or similar addresses and dobs 
+```{r}
+manual_review <- stacked_out_review %>% filter(same_dob != "different" & address_sim == "Highly likely" & 
+                                                   name_full_sim != "Highly likely" & flag == "Needs Manual Review") %>% 
+  select(pair, name_full, name_middle_initial, posterior_probability)
+```
+
+Likely nickname or shortened form of name
+654, 4586, 4612, 4823, 4880, 5110, 5146, 5460, 5522, 10841, 10898, 11322, 11442, 11890, 16819, 17406, 22654, 22681, 22881, 23240, 23569, 23778, 28565, 28732, 29274, 29516, 34154, 34175, 34363, 34447, 34656, 36119, 38732, 39070, 39919, 40520, 41064, 45812, 45850, 50673, 55703
+
+Uncommon first name + different last name/ typo likely
+4605, 6035, 17922, 17973, 34413, 42867, 47979
+
+Based on other pairs last, first and middle names likely swapped around
+19368, 19369
+
+Same first name + phone number and/ or middle initial that corresponds to one of the first names in the pair
+7772, 11572, 12044, 17413, 17550, 20857, 23397, 23403, 29512, 30134, 34148, 34623, 37779, 37918, 41203, 43675, 45935, 49810, 50955, 55781, 57194
+
+Pairs with the same name, the same dob but different addresses and similar but not the same phone numbers.
+```{r}
+manual_review <- stacked_out_review %>% filter(name_full_sim == "Highly likely" & same_dob == "same" & address_sim != "Highly likely" & 
+                                                 phone_sim == "similar" & posterior_probability > 0.7 & flag == "Needs Manual Review") %>%
+                                               select(pair, name_full, name_middle_initial, dob, address, phone, posterior_probability)
+```
+
+Same_name + same dob + similar phone number (could be a typo) or uncommon name
+
+4604, 4748, 4845, 4990, 5116, 5142, 5248, 5418, 5448, 5461, 5513, 5837, 5838, 5980, 6274, 10862, 11111, 11226, 11231, 11323, 11443, 11455, 11467, 11490, 11676, 11823, 11902, 11911, 16910,  17011, 17095, 17114, 17137, 17293, 17588, 17663, 17723, 17996, 18051, 22682, 23134, 23272, 23717, 23808, 25329, 28515, 28927, 29090, 29163, 29191, 29265, 34337, 34747, 34972, 35108, 35304, 39903, 40090, 40136, 40280, 40281, 40365, 40437, 40608, 45453, 45498, 45590,  45661,  50549, 50650, 50812
+
+
+## Change the flags for the manually reviewed pairs that were determined to be incorrect
+```{r}
+pair_list <- c(1318, 5010, 6304, 11903, 17227, 17420, 19107, 23090, 28676, 28781, 34312, 34701, 34772, 42813, 50551, 50814, 50840, 50992, 4583, 4660, 5029, 5137, 10865, 11341, 11370, 11467, 11620, 11661, 12032, 17082, 17137, 17331, 17383, 17481, 17846, 17965, 20457, 23524, 23851, 34313, 34551, 34882, 40223, 40280, 40421, 50862, 50993, 55575, 4845, 5461, 11443, 17996, 50650, 5441, 28747, 29582, 34728, 34817, 40232, 23915, 29578, 30883, 34332, 34881, 35079, 50729,  52243, 39997, 50682, 654, 4586, 4612, 4823, 4880, 5110, 5146, 5460, 5522, 10841, 10898, 11322, 11442, 11890, 16819, 17406, 22654, 22681, 22881, 23240, 23569, 23778, 28565, 28732, 29274, 29516, 34154, 34175, 34363, 34447, 34656, 36119, 38732, 39070, 39919, 40520, 41064, 45812, 45850, 50673, 55703, 4605, 6035, 17922, 17973, 34413, 42867, 47979, 19368, 19369, 7772, 11572, 12044, 17413, 17550, 20857, 23397, 23403, 29512, 30134, 34148, 34623, 37779, 37918, 41203, 43675, 45935, 49810, 50955, 55781, 57194, 4604, 4748, 4845, 4990, 5116, 5142, 5248, 5418, 5448, 5461, 5513, 5837, 5838, 5980, 6274, 10862, 11111, 11226, 11231, 11323, 11443, 11455, 11467, 11490, 11676, 11823, 11902, 11911, 16910,  17011, 17095, 17114, 17137, 17293, 17588, 17663, 17723, 17996, 18051, 22682, 23134, 23272, 23717, 23808, 25329, 28515, 28927, 29090, 29163, 29191, 29265, 34337, 34747, 34972, 35108, 35304, 39903, 40090, 40136, 40280, 40281, 40365, 40437, 40608, 45453, 45498, 45590,  45661,  50549, 50650, 50812
+)  
+
+stacked_out_review <- stacked_out_review %>% 
+  mutate(
+    new_flag = case_when(
+      pair %in% pair_list ~ "Likely same",
+      TRUE                ~ flag
+    )
+  )
+```
+
+```{r}
+table(stacked_out_review$new_flag)
+```
+# Assign the same unique ID to verified matches
+
+```{r}
+# Create a dichotomous variable for verified matches
+stacked_out_review <- stacked_out_review %>% 
+  mutate(
+    v_match = case_when(
+      new_flag != "Cannot be determined" & new_flag != "Needs Manual Review" & new_flag != "Likely not the same" ~ 1,
+      TRUE                                                                                                       ~ 0
+    )
+  )
+```
+
+```{r}
+# Filter out the verified matches and group them by pair
+veri_matches <- stacked_out_review %>% filter(v_match == 1) %>% select(pair_index, pair, exact_match_id) %>% distinct() %>% group_by(pair) 
+```
+
+```{r}
+# Widen the data by separating each pair into two columns
+veri_match_wide <- veri_matches %>% pivot_wider(names_from = pair_index, values_from = exact_match_id) %>% 
+  rename(
+  pair_index_1 = "1",
+  pair_index_2 = "2"
+  ) %>%
+  ungroup() %>%
+  right_join(veri_match_test, by = "pair") 
+```
+
+```{r}
+# Use functions in the igraph package to cluster ids with overlapping pair groups together
+
+## Create a graph from the widened data frame
+graph_test <- veri_match_wide %>% select(pair_index_1, pair_index_2) %>% graph_from_data_frame()
+
+## Create a data frame from the results of the igraph functions
+group_id <- data.frame(V = names(clusters(graph_test)$membership),
+                       cluster = clusters(graph_test)$membership,stringsAsFactors=FALSE)
+group_id <- group_id %>% 
+  mutate(
+    V = as.numeric(V)
+  )
+
+## Join the created ids back to the data frame with the exact match ids and filter unique rows for each exact_match id
+unique_id <- left_join(veri_match_wide, group_id, by=c("pair_index_2" = "V")) %>% 
+  group_by(exact_match_id) %>%
+  slice(1) %>% 
+  rename(
+    unique_id = "cluster"
+  )
+```
+
+## Add the new unique id column to the participant data frame
+
+```{r}
+# Manually assign unique ids to the 4 rows in the participant data frame that were not in the stacked pairs since their names and dobs are missing
+excluded_rows <- par_exact_id %>% filter(!(exact_match_id %in% unique_id$exact_match_id)) %>% select(exact_match_id) %>% arrange(exact_match_id)
+
+excluded_rows["unique_id"] <- c(42201, 42202, 42203, 42204)
+
+unique_id <- bind_rows(unique_id, excluded_rows)
+```
+
+```{r}
+# Add the unique id column to the par data set
+par_unique_id <- unique_id %>% select(exact_match_id, unique_id) %>% right_join(par_exact_id, by = "exact_match_id") %>% select(-c("visit_no", "count")) %>%
+  ungroup()
+
+```
+
+
+```{r}
+e <- par_unique_id %>% select(exact_match_id) %>% unique() %>% nrow()
+
+f <- par_unique_id %>% select(unique_id) %>% unique() %>% nrow()
+
+cat("The mumber of IDs assigned using exact matching is", e, "while the number assignmed using probabilistic matching is", f)
+```
+# Save the RDS file
+
+```{r}
+saveRDS(par_unique_id, "participant_unique_id.rds")
+```
+
