@@ -5,7 +5,7 @@ format: html
 
 # Purpose
 
-The purpose of the code in this file is to compare the MedStar IDS in the DETECT FU Interview data sets, create a combined data set of all the DETECT F/U data sets and assign an ID for each unique participant.
+The purpose of the code in this file is to compare the MedStar IDS in the DETECT FU Interview data sets, create a combined data set of all the DETECT F/U data set that includes an ID for each unique participant.
 
 # Load Packages
 
@@ -14,7 +14,6 @@ library(dplyr)
 library(readr)
 library(tidyverse)
 ```
-
 # Load DETECT F/U Data
 
 ```{r}
@@ -23,9 +22,10 @@ cls <- read_rds("../data/cleaned_rds_files/clutter_scale_import.rds")
 glh <- read_rds("../data/cleaned_rds_files/general_health_import.rds")
 lpa <- read_rds("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
 obs <- read_rds("../data/cleaned_rds_files/observational_measures_import.rds")
-par <- read_rds("../data/cleaned_rds_files/participant_import.rds")
+par <- read_rds("../data/unique_id_creation/participant_unique_id.rds")
 sfr <- read_rds("../data/cleaned_rds_files/self_report_import.rds")
 soc <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.rds")
+
 
 # Fix the lead panel assessment data error defined in fix_lead_data_error file
 source("../user_defined_functions/fix_lead_data_error.R")
@@ -147,33 +147,6 @@ soc_id_compare <- common_id(soc_id)
 soc_id_compare
 ```
 
-# Unique IDs for Unique People
-
-The participant data set contains all the MedStar IDs found in all the detect FU interview data sets so it will be used for creating IDs for unique people in the merged data set.
-
-```{r}
-unique_people_id <- par %>%
-  group_by(name_first, name_last, dob, sex_3cat_f
-           ) %>%
-  mutate(
-    # Column that shows the number of times each person occurs
-    count               = n(),
-    # Column that assigns an ID to each unique person
-    unique_person_id = cur_group_id()
-  ) %>%
-  group_by(x_created_timestamp) %>%
-  arrange() %>%
-  ungroup() %>%
-  group_by(name_first, name_last, dob, sex_3cat_f
-           ) %>%
-  mutate(
-    # Column that gives each visit a number that represents the chronological order
-    visit_no = row_number()
-  ) %>%
-  ungroup() %>%
-  select(medstar_id, unique_person_id, count, visit_no, x_created_timestamp, x_record_month, x_record_year)
-```
-
 # Select Only the Needed Variables and Merge the Subsetted Data Frames
 
 ```{r}
@@ -213,8 +186,12 @@ soc_merge <- soc %>% select(-c(x_primary_key, name_full, xc_case_id))
 
 ```{r}
 # Merge the data and add suffixes to the column names to indicate the data sets of origin
-detect_fu_merge <-lst(par = unique_people_id, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpc = lpc_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge) %>%
-  imap(function(x, y) x %>% rename_with(~ paste(., y, sep = '_'), -medstar_id)) %>%
+detect_fu_merge <-lst(par = par, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpc = lpc_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge) %>%
+  imap(
+    function(x, y) x %>% 
+      rename_with(~ paste(., y, sep = '_'), -medstar_id
+                  )
+    ) %>%
   reduce(full_join, by = 'medstar_id')
 ```
 
