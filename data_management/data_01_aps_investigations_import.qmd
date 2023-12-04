@@ -1,28 +1,39 @@
 ---
-title: "data_01_aps_investigations_import.qmd"
-execute:
-  echo: false
-format: html
+title: "Import Data from FileMaker Pro: APS Investigations"
 ---
 
-```{r, message= FALSE}
-# Load all necessary libraries
+# Overview
+
+In this file, we import and do some initial cleaning of the APS Investigations data collected and stored in FileMaker Pro.
+
+
+# Load packages
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
 library(readr)
 library(purrr)
 library(stringr)
-library(tidyverse)
 ```
+
 
 # Load data
 
-Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki/Using-this-repository. 
 
 ```{r}
-aps_investigations_import.csv <- file.choose()
-aps_inv <- read_csv(aps_investigations_import.csv)
+aps_inv <- read_csv("../data/filemaker_pro_exports/APS Investigations.csv")
 ```
 
-# Clean up data
+```{r}
+# Data check
+dim(aps_inv) # 951  15
+```
+
+
+# Data cleaning
+
+We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ## Convert all variable names to snake case
 
@@ -52,7 +63,7 @@ walk(
 ## Create recoded variables to match levels in follow-up interview protocol
 
 ```{r}
-#Create recoded variables for aps_report
+# Create recoded variables for aps_report
 aps_inv <- aps_inv %>%
   mutate(
     aps_report_4cat = case_when(
@@ -69,7 +80,7 @@ aps_inv <- aps_inv %>%
 ```
 
 ```{r}
-#Create recoded variables for aps_times
+# Create recoded variables for aps_times
 aps_inv <- aps_inv %>%
   mutate(
     aps_times_5cat = case_when(
@@ -87,7 +98,7 @@ aps_inv <- aps_inv %>%
 ```
 
 ```{r}
-#Create recoded variables for aps_first
+# Create recoded variables for aps_first
 aps_inv <- aps_inv %>%
   mutate(
     aps_first_8cat = case_when(
@@ -112,18 +123,18 @@ aps_inv <- aps_inv %>%
 ```
 
 ```{r}
-#Create recoded variables for aps_recent
+# Create recoded variables for aps_recent
 aps_inv <- aps_inv %>%
   mutate(
     aps_recent_8cat = case_when(
-      aps_recent == "In the past week" ~ 1,
-      aps_recent == "In the past month" ~ 2,
+      aps_recent == "In the past week"                           ~ 1,
+      aps_recent == "In the past month"                          ~ 2,
       aps_recent == "In the past year but more than a month ago" ~ 3,
-      aps_recent == "1-5 years ago" ~ 4,
-      aps_recent == "5-10 years ago" ~ 5, 
-      aps_recent == "10 or more years ago" ~ 6,
-      aps_recent == "Don’t know" ~ 7,
-      aps_recent == "Refused" ~ 9
+      aps_recent == "1-5 years ago"                              ~ 4,
+      aps_recent == "5-10 years ago"                             ~ 5, 
+      aps_recent == "10 or more years ago"                       ~ 6,
+      aps_recent == "Don’t know"                                 ~ 7,
+      aps_recent == "Refused"                                    ~ 9
     ),
     aps_recent_8cat_f = factor(
       aps_recent,
@@ -143,15 +154,14 @@ aps_inv <- aps_inv %>%
   select(-c(aps_report, aps_times, aps_first, aps_recent))
 ```
 
-## Change column name
-
 ```{r}
-colnames(aps_inv)[13] <- "xc_case_id"
+# Data check
+dim(aps_inv) # 951  19
 ```
+
 
 # Save as rds file
 
 ```{r}
-saveRDS(aps_inv, "aps_investigations_import.rds")
+write_rds(aps_inv, "../data/cleaned_rds_files/aps_investigations_import.rds")
 ```
-
