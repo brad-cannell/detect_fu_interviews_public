@@ -84,7 +84,7 @@ lpa <- lpa %>%
     across(
       .cols = ends_with(c("_abuse_2cat", "neglect_2cat", "exploitation_2cat", "abandonment_2cat")),
       .fns   = ~ factor(.x, levels = c(0, 1)),
-      .names = "{col}_f"
+      .names = "{col}"
       )
     )
 

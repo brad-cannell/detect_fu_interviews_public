@@ -32,6 +32,7 @@ for(i in socdem_vars) {
   attr(socdem[[i]], "source") <- "DETECT Follow-up Interview Questions - Sociodemographic Information"
 }
 ```
+
 ```{r}
 # Choose variables that will not have summary statistics
 no_stats <- socdem %>%

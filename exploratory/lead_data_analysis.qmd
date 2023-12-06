@@ -160,8 +160,8 @@ Write code that identifies the specific issues, indicates whether a row should b
 
 ```{r}
   # Create a vector of columns that will be used for grouping below.
-group <- c('assessment_type_3cat_f', 'physical_abuse_2cat', 'sexual_abuse_2cat', 'emotional_psycho_abuse_2cat', 'neglect_2cat', 
-           'self_neglect_2cat', 'financial_exploitation_2cat', 'abandonment_2cat')
+group <- c('assessment_type_3cat_f', 'physical_abuse_2cat_f', 'sexual_abuse_2cat_f', 'emotional_psycho_abuse_2cat_f', 'neglect_2cat_f', 
+           'self_neglect_2cat_f', 'financial_exploitation_2cat_f', 'abandonment_2cat_f')
 
 # Add a column to the data frame -- multiple_count -- that is equal to the number of rows in the data frame for each combination of medstar ID 
 # and panelist name.
@@ -175,8 +175,8 @@ multiple_assessment <- lpa %>%
 # For each MedStar ID, are all the scores assigned by the same panelist identical or different (identifies whether or not there is more than one row per group).
 multiple_assessment <- multiple_assessment |> 
   group_by(
-    medstar_id, panelist_name_10cat_f, assessment_type_3cat_f, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
-    self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat
+    medstar_id, panelist_name_10cat_f, assessment_type_3cat_f, sexual_abuse_2cat_f, emotional_psycho_abuse_2cat_f, neglect_2cat_f,
+    self_neglect_2cat_f, financial_exploitation_2cat_f, abandonment_2cat_f
   ) %>%
   mutate(
     same_score = case_when(
@@ -918,15 +918,15 @@ For each LEAD panel member, how many initial votes did they have? How many secon
 ```{r}
 init_sec <- lpac %>%
   # Select only the needed columns
-  select(c(medstar_id, assessment_type_3cat_f, panelist_name_10cat_f, physical_abuse_2cat : abandonment_2cat))
+  select(c(medstar_id, assessment_type_3cat_f, panelist_name_10cat_f, physical_abuse_2cat_f : abandonment_2cat))
 
 # Create a subset data frame with only the initial assessment rows and rename the abuse columns to distinguish them from those of the secondary assessment
 initial_panelist_votes <- init_sec %>%
   filter(assessment_type_3cat_f ==  "Initial assessment") %>%
   select(-c(assessment_type_3cat_f)) %>%
   rename_with(
-    .cols   = c(ends_with("_2cat")), 
-    .fn     = ~ gsub("2cat", "2cat_init", .x)
+    .cols   = c(ends_with("_2cat_f")), 
+    .fn     = ~ gsub("2cat_f", "2cat_init", .x)
   )
 
 # Create a subset data frame with only the secondary assessment rows and rename the abuse columns to distinguish them from those of the initial assessment
@@ -934,8 +934,8 @@ sec_panelist_votes <- init_sec %>%
   filter(assessment_type_3cat_f ==  "Secondary assessment") %>%
   select(-c(assessment_type_3cat_f)) %>%
   rename_with(
-    .cols   = c(ends_with("_2cat")), 
-    .fn     = ~ gsub("2cat", "2cat_sec", .x)
+    .cols   = c(ends_with("_2cat_f")), 
+    .fn     = ~ gsub("2cat_f", "2cat_sec", .x)
   )
 
 # Merge the two above data frames into one
@@ -980,7 +980,7 @@ type_perc_change <- function(a_agree, a_type) {
     
   # Create data frame containing the number of initial and secondary votes per abuse type for each panelist
   tab2 <- as.data.frame(table(lpac$panelist_name_10cat_f, lpac$assessment_type_3cat_f,
-                              lpac$physical_abuse_2cat))
+                              lpac$physical_abuse_2cat_f))
 
   # Make the data frames tidy
   df2 <- tab2 %>%

@@ -16,8 +16,8 @@
 error_fix <- function(lead_panel_assessment_df) {
   
   # Create a vector of columns that will be used for grouping below.
-  group <- c('assessment_type_3cat_f', 'physical_abuse_2cat', 'sexual_abuse_2cat', 'emotional_psycho_abuse_2cat', 'neglect_2cat', 
-             'self_neglect_2cat', 'financial_exploitation_2cat', 'abandonment_2cat')
+  group <- c('assessment_type_3cat_f', 'physical_abuse_2cat_f', 'sexual_abuse_2cat_f', 'emotional_psycho_abuse_2cat_f', 'neglect_2cat_f', 
+             'self_neglect_2cat_f', 'financial_exploitation_2cat_f', 'abandonment_2cat_f')
   
   # Add a column to the data frame -- multiple_count -- that is equal to the number of rows in the data frame for each combination of medstar ID 
   # and panelist name.
@@ -32,8 +32,8 @@ error_fix <- function(lead_panel_assessment_df) {
   # row per group).
   multiple_assessment <- multiple_assessment |> 
     group_by(
-      medstar_id, panelist_name_10cat_f, assessment_type_3cat_f, sexual_abuse_2cat, emotional_psycho_abuse_2cat, neglect_2cat,
-      self_neglect_2cat, financial_exploitation_2cat, abandonment_2cat
+      medstar_id, panelist_name_10cat_f, assessment_type_3cat_f, sexual_abuse_2cat_f, emotional_psycho_abuse_2cat_f, neglect_2cat_f,
+      self_neglect_2cat_f, financial_exploitation_2cat_f, abandonment_2cat_f
     ) %>%
     mutate(
       same_score = case_when(
@@ -112,5 +112,7 @@ error_fix <- function(lead_panel_assessment_df) {
   lead_panel_clean <-  multiple_assessment %>% filter(!(remove == "Yes")) 
   
   # Remove rows marked by the error_check function for individual review that are not the most recent.
-  lead_panel_clean <-  lead_panel_clean %>% filter(!(remove == "Individual review" & most_recent == "No") | remove == "No")
+  lead_panel_clean <-  lead_panel_clean %>% filter(!(remove == "Individual review" & most_recent == "No") | remove == "No") %>%
+    # Remove filtering columns
+    select(-c(multiple_count, same_score, all_na, over_24_hours, most_recent, remove))
 }

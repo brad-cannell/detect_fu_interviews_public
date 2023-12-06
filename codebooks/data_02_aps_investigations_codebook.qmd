@@ -18,8 +18,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 # Load cleaned data
 ```{r}
 #| warning: false
-aps_investigations_import.rds <- file.choose()
-aps_inv <- readRDS(aps_investigations_import.rds)
+aps_inv <- read_rds("../data/cleaned_rds_files/aps_investigations_import.rds")
 ```
 
 # Glimpse data with every column shown

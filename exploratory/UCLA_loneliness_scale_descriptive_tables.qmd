@@ -21,20 +21,15 @@ Load the general health and participant datasets
 
 ```{r}
 #| warning: false
-general_health_import.rds <- file.choose()
-general_health <- readRDS(general_health_import.rds)
+general_health <- readRDS("../data/cleaned_rds_files/general_health_import.rds")
 
-participant_import.rds <- file.choose()
-participant <- readRDS(participant_import.rds)
+participant <- readRDS("../data/cleaned_rds_files/participant.rds")
 
-sociodemographic_information_import.rds <- file.choose()
-soc_dem <- readRDS(sociodemographic_information_import.rds)
+soc_dem <- readRDS("../data/cleaned_rds_files/sociodemographic_information_import.rds")
 
-self_report_import.rds <- file.choose()
-self_report <- readRDS(self_report_import.rds)
+self_report <- readRDS("../data/cleaned_rds_files/self_report_import.rds")
 
-aps_investigations_import.rds <- file.choose()
-aps <- readRDS(aps_investigations_import.rds)
+aps <- readRDS("../data/cleaned_rds_files/aps_investigations_import.rds")
 ```
 
 #UCLA loneliness scale
@@ -84,7 +79,7 @@ Merge relevant variables from the participant and general health datasets into o
 
 ```{r}
 part_id <- participant %>% 
-  select(medstar_id, name_first, name_middle_initial, name_last, dob, sex, x_address_original)
+  select(medstar_id, name_first, name_middle_initial, name_last, dob, sex_3cat_f, x_address_original)
 
 # merge name columns into new full name column
 part_id <- part_id %>% unite("name_full", 'name_first': 'name_last', sep = ' ', na.rm = TRUE, remove = F) %>% relocate(name_full, .after = name_last)
@@ -105,7 +100,7 @@ Table with counts of unique names and number of names that occur once or more th
 ```{r, warning = FALSE}
 # Unique people count
 
-unique_people <- gen_part %>% select(name_first, name_last, dob, sex, house_number) %>% group_by_all() %>% summarise(count = n()) %>% unique()
+unique_people <- gen_part %>% select(name_first, name_last, dob, sex_3cat_f, house_number) %>% group_by_all() %>% summarise(count = n()) %>% unique()
 
 # List of people whose names occur in only one row with complete ls scale data
 
