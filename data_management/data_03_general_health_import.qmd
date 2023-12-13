@@ -1,43 +1,77 @@
 ---
-title: "data_01_general_health_import.qmd"
-format: html
+title: "Import Data from FileMaker Pro: General Health"
 ---
 
-```{r, message= FALSE}
-# Load all necessary libraries
+# Overview
+
+In this file, we import and do some initial cleaning of the General Health data collected and stored in FileMaker Pro.
+
+
+# Load packages
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
 library(readr)
 library(purrr)
 library(stringr)
-library(tidyverse)
-library(dplyr)
-library(janitor)
+# library(janitor)
 ```
 
 
 # Load data
 
-Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki/Using-this-repository. 
 
 ```{r}
-general_health <- read_csv("../data/filemaker_pro_exports/general_health_import.csv")
+general_health <- read_csv("../data/filemaker_pro_exports/General Health.csv")
 ```
 
-# Clean data
+```{r}
+# Data check
+dim(general_health) # 955  63
+```
 
-Here we will convert all variable names to snake case so that everything is uniform.
+
+# Data cleaning
+
+We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+## Convert all variable names to snake case
 
 ```{r}
-# Convert all variable names to snake case
-general_health <- clean_names(general_health)
+walk(
+  # Grab the names of all data frames in the global environment
+  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
+  .f = function(x) {
+    # Grab individual df from environment
+    df <- get(x)
+    # Grab the variables names
+    var_names <- names(df)
+    # Convert variable names to snake case
+    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
+    # Convert variable names to lower case
+    var_names <- str_to_lower(var_names)
+    # Fix medstar_id
+    var_names[var_names == "medstar_i_d"] <- "medstar_id"
+    # assign back to the dataframe
+    names(df) <- var_names
+    # Replace df with new names in global environment
+    assign(x, df, envir = .GlobalEnv)
+  }
+)
+```
 
-colnames(general_health)[which(names(general_health) == "outcomes4weeks_pain")] <- "outcomes_4weeks_pain"
+```{r}
+# Fix one additional column name
+general_health <- general_health |> 
+  rename(outcomes_4weeks_pain = outcomes4_weeks_pain)
 ```
 
 Change all instances of "Very severe" to "Very Severe" to match codebook.
 
 ```{r}
-general_health <- general_health %>% 
-  mutate_all(str_replace_all, "Very severe", "Very Severe")
+general_health <- general_health |>
+  mutate(across(everything(), ~ str_replace_all(.x, "Very severe", "Very Severe")))
 ```
 
 Remove unwanted characters and replace with "Don't know"
@@ -47,6 +81,7 @@ general_health[general_health == "Dont know"] <- "Don't know"
 ```
 
 ## Create recoded variables and factor variables to match levels in follow-up interview protocol
+
 ### PEG: A Three-Item Scale Assessing Pain Intensity and Interference
 
 ```{r}
@@ -69,13 +104,16 @@ general_health <- general_health %>%
         .x == "Refused"                             ~ 99
         ),
       .names = "{col}_12cat"
-      ),
-       across(
+    ),
+    across(
       .cols  = setdiff(starts_with("peg"), ends_with("_12cat")),
-      .fns   = ~ factor(.x, levels = c("0 - No pain", "1", "2", "3", "4", "5",
-                                    "6", "7", "8", "9", 
-                                    "10 - Pain as bad as you can imagine",
-                                    "Refused")),
+      .fns   = ~ factor(
+        .x, 
+        levels = c(
+          "0 - No pain", "1", "2", "3", "4", "5", "6", "7", "8", "9", 
+          "10 - Pain as bad as you can imagine", "Refused"
+        )
+      ),
       .names = "{col}_12cat_f"
     )
   )
@@ -83,13 +121,15 @@ general_health <- general_health %>%
 
 ### Medical Outcomes Study
 
+Create categorical and factor variables for variables beginning with "outcomes_health" excluding those that contain "general", "keep" and "unable"
 
 ```{r}
-#Create categorical and factor variables for variables beginning with "outcomes_health" excluding those that contain "general", "keep" and "unable"
 general_health <- general_health %>%
   mutate(
     across(
-      .cols  = setdiff(starts_with("outcomes_health"), ends_with(c("keep", "general", "unable"))),
+      .cols  = setdiff(
+        starts_with("outcomes_health"), ends_with(c("keep", "general", "unable"))
+      ),
       .fn  =  ~ case_when(
         .x == "Yes, limited for more than 3 months" ~ 1,
         .x == "Yes, limited for 3 months or less"   ~ 2,
@@ -100,20 +140,23 @@ general_health <- general_health %>%
       .names = "{col}_5cat"
     ),
     across(
-      .cols  = setdiff(starts_with("outcomes_health"), ends_with(c("keep", "general", "unable", "_5cat"))),
-      .fn = ~ factor(.x, levels = c("Yes, limited for more than 3 months",
-                                     "Yes, limited for 3 months or less",
-                                     "Not limited at all", "Don't know",
-                                     "Refused")),
+      .cols  = setdiff(
+        starts_with("outcomes_health"), ends_with(c("keep", "general", "unable", "_5cat"))
+      ),
+      .fn = ~ factor(
+        .x, 
+        levels = c(
+          "Yes, limited for more than 3 months", "Yes, limited for 3 months or less",
+          "Not limited at all", "Don't know", "Refused"
+        )
+      ),
       .names = "{col}_5cat_f"
     )
   )
-
 ```
 
-
 ```{r}
-#Create categorical and factor variables for outcomes_health_general
+# Create categorical and factor variables for outcomes_health_general
 general_health <- general_health %>%
   mutate (
     outcomes_health_general_7cat = case_when(
@@ -127,14 +170,16 @@ general_health <- general_health %>%
     ),
     outcomes_health_general_7cat_f = factor(
       outcomes_health_general,
-      levels = c("Excellent", "Very good", "Good", "Fair", "Poor", 
-                 "Don't know", "Refused")
+      levels = c(
+        "Excellent", "Very good", "Good", "Fair", "Poor", "Don't know", 
+        "Refused"
+      )
     )
   )
 ```
 
 ```{r}
-#Create categorical and factor variables for outcomes_4weeks_pain
+# Create categorical and factor variables for outcomes_4weeks_pain
 general_health <- general_health %>%
   mutate(
     outcomes_4weeks_pain_8cat = case_when(
@@ -149,14 +194,16 @@ general_health <- general_health %>%
     ),
     outcomes_4weeks_pain_8cat_f = factor(
       outcomes_4weeks_pain,
-      levels = c("None", "Very mild", "Mild", "Moderate", "Severe", 
-                 "Very Severe", "Don't know", "Refused")
+      levels = c(
+        "None", "Very mild", "Mild", "Moderate", "Severe", "Very Severe", 
+        "Don't know", "Refused"
+      )
     )
   )
 ```
 
 ```{r}
-#Create categorical and factor variables for outcomes_health_keep, outcomes_health_unable
+# Create categorical and factor variables for outcomes_health_keep, outcomes_health_unable
 general_health <- general_health %>%
   mutate(
     across(
@@ -172,17 +219,20 @@ general_health <- general_health %>%
     ),
     across(
       .cols  = setdiff(contains(c("keep", "unable")), ends_with("_5cat")),
-      .fn = ~ factor(.x, levels = c("Yes, for more than 3 months",
-                                     "Yes, for 3 months or less",
-                                     "No", "Don't know",
-                                     "Refused")),
+      .fn = ~ factor(
+        .x, 
+        levels = c(
+          "Yes, for more than 3 months", "Yes, for 3 months or less", "No", 
+          "Don't know", "Refused"
+        )
+      ),
       .names = "{col}_5cat_f"
     )
   )
 ```
 
 ```{r}
-#Create categorical and factor variables for variables that start with "outcomes_month
+# Create categorical and factor variables for variables that start with "outcomes_month
 general_health <- general_health %>%
   mutate(
     across(
@@ -200,11 +250,14 @@ general_health <- general_health %>%
     ),
     across(
       .col = setdiff(starts_with("outcomes_month"), ends_with("_7cat")),
-      .fn = ~ factor(.x, levels = c("All of the time", "Most of the time",
-                                    "Some of the time", 
-                                    "A little of the time",
-                                    "None of the time", "Don't know",
-                                    "Refused")),
+      .fn = ~ factor(
+        .x, 
+        levels = c(
+          "All of the time", "Most of the time", "Some of the time", 
+          "A little of the time", "None of the time", "Don't know", 
+          "Refused"
+        )
+      ),
       .names = "{col}_7cat_f"
     )
   )
@@ -228,9 +281,13 @@ general_health <- general_health %>%
     ),
     across(
       .col = setdiff(starts_with("outcomes_tf"), ends_with("_6cat")),
-      .fn = ~ factor(.x, levels = c("Definitely true", "Mostly true", 
-                                    "Don't know", "Mostly false",
-                                    "Definitely false", "Refused")),
+      .fn = ~ factor(
+        .x, 
+        levels = c(
+          "Definitely true", "Mostly true", "Don't know", "Mostly false", 
+          "Definitely false", "Refused"
+        )
+      ),
       .names = "{col}_6cat_f"
     )
   )
@@ -239,6 +296,7 @@ general_health <- general_health %>%
 ### Geriatric Depression Scale Variables
 
 These had to be coded individually, since some variables are coded 0 for "Yes" and 1 for "No" and others are coded the opposite
+
 ```{r}
 general_health <- general_health %>%
   mutate(
@@ -382,8 +440,9 @@ general_health <- general_health %>%
     ),
     across(
       .col = setdiff(starts_with("ls"), ends_with("_4cat")),
-      .fn = ~ factor(.x, levels = c("Hardly ever", "Some of the time",
-                                    "Often", "Refused")),
+      .fn = ~ factor(
+        .x, 
+        levels = c("Hardly ever", "Some of the time", "Often", "Refused")),
       .names = "{col}_4cat_f"
     )
   )
@@ -429,16 +488,17 @@ general_health <- general_health %>%
     ),
     auditc_drink_7cat_f = factor(
       auditc_drink,
-      levels = c("Never", "Monthly or less", "2-4 times a month",
-                 "2-3 times a week", "4 or more times a week",
-                 "Don't know", "Refused")
+      levels = c(
+        "Never", "Monthly or less", "2-4 times a month", "2-3 times a week", 
+        "4 or more times a week", "Don't know", "Refused"
+      )
     )
   )
   
 ```
 
 ```{r}
-#Create categorical and factor variables for the auditc_day variable
+# Create categorical and factor variables for the auditc_day variable
 general_health <- general_health %>%
   mutate(
     auditc_day_7cat = case_when(
@@ -452,14 +512,16 @@ general_health <- general_health %>%
     ),
     auditc_day_7cat_f = factor(
       auditc_day,
-      levels = c("1 or 2", "3 or 4", "5 or 6", "7 to 9", "10 or more",
-                 "Don't know", "Refused")
+      levels = c(
+        "1 or 2", "3 or 4", "5 or 6", "7 to 9", "10 or more", "Don't know", 
+        "Refused"
+      )
     )
   )
 ```
 
 ```{r}
-#Create categorical and factor variables for the auditc_five variable
+# Create categorical and factor variables for the auditc_five variable
 general_health <- general_health %>%
   mutate(
     auditc_five_7cat = case_when(
@@ -473,23 +535,32 @@ general_health <- general_health %>%
     ),
     auditc_five_7cat_f = factor(
       auditc_five,
-      levels = c("Never", "Less than monthly", "Monthly", "Weekly",
-      "Daily or almost daily", "Don't know", "Refused"
+      levels = c(
+        "Never", "Less than monthly", "Monthly", "Weekly", 
+        "Daily or almost daily", "Don't know", "Refused"
       )
     )
   )
 ```
-`
 
 ## Remove raw variables that have recoded forms
 
 ```{r}
-general_health<-general_health %>% select(-c(9:47,49:55,59:61,63:65))
+general_health <- general_health %>% 
+  select(-c(
+    # Don't drop by number like this...
+    9:47,49:55,59:61,63:65
+  ))
 ```
+
+```{r}
+# Data check
+dim(general_health) # 955 155
+```
+
 
 # Save as rds file
 
 ```{r}
-saveRDS(general_health, "general_health_import.rds")
-
+write_rds(general_health, "../data/cleaned_rds_files/general_health_import.rds")
 ```

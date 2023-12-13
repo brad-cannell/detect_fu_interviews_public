@@ -36,7 +36,7 @@ for(i in participant_vars) {
 ```{r}
 # Choose variables that will not have summary statistics
 no_stats <- participant %>%
-  select(1:28, 30:32, 34:58)
+   select(-any_of(c("age", "race", "sex_3cat_f")))
 
 no_stats_vars <- colnames(no_stats)
 ```

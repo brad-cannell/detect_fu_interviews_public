@@ -1,27 +1,39 @@
 ---
-title: "data_01_clutter_scale_import.qmd"
-format: html
+title: "Import Data from FileMaker Pro: Clutter Rating Scale"
 ---
 
-```{r, message= FALSE}
-# Load all necessary libraries
+# Overview
+
+In this file, we import and do some initial cleaning of the Clutter Rating Scale data collected and stored in FileMaker Pro.
+
+
+# Load packages
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
 library(readr)
 library(purrr)
 library(stringr)
-library(tidyverse)
-library(expss)
 ```
+
 
 # Load data
 
-Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki/Using-this-repository. 
 
 ```{r}
-clutter_scale_import.csv <- file.choose()
-clutter_scale <- read_csv(clutter_scale_import.csv)
+clutter_scale <- read_csv("../data/filemaker_pro_exports/Clutter Scale.csv")
 ```
 
-# Clean up data.
+```{r}
+# Data check
+dim(clutter_scale) # 893  20
+```
+
+
+# Data cleaning
+
+We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ## Convert all variable names to snake case
 
@@ -46,82 +58,82 @@ walk(
     assign(x, df, envir = .GlobalEnv)
   }
 )
-
 ```
 
 ## Create recoded variables and factor variables to match levels in follow-up interview protocol
+
 ```{r}
-#Create recoded variable for look_living
+# Create recoded variable for look_living
 clutter_scale <- clutter_scale %>%
   mutate(
     look_living_3cat = case_when(
+      look_living == "No"             ~ 0,
       look_living == "Yes"            ~ 1,
-      look_living == "No"             ~ 2,
       look_living == "No living room" ~ 7
     ),
-#Create factor variable for look_living
+    # Create factor variable for look_living
     look_living_3cat_f = factor(
       look_living,
-      levels = c("Yes", "No", "No living room")
+      levels = c("No", "Yes", "No living room")
     )
   )
 ```
 
 ```{r}
-#Create factor variable for clutter_living
+# Create factor variable for clutter_living
 clutter_scale <- clutter_scale %>%
   mutate(
     clutter_living_f = factor(
       clutter_living
     ),
-#Create recoded variable for clutter_living_photo
+    # Create recoded variable for clutter_living_photo
     clutter_living_photo_3cat = case_when(
+      clutter_living_photo == "No"             ~ 0,
       clutter_living_photo == "Yes"            ~ 1,
-      clutter_living_photo == "No"             ~ 2,
       clutter_living_photo == "No living room" ~ 7
     ),
-#Create factor variable for clutter_living_photo
+    # Create factor variable for clutter_living_photo
     clutter_living_photo_3cat_f = factor(
       clutter_living_photo,
-      levels = c("Yes", "No", "No living room")
+      levels = c("No", "Yes", "No living room")
     )
   )
 ```
 
 ```{r}
-#Create recoded variable for look_kitchen
+# Create recoded variable for look_kitchen
 clutter_scale <- clutter_scale %>%
   mutate(
     look_kitchen_3cat = case_when(
+      look_kitchen == "No"         ~ 0,
       look_kitchen == "Yes"        ~ 1,
-      look_kitchen == "No"         ~ 2,
       look_kitchen == "No kitchen" ~ 7
     ),
-#Create factor variable for look_kitchen
+    # Create factor variable for look_kitchen
     look_kitchen_3cat_f = factor(
       look_kitchen,
-      levels = c("Yes", "No", "No kitchen")
+      levels = c("No", "Yes", "No kitchen")
     )
   )
 ```
 
 ```{r}
-#Create factor variable for clutter_kitchen
+# Create factor variable for clutter_kitchen
 clutter_scale <- clutter_scale %>%
   mutate(
     clutter_kitchen_f = factor(
       clutter_kitchen
     ),
-#Create recoded variable for clutter_kitchen_photo
+    # Create recoded variable for clutter_kitchen_photo
     clutter_kitchen_photo_3cat = case_when(
+      clutter_kitchen_photo == "No"         ~ 0,
       clutter_kitchen_photo == "Yes"        ~ 1,
-      clutter_kitchen_photo == "No"         ~ 2,
       clutter_kitchen_photo == "No kitchen" ~ 7
     ),
-#Create factor variable for clutter_kitchen_photo
+    # Create factor variable for clutter_kitchen_photo
     clutter_kitchen_photo_3cat_f = factor(
       clutter_kitchen_photo,
-      levels = c("Yes", "No", "No living room")
+      levels = c("No", "Yes", "No living room")
     )
   )
 ```
@@ -131,54 +143,57 @@ clutter_scale <- clutter_scale %>%
 clutter_scale <- clutter_scale %>%
   mutate(
     look_bedroom_3cat = case_when(
+      look_bedroom == "No"         ~ 0,
       look_bedroom == "Yes"        ~ 1,
-      look_bedroom == "No"         ~ 2,
       look_bedroom == "No bedroom" ~ 7
     ),
-#Create factor variable for look_bedroom
+    # Create factor variable for look_bedroom
     look_bedroom_3cat_f = factor(
       look_bedroom,
-      levels = c("Yes", "No", "No bedroom")
+      levels = c("No", "Yes", "No bedroom")
     )
   )
 ```
 
 ```{r}
-#Create factor variable for clutter_bedroom
+# Create factor variable for clutter_bedroom
 clutter_scale <- clutter_scale %>%
   mutate(
     clutter_bedroom_f = factor(
       clutter_bedroom
     ),
-#Create recoded variable for clutter_bedroom_photo
+    # Create recoded variable for clutter_bedroom_photo
     clutter_bedroom_photo_3cat = case_when(
+      clutter_bedroom_photo == "No"         ~ 0,
       clutter_bedroom_photo == "Yes"        ~ 1,
-      clutter_bedroom_photo == "No"         ~ 2,
       clutter_bedroom_photo == "No bedroom" ~ 7
     ),
-#Create factor variable for clutter_bedroom_photo
+    # Create factor variable for clutter_bedroom_photo
     clutter_bedroom_photo_3cat_f = factor(
       clutter_bedroom_photo,
-      levels = c("Yes", "No", "No bedroom")
+      levels = c("No", "Yes", "No bedroom")
     )
   )
 ```
 
 ## Remove raw variables that have recoded forms
+
 ```{r}
-clutter_scale <- clutter_scale %>% select(-c(8:16))
+clutter_scale <- clutter_scale %>% 
+  select(-c(
+    look_living, clutter_living, clutter_living_photo, look_kitchen, clutter_kitchen,
+    clutter_kitchen_photo, look_bedroom, clutter_bedroom, clutter_bedroom_photo
+  ))
 ```
 
-## Change column name
 ```{r}
-colnames(clutter_scale)[14]  <- "xc_case_id"
+# Data check
+dim(clutter_scale) # 893  26
 ```
+
 
 # Save as rds file
 
 ```{r}
-saveRDS(clutter_scale, "clutter_scale_import.rds")
-
+write_rds(clutter_scale, "../data/cleaned_rds_files/clutter_scale_import.rds")
 ```
-
-

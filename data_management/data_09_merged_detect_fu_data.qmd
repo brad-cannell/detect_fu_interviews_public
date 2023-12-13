@@ -150,6 +150,11 @@ soc_id_compare
 # Select Only the Needed Variables and Merge the Subsetted Data Frames
 
 ```{r}
+par_merge <- par %>% select(-c(exact_match_id))
+```
+
+
+```{r}
 # APS Investigations 
 aps_merge <- aps %>% select(-c(x_primary_key, name_full, xc_case_id))
 ```
@@ -186,7 +191,7 @@ soc_merge <- soc %>% select(-c(x_primary_key, name_full, xc_case_id))
 
 ```{r}
 # Merge the data and add suffixes to the column names to indicate the data sets of origin
-detect_fu_merge <-lst(par = par, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpc = lpc_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge) %>%
+detect_fu_merge <-lst(par = par_merge, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpc = lpc_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge) %>%
   imap(
     function(x, y) x %>% 
       rename_with(~ paste(., y, sep = '_'), -medstar_id
