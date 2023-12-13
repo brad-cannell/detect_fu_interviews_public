@@ -1,6 +1,5 @@
 ---
-title: "data_01_clutter_scale_codebook"
-format: html
+title: "Create Clutter Scale Codebook"
 ---
 
 ```{r}
@@ -21,17 +20,11 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 clutter_scale <- read_rds("../data/cleaned_rds_files/clutter_scale_import.rds")
 ```
 
-# Glimpse data with every column shown
-```{r}
-glimpse(clutter_scale)
-```
-
 # Set column attributes
 
 ```{r}
 # Set the source to "DETECT Follow-up Interview home inspection and the clutter image rating scale data" for all the variables
 clutter_scale_vars <- clutter_scale %>% 
-  select(1:29) %>%
   names()
 
 for(i in clutter_scale_vars) {
@@ -122,8 +115,8 @@ clutter_scale <- clutter_scale %>%
       skip_pattern = "If answer is No, go to CL_2a.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No living room" = 3
+        "No"             = 0, 
+        "No living room" = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -145,8 +138,8 @@ clutter_scale <- clutter_scale %>%
       skip_pattern = "If answer is No, go to CL_2a.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No living room" = 3
+        "No"             = 0, 
+        "No living room" = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -163,8 +156,8 @@ clutter_scale <- clutter_scale %>%
       skip_pattern = "If answer is No, go to CL_3a.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No kitchen" = 3
+        "No"             = 0, 
+        "No kitchen"     = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -186,8 +179,8 @@ clutter_scale <- clutter_scale %>%
       skip_pattern = "If answer is No, go to CL_3a.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No kitchen" = 3
+        "No"             = 0, 
+        "No kitchen"     = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -204,8 +197,8 @@ clutter_scale <- clutter_scale %>%
       skip_pattern = "If answer is No, go to section 4.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No bedroom" = 3
+        "No"             = 0, 
+        "No bedroom"     = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -227,8 +220,8 @@ clutter_scale <- clutter_scale %>%
       skip_pattern = "If answer is No, go to section 4.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No bedroom" = 3
+        "No"             = 0, 
+        "No bedroom"     = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -244,9 +237,11 @@ clutter_scale <- clutter_scale %>%
 # Exclude summary stats for certain variables in word doc
 
 ```{r}
-#Create a vector of variables to exclude summary statistics from
+# Create a vector of variables to exclude summary statistics from
 no_stats <- clutter_scale %>%
-  select(1:14)
+  select(
+    c(matches("^(x|xc)_"), matches("^(name)"), medstar_id)
+  )
 
 no_stats_vars <- colnames(no_stats)
 
@@ -254,7 +249,7 @@ no_stats_vars <- colnames(no_stats)
 
 # Pass data frame to the codebook function
 ```{r}
-#Add title, subtitle and description while excluding summary statistics for the specified variables
+# Add title, subtitle and description while excluding summary statistics for the specified variables
 clutter_scale_codebook <- codebook(
   df = clutter_scale,
   title = "Clutter Scale Dataset",
@@ -263,5 +258,5 @@ clutter_scale_codebook <- codebook(
 ```
 
 ```{r}
-print(clutter_scale_codebook, "clutter_scale_codebook.docx")
+print(clutter_scale_codebook, "../codebooks/clutter_scale_codebook.docx")
 ```

@@ -1,6 +1,5 @@
 ---
-title: "data_01_aps_investigations_codebook"
-format: html
+title: "Create APS Investigations Codebook"
 ---
 
 # Load the necessary packages
@@ -9,6 +8,7 @@ format: html
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(haven)
+library(readr)
 ```
 
 # Purpose of the program
@@ -21,17 +21,11 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 aps_inv <- read_rds("../data/cleaned_rds_files/aps_investigations_import.rds")
 ```
 
-# Glimpse data with every column shown
-```{r}
-glimpse(aps_inv)
-```
-
 # Set column attributes
 
 ```{r}
 # Set the source to "DETECT Follow-up Interview APS Investigations" for all the variables
 aps_vars <- aps_inv %>% 
-  select(1:22) %>% 
   names()
 
 for(i in aps_vars) {
@@ -204,7 +198,9 @@ aps_inv <- aps_inv %>%
 ```{r}
 #Create a vector of variables to exclude summary statistics from
 no_stats <- aps_inv %>%
-  select(1:14)
+  select(
+    c(matches("^(x|xc)_"), name_full, medstar_id)
+  )
 
 no_stats_vars <- colnames(no_stats)
 
@@ -224,5 +220,5 @@ aps_codebook <- codebook(
 
 
 ```{r}
-print(aps_codebook, "aps_investigations_codebook.docx")
+print(aps_codebook, "../codebooks/aps_investigations_codebook.docx")
 ```

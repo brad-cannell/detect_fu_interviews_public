@@ -1,6 +1,5 @@
 ---
-title: "data_09_participant_codebook"
-format: html
+title: "Create Participant Codebook"
 ---
 
 ```{r}
@@ -18,7 +17,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 
 ```{r}
 #| warning: false
-participant <- readRDS("../data/cleaned_rds_files/participant_import.rds")
+participant <- read_rds("../data/cleaned_rds_files/participant_import.rds")
 ```
 
 # Set column attributes
@@ -26,17 +25,20 @@ participant <- readRDS("../data/cleaned_rds_files/participant_import.rds")
 ```{r}
 #Set the source to "Participant data" for all the variables
 participant_vars <- participant %>% 
-  select(1:76) %>% 
   names()
 
 for(i in participant_vars) {
   attr(participant[[i]], "source") <- "Participant data"
 }
 ```
+
 ```{r}
 # Choose variables that will not have summary statistics
 no_stats <- participant %>%
-   select(-any_of(c("age", "race", "sex_3cat_f")))
+   select(
+     -c(age, race, matches("_[0-9]cat"), matches("xc_detect_positive_summary_count"))
+   )
+     
 
 no_stats_vars <- colnames(no_stats)
 ```
@@ -461,7 +463,7 @@ participant_codebook <- codebook(
 ```
 
 ```{r}
-print(participant_codebook, "participant_codebook.docx")
+print(participant_codebook, "../codebooks/participant_codebook.docx")
 ```
 
 

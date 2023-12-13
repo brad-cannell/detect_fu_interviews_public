@@ -1,6 +1,5 @@
 ---
-title: "data_09_merged_detect_fu_data"
-format: html
+title: "Merge all DETECT FU Interview Datasets"
 ---
 
 # Purpose
@@ -12,7 +11,7 @@ The purpose of the code in this file is to compare the MedStar IDS in the DETECT
 ```{r}
 library(dplyr)
 library(readr)
-library(tidyverse)
+library(purrr)
 ```
 # Load DETECT F/U Data
 
@@ -26,17 +25,13 @@ par <- read_rds("../data/unique_id_creation/participant_unique_id.rds")
 sfr <- read_rds("../data/cleaned_rds_files/self_report_import.rds")
 soc <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.rds")
 
-
-# Fix the lead panel assessment data error defined in fix_lead_data_error file
-source("../user_defined_functions/fix_lead_data_error.R")
-lpc <- error_fix(lpa)
 ```
 
 # Summarize the Medstar ID commonalities and differences across all the datasets
 
 ```{r}
 # Create vectors, each containing the medstar IDS for each DETECT FU data set.
-vec_list <- list(aps_id = aps, cls_id = cls, glh_id = glh, lpc_id = lpc, obs_id = obs, par_id = par, sfr_id = sfr, soc_id = soc)
+vec_list <- list(aps_id = aps, cls_id = cls, glh_id = glh, lpa_id = lpa, obs_id = obs, par_id = par, sfr_id = sfr, soc_id = soc)
 
 medstar_id_lists <- lapply(vec_list, function(vec) {
  vec_ID <-  unique(vec$medstar_id)
@@ -46,17 +41,19 @@ medstar_id_lists <- lapply(vec_list, function(vec) {
 list2env(medstar_id_lists, envir = .GlobalEnv)
 
 ```
+
 ## Intersect of MedStar IDS across all DETECT FU datasets
 ```{r}
-intersect_detect <- Reduce(intersect, list(aps_id, cls_id, glh_id, lpc_id, obs_id, par_id, sfr_id, soc_id))
+intersect_detect <- Reduce(intersect, list(aps_id, cls_id, glh_id, lpa_id, obs_id, par_id, sfr_id, soc_id))
 cat("There are", length(intersect_detect), "Medstar IDs that are present in all the DETECT FU Interview datasets")
 ```
+
 ## Comparison of MedStar IDs in each dataset to those in the other DETECT FU Interviews datasets
 ```{r}
 # Create a function that checks the presence of the values of one vector in another reference vector
 common_id <- function(vec) {
   #  List of vectors to check each vector against
-  vec_ref_list <- list(aps_id = aps_id, cls_id = cls_id, glh_id = glh_id, lpc_id = lpc_id, obs_id = obs_id, 
+  vec_ref_list <- list(aps_id = aps_id, cls_id = cls_id, glh_id = glh_id, lpa_id = lpa_id, obs_id = obs_id, 
                      par_id = par_id, sfr_id = sfr_id, soc_id = soc_id)
   
   # Function for comparing 2 vectors
@@ -115,8 +112,8 @@ glh_id_compare
 ### LEAD Panel Assessment dataset
 ```{r, tbl}
 # Comparison of MedStar IDs in the LEAD panel assessment dataset to those in the other DETECT FU Interviews datasets
-lpc_id_compare <- common_id(lpc_id)
-lpc_id_compare
+lpa_id_compare <- common_id(lpa_id)
+lpa_id_compare
 ```
 
 ### Observational Measures dataset
@@ -171,7 +168,7 @@ glh_merge <- glh %>% select(-c(x_primary_key, name_full, xc_case_id))
 
 ```{r}
 # LEAD Panel Assessment
-lpc_merge <- lpc %>% select(-c(x_primary_key, name_full, case_id))
+lpa_merge <- lpa %>% select(-c(x_primary_key, name_full, case_id))
 ```
 
 ```{r}
@@ -191,7 +188,7 @@ soc_merge <- soc %>% select(-c(x_primary_key, name_full, xc_case_id))
 
 ```{r}
 # Merge the data and add suffixes to the column names to indicate the data sets of origin
-detect_fu_merge <-lst(par = par_merge, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpc = lpc_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge) %>%
+detect_fu_merge <-lst(par = par_merge, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpa = lpa_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge) %>%
   imap(
     function(x, y) x %>% 
       rename_with(~ paste(., y, sep = '_'), -medstar_id
@@ -202,7 +199,7 @@ detect_fu_merge <-lst(par = par_merge, aps = aps_merge, cls = cls_merge, glh = g
 
 # Save as RDS file
 ```{r}
-saveRDS(detect_fu_merge, "detect_fu_data_merged.rds")
+write_rds(detect_fu_merge, "../data/cleaned_rds_files/detect_fu_data_merged.rds")
 ```
 
 

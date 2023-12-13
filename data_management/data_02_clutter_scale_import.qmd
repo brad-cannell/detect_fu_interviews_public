@@ -12,8 +12,7 @@ In this file, we import and do some initial cleaning of the Clutter Rating Scale
 ```{r}
 library(dplyr, warn.conflicts = FALSE)
 library(readr)
-library(purrr)
-library(stringr)
+library(janitor)
 ```
 
 
@@ -22,12 +21,12 @@ library(stringr)
 Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki/Using-this-repository. 
 
 ```{r}
-clutter_scale <- read_csv("../data/filemaker_pro_exports/Clutter Scale.csv")
+clutter_scale <- read_csv("../data/filemaker_pro_exports/clutter_scale_import.csv")
 ```
 
 ```{r}
 # Data check
-dim(clutter_scale) # 893  20
+dim(clutter_scale) # 893  23
 ```
 
 
@@ -38,26 +37,7 @@ We will create categorical variables with numerical values that match the codebo
 ## Convert all variable names to snake case
 
 ```{r}
-walk(
-  # Grab the names of all data frames in the global environment
-  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
-  .f = function(x) {
-    # Grab individual df from environment
-    df <- get(x)
-    # Grab the variables names
-    var_names <- names(df)
-    # Convert variable names to snake case
-    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
-    # Convert variable names to lower case
-    var_names <- str_to_lower(var_names)
-    # Fix medstar_id
-    var_names[var_names == "medstar_i_d"] <- "medstar_id"
-    # assign back to the dataframe
-    names(df) <- var_names
-    # Replace df with new names in global environment
-    assign(x, df, envir = .GlobalEnv)
-  }
-)
+clutter_scale <- clean_names(clutter_scale)
 ```
 
 ## Create recoded variables and factor variables to match levels in follow-up interview protocol
@@ -188,7 +168,7 @@ clutter_scale <- clutter_scale %>%
 
 ```{r}
 # Data check
-dim(clutter_scale) # 893  26
+dim(clutter_scale) # 893  29
 ```
 
 

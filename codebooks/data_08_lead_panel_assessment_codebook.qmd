@@ -1,6 +1,5 @@
 ---
-title: "data_08_lead_panel_assessment_codebook"
-format: html
+title: "LEAD Panel Assessment Codebook"
 ---
 
 ```{r}
@@ -18,7 +17,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 
 ```{r}
 #| warning: false
-lpa <- readRDS("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
+lpa <- read_rds("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
 ```
 
 # Set column attributes
@@ -26,17 +25,19 @@ lpa <- readRDS("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
 ```{r}
 #Set the source to "DETECT LEAD Panel Assessment Data" for all the variables
 lpa_vars <- lpa %>% 
-  select(1:28) %>% 
   names()
 
 for(i in lpa_vars) {
   attr(lpa[[i]], "source") <- "DETECT LEAD Panel Assessment Data"
 }
 ```
+
 ```{r}
 # Choose variables that will not have summary statistics
 no_stats <- lpa %>%
-  select(1:19)
+  select(
+    c((matches("^(x|xc)_") & !contains("2cat")), matches("^(name)"), medstar_id, case_id, comments)
+  )
 
 no_stats_vars <- colnames(no_stats)
 ```
@@ -138,6 +139,41 @@ lead_panel_assessment <- lpa %>%
     ) %>%
   
     cb_add_col_attributes( 
+      physical_abuse_2cat, 
+      description = "If LEAD panel user thought physical abuse occurred"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sexual_abuse_2cat, 
+      description = "If LEAD panel user thought sexual abuse occurred"
+    ) %>%
+
+    cb_add_col_attributes( 
+      emotional_psycho_abuse_2cat, 
+      description = "If LEAD panel user thought emotional or phsychological abuse occurred"
+    ) %>%
+
+    cb_add_col_attributes( 
+      neglect_2cat, 
+      description = "If LEAD panel user thought neglect occurred"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      abandonment_2cat, 
+      description = "If LEAD panel user thought abandonment occurred"
+    ) %>%
+
+    cb_add_col_attributes( 
+      financial_exploitation_2cat, 
+      description = "If LEAD panel user thought financial or material exploitation occurred"
+    ) %>%
+
+    cb_add_col_attributes( 
+      self_neglect_2cat, 
+      description = "If LEAD panel user thought self-neglect occurred"
+    ) %>%
+  
+    cb_add_col_attributes( 
       physical_abuse_2cat_f, 
       description = "If LEAD panel user thought physical abuse occurred"
     ) %>%
@@ -147,7 +183,7 @@ lead_panel_assessment <- lpa %>%
       description = "If LEAD panel user thought sexual abuse occurred"
     ) %>%
 
-      cb_add_col_attributes( 
+    cb_add_col_attributes( 
       emotional_psycho_abuse_2cat_f, 
       description = "If LEAD panel user thought emotional or phsychological abuse occurred"
     ) %>%
@@ -188,12 +224,12 @@ lead_panel_assessment <- lpa %>%
     ) %>%
   
     cb_add_col_attributes( 
-      panelist_discipline, 
+      panelist_discipline_5cat_f, 
       description = "Panelist's professional discipline"
     ) %>%
   
     cb_add_col_attributes( 
-      healthcare_worker, 
+      healthcare_worker_2cat_f, 
       description   = "Does the panelist's discipline fall under the classification of healthcare worker?",
       value_labesls = c(
         "Yes" = 1,
@@ -205,7 +241,12 @@ lead_panel_assessment <- lpa %>%
     cb_add_col_attributes( 
       xc_assessment_screened_2cat_f, 
       description = "Calculation determining if the participant screened 'positive' or 'negative'"
-    )
+    ) %>%
+  
+    cb_add_col_attributes( 
+      xc_assessment_screened_2cat, 
+      description = "Calculation determining if the participant screened 'positive' or 'negative'"
+      )
 
 ```
 
@@ -221,7 +262,5 @@ lpa_codebook <- codebook(
 ```
 
 ```{r}
-print(lpa_codebook, "lead_panel_assessment_codebook.docx")
+print(lpa_codebook, "../codebooks/lead_panel_assessment_codebook.docx")
 ```
-
-

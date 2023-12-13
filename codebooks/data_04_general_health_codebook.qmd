@@ -1,6 +1,5 @@
 ---
-title: "data_01_general_health_codebook"
-format: html
+title: "Create General Health Codebook"
 ---
 ```{r}
 # Load needed packages
@@ -18,7 +17,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 
 ```{r}
 #| warning: false
-general_health <- readRDS("../data/cleaned_rds_files/general_health_import.rds")
+general_health <- read_rds("../data/cleaned_rds_files/general_health_import.rds")
 ```
 
 # Set column attributes
@@ -26,7 +25,6 @@ general_health <- readRDS("../data/cleaned_rds_files/general_health_import.rds")
 ```{r}
 #Set the source to "DETECT Follow-up Interview General Health" for all the variables
 general_health_vars <- general_health %>% 
-  select(1:105) %>% 
   names()
 
 for(i in general_health_vars) {
@@ -289,7 +287,7 @@ general_health <- general_health %>%
     ) %>%
   
     cb_add_col_attributes(
-      outcomes4_weeks_pain_8cat, 
+      outcomes_4weeks_pain_8cat, 
       description = "MO_1. How much bodily pain have you had during the past 4 weeks?",
       value_labels = c(
         "None"        = 0, 
@@ -305,7 +303,7 @@ general_health <- general_health %>%
     ) %>%
   
     cb_add_col_attributes( 
-      outcomes4_weeks_pain_8cat_f, 
+      outcomes_4weeks_pain_8cat_f, 
       description = "MO_1. How much bodily pain have you had during the past 4 weeks?"
     ) %>%
   
@@ -944,7 +942,9 @@ general_health <- general_health %>%
 ```{r}
 #Create a vector of variables to exclude summary statistics from
 no_stats <- general_health %>%
-  select(1:13)
+  select(
+    c(matches("^(x|xc)_"), matches("^(name)"), medstar_id)
+  )
 
 no_stats_vars <- colnames(no_stats)
 
@@ -962,5 +962,5 @@ general_health_codebook <- codebook(
 ```
 
 ```{r}
-print(general_health_codebook, "general_health_codebook.docx")
+print(general_health_codebook, "../codebooks/general_health_codebook.docx")
 ```
