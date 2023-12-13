@@ -1,6 +1,5 @@
 ---
-title: "data_01_observational_measures_codebook"
-format: html
+title: "Create Observational Measures Codebook"
 ---
 
 ```{r}
@@ -17,9 +16,7 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 # Load cleaned data
 
 ```{r}
-#| warning: false
-observational_measures_import.rds <- file.choose()
-obs <- readRDS(observational_measures_import.rds)
+obs <- read_rds("../data/cleaned_rds_files/observational_measures_import.rds")
 ```
 
 # Set column attributes
@@ -27,7 +24,6 @@ obs <- readRDS(observational_measures_import.rds)
 ```{r}
 #Set the source to "DETECT Follow-up Interview Questions Observational Measures" for all the variables
 obs_vars <- obs %>% 
-  select(1:125) %>% 
   names()
 
 for(i in obs_vars) {
@@ -38,7 +34,9 @@ for(i in obs_vars) {
 ```{r}
 # Choose variables that will not have summary statistics
 no_stats <- obs %>%
-  select(1:13,16:29,131)
+  select(
+    c(matches("^(x|xc)_"), matches("^(name)"), medstar_id, matches("_comments$"), matches("_why$"), aps_reported_confirmation_number)
+  )
 
 no_stats_vars <- colnames(no_stats)
 ```
@@ -835,5 +833,5 @@ obs_meas_codebook <- codebook(
 ```
 
 ```{r}
-print(obs_meas_codebook, "observational_measures_codebook.docx")
+print(obs_meas_codebook, "../codebooks/observational_measures_codebook.docx")
 ```

@@ -1,15 +1,10 @@
 ---
-title: "Participant Import"
-format: html
+title: "Import Data from FileMaker Pro: Participant"
 ---
 
 
 ```{r, message= FALSE}
 library(readr)
-library(purrr)
-library(stringr)
-library(tidyverse)
-library(expss)
 library(dplyr)
 library(janitor)
 ```
@@ -22,12 +17,18 @@ Load the data table into the global environment as a data frame using the raw cs
 participant <- read_csv("../data/filemaker_pro_exports/participant_import.csv")
 
 ```
+
 # Clean the data
 
 Here we will convert all variable names to snake case so that everything is uniform.
 
 ```{r}
 participant <- clean_names(participant)
+```
+
+```{r}
+# Data check
+dim(participant) # 92160 94
 ```
 
 ## Coerce categorical variables to factor variables
@@ -79,12 +80,17 @@ participant <- participant %>%
 ### Remove variables that have recoded forms
 
 ```{r}
-participant <- participant %>% select(-c(sex, x_do_not_call, x_unusual_odor : x_aps_reported, xc_detect_status))
+participant <- participant %>% select(-c(sex, x_do_not_call, x_unusual_odor, x_disarray_hoarding,  x_health_safety_concern,  x_caregiver_lack_knowledge,  x_caregiver_unengaged,  x_caregiver_frustrated,  x_caregiver_anxious,  x_isolated_home,  x_depressed,  x_poor_personal_hygiene,  x_inadequately_clothed,  x_difficulty_medications,  x_hoarding_medications,  x_unmet_needs, x_aps_reported, xc_detect_status))
+```
+
+```{r}
+# Data check
+dim(participant) # 92160 76
 ```
 
 # Save as rds file
 
 ```{r}
-  saveRDS(participant, "participant_import.rds")
+write_rds(participant, "../data/cleaned_rds_files/participant_import.rds")
 
 ```

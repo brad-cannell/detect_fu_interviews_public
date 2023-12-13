@@ -1,13 +1,11 @@
 ---
-title: "data_01_merged_data_codebook"
-format: html
+title: "Merged DETECT FU Data Codebook"
 ---
 
 ```{r}
 # Load needed packages
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
-library(haven)
 library(readr)
 ```
 
@@ -27,7 +25,7 @@ detect_fu_merge <- read_rds("../data/cleaned_rds_files/detect_fu_data_merged.rds
 ```{r}
 # Set the source for Participant data variables
 participant_vars <- detect_fu_merge %>% 
-  select(ends_with("_par")) %>%
+  select(c(ends_with("_par"), medstar_id)) %>%
   names()
 
 for(i in participant_vars) {
@@ -70,11 +68,11 @@ for(i in glh_vars) {
 
 ```{r}
 # Set the source for LEAD Panel Assessment data variables
-lpc_vars <- detect_fu_merge %>% 
-  select(ends_with("_lpc")) %>%
+lpa_vars <- detect_fu_merge %>% 
+  select(ends_with("_lpa")) %>%
   names()
 
-for(i in lpc_vars) {
+for(i in lpa_vars) {
   attr(detect_fu_merge[[i]], "source") <- "DETECT Follow-up LEAD Panel Assessment data"
 }
 ```
@@ -116,12 +114,17 @@ for(i in soc_vars) {
 ```{r}
 no_stats <- detect_fu_merge %>%
   select(
-    unique_id_par, x_created_by_par, x_created_timestamp_par, name_first_par, name_middle_initial_par, name_last_par, medstar_id, name_full_par, x_address_original_par, city_par, state_par, zip_code_par, name_suffix_par, x_primary_key_par, x_modified_by_par, x_modified_timestamp_par, x_record_status_par, phone_par, x_record_month_par, x_record_year_par, x_error_message_par, dob_par, x_randomizer_par, x_call_order_par, incident_timestamp_par, unit_arrived_timestamp_par, ems_response_number_par, medstar_internal_id_par, complaint_reported_par, incident_result_par, ems_crew_member_par, symptom_list_par, xc_incident_day_name_par, xc_incident_month_name_par, xc_incident_day_par, xc_incident_year_par, xc_record_month_year_abbr_par, x_is_archived_par, apt_par, address_par, x_usps_address_result_par, x_address_verified_par, x_call_order_initial_par, x_exclusion_reason_par, xc_case_id_par, xc_call_order_even_odd_par, xc_participant_list_found_count_par, x_aps_reported_confirmation_number_par, xc_name_title_par, address_valid_par, address_updated_par, apt_updated_par, city_updated_par, zip_code_updated_par, xc_address_par, xc_incident_date_par, xc_detect_positive_summary_count_par, x_created_by_aps, x_created_timestamp_aps, x_modified_by_aps, x_modified_timestamp_aps, x_record_status_aps, x_error_message_aps, x_record_month_aps, x_record_year_aps, x_record_comment_aps, xc_lead_panel_summary_count_aps, x_created_by_cls, x_created_timestamp_cls, x_modified_by_cls, x_modified_timestamp_cls, x_error_message_cls, x_record_status_cls, x_record_month_cls, x_record_year_cls, x_record_comment_cls, x_created_by_glh, x_created_timestamp_glh, x_modified_by_glh, x_modified_timestamp_glh, x_error_message_glh, x_record_status_glh, x_record_month_glh, x_record_year_glh, x_record_comment_glh, x_created_by_lpc, x_created_timestamp_lpc, x_modified_by_lpc, x_modified_timestamp_lpc, x_record_month_lpc, x_record_year_lpc, x_record_status_lpc, x_record_comment_lpc, x_error_message_lpc, x_username_lpc, comments_lpc, x_assessment_month_lpc, x_assessment_year_lpc, xc_join_lpc, x_created_by_obs, x_created_timestamp_obs, x_modified_by_obs, x_modified_timestamp_obs, x_error_message_obs, x_record_status_obs, x_record_month_obs, x_record_year_obs, x_record_comment_obs, xc_lead_panel_summary_count_obs, xc_lead_panel_summary_comment_count_obs, xc_lead_panel_summary_obs, neglect_comments_obs, exploitation_comments_obs, abandonment_comments_obs, summary_comments_obs, general_assessment_comments_obs, abuse_indicators_comments_obs, at_phys_why_obs, at_sex_why_obs, at_emot_why_obs, at_neg_why_obs, at_aban_why_obs, at_fina_why_obs, at_self_why_obs, aps_reported_confirmation_number_obs, x_created_by_sfr, x_created_timestamp_sfr, x_modified_by_sfr, x_modified_timestamp_sfr, x_record_status_sfr, x_error_message_sfr, xc_lead_panel_summary_count_sfr, x_record_month_sfr, x_record_year_sfr, x_record_comment_sfr, xc_emotional_list_sfr, xc_physical_list_sfr, xc_sexual_list_sfr, x_created_by_soc, x_created_timestamp_soc, x_modified_by_soc, x_modified_timestamp_soc, x_record_status_soc, x_error_message_soc, x_record_month_soc, x_record_year_soc, x_record_comment_soc
+    c(unique_id_par, medstar_internal_id_par, city_par, state_par, zip_code_par, phone_par, dob_par, incident_timestamp_par,
+      unit_arrived_timestamp_par, ems_response_number_par, complaint_reported_par, incident_result_par, ems_crew_member_par,
+      symptom_list_par, apt_par, address_par, xc_name_title_par, address_valid_par, address_updated_par, apt_updated_par,
+      city_updated_par, zip_code_updated_par, (matches("^(x|xc)_") & !matches("_[0-9]+cat") & !xc_detect_positive_summary_count_par),
+      matches("^(name)"), medstar_id, matches("comments"), matches("_why"), aps_reported_confirmation_number_obs, matches("_response"))
     )
 
 no_stats_vars <- colnames(no_stats)
 
 ```
+
 
 # Set column attributes
 ## Participant data variables
@@ -734,8 +737,8 @@ detect_fu_merge <- detect_fu_merge %>%
       skip_pattern = "If answer is No, go to CL_2a.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No living room" = 3
+        "No"             = 0, 
+        "No living room" = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -757,8 +760,8 @@ detect_fu_merge <- detect_fu_merge %>%
       skip_pattern = "If answer is No, go to CL_2a.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No living room" = 3
+        "No"             = 0, 
+        "No living room" = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -775,8 +778,8 @@ detect_fu_merge <- detect_fu_merge %>%
       skip_pattern = "If answer is No, go to CL_3a.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No kitchen" = 3
+        "No"             = 0, 
+        "No kitchen"     = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -798,8 +801,8 @@ detect_fu_merge <- detect_fu_merge %>%
       skip_pattern = "If answer is No, go to CL_3a.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No kitchen" = 3
+        "No"             = 0, 
+        "No kitchen"     = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -816,8 +819,8 @@ detect_fu_merge <- detect_fu_merge %>%
       skip_pattern = "If answer is No, go to section 4.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No bedroom" = 3
+        "No"             = 0, 
+        "No bedroom"     = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -839,8 +842,8 @@ detect_fu_merge <- detect_fu_merge %>%
       skip_pattern = "If answer is No, go to section 4.",
       value_labels = c(
         "Yes"            = 1, 
-        "No"             = 2, 
-        "No bedroom" = 3
+        "No"             = 0, 
+        "No bedroom"     = 7
       ),
       col_type = "Categorical"
     ) %>%
@@ -1087,7 +1090,7 @@ detect_fu_merge <- detect_fu_merge %>%
     ) %>%
   
     cb_add_col_attributes(
-      outcomes4_weeks_pain_8cat_glh, 
+      outcomes_4weeks_pain_8cat_glh, 
       description = "MO_1. How much bodily pain have you had during the past 4 weeks?",
       value_labels = c(
         "None"        = 0, 
@@ -1103,7 +1106,7 @@ detect_fu_merge <- detect_fu_merge %>%
     ) %>%
   
     cb_add_col_attributes( 
-      outcomes4_weeks_pain_8cat_f_glh, 
+      outcomes_4weeks_pain_8cat_f_glh, 
       description = "MO_1. How much bodily pain have you had during the past 4 weeks?"
     ) %>%
   
@@ -1741,167 +1744,167 @@ detect_fu_merge <- detect_fu_merge %>%
 ```{r}
 detect_fu_merge <- detect_fu_merge %>%
     cb_add_col_attributes( 
-      x_created_by_lpc, 
+      x_created_by_lpa, 
       description = "User who created the record"
     ) %>%
   
     cb_add_col_attributes( 
-      x_created_timestamp_lpc, 
+      x_created_timestamp_lpa, 
       description = "Timestamp when the record was created",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
-      x_modified_by_lpc, 
+      x_modified_by_lpa, 
       description = "User who last modified the record"
     ) %>%
   
     cb_add_col_attributes( 
-      x_modified_timestamp_lpc, 
+      x_modified_timestamp_lpa, 
       description = "Timestamp when the record was last modified",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
-      x_error_message_lpc, 
+      x_error_message_lpa, 
       description = "Any database error messages"
     ) %>%
   
     cb_add_col_attributes( 
-      x_record_month_lpc, 
+      x_record_month_lpa, 
       description = "Related month of the record",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
-      x_record_year_lpc, 
+      x_record_year_lpa, 
       description = "Related year of the record",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
-      x_record_status_lpc, 
+      x_record_status_lpa, 
       description = "The records status"
     ) %>%
   
     cb_add_col_attributes( 
-      x_record_comment_lpc, 
+      x_record_comment_lpa, 
       description = "Any record comments added by the user"
     ) %>%
   
     cb_add_col_attributes( 
-      x_assessment_month_lpc, 
+      x_assessment_month_lpa, 
       description = "Related assessment month of the record",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
-      x_assessment_year_lpc, 
+      x_assessment_year_lpa, 
       description = "Related assessment year of the record",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
-      panelist_name_10cat_f_lpc, 
+      panelist_name_10cat_f_lpa, 
       description = "Name of the LEAD panelist user"
     ) %>%
   
     cb_add_col_attributes( 
-      assessment_type_3cat_f_lpc, 
+      assessment_type_3cat_f_lpa, 
       description = "Type of assessment, such as 'Initial', 'Secondary'. etc'"
     ) %>%
       cb_add_col_attributes( 
-      physical_abuse_2cat_lpc, 
+      physical_abuse_2cat_lpa, 
       description = "If LEAD panel user thought physical abuse occurred"
     ) %>%
   
     cb_add_col_attributes( 
-      sexual_abuse_2cat_lpc, 
+      sexual_abuse_2cat_lpa, 
       description = "If LEAD panel user thought sexual abuse occurred"
     ) %>%
 
       cb_add_col_attributes( 
-      emotional_psycho_abuse_2cat_lpc, 
+      emotional_psycho_abuse_2cat_lpa, 
       description = "If LEAD panel user thought emotional or phsychological abuse occurred"
     ) %>%
 
     cb_add_col_attributes( 
-      neglect_2cat_lpc, 
+      neglect_2cat_lpa, 
       description = "If LEAD panel user thought neglect occurred"
     ) %>%
   
     cb_add_col_attributes( 
-      abandonment_2cat_lpc, 
+      abandonment_2cat_lpa, 
       description = "If LEAD panel user thought abandonment occurred"
     ) %>%
 
     cb_add_col_attributes( 
-      financial_exploitation_2cat_lpc, 
+      financial_exploitation_2cat_lpa, 
       description = "If LEAD panel user thought financial or material exploitation occurred"
     ) %>%
 
     cb_add_col_attributes( 
-      self_neglect_2cat_lpc, 
+      self_neglect_2cat_lpa, 
       description = "If LEAD panel user thought self-neglect occurred"
     ) %>%
   
     cb_add_col_attributes( 
-      physical_abuse_2cat_f_lpc, 
+      physical_abuse_2cat_f_lpa, 
       description = "If LEAD panel user thought physical abuse occurred"
     ) %>%
   
     cb_add_col_attributes( 
-      sexual_abuse_2cat_f_lpc, 
+      sexual_abuse_2cat_f_lpa, 
       description = "If LEAD panel user thought sexual abuse occurred"
     ) %>%
 
       cb_add_col_attributes( 
-      emotional_psycho_abuse_2cat_f_lpc, 
+      emotional_psycho_abuse_2cat_f_lpa, 
       description = "If LEAD panel user thought emotional or phsychological abuse occurred"
     ) %>%
 
     cb_add_col_attributes( 
-      neglect_2cat_f_lpc, 
+      neglect_2cat_f_lpa, 
       description = "If LEAD panel user thought neglect occurred"
     ) %>%
   
     cb_add_col_attributes( 
-      abandonment_2cat_f_lpc, 
+      abandonment_2cat_f_lpa, 
       description = "If LEAD panel user thought abandonment occurred"
     ) %>%
 
     cb_add_col_attributes( 
-      financial_exploitation_2cat_f_lpc, 
+      financial_exploitation_2cat_f_lpa, 
       description = "If LEAD panel user thought financial or material exploitation occurred"
     ) %>%
 
     cb_add_col_attributes( 
-      self_neglect_2cat_f_lpc, 
+      self_neglect_2cat_f_lpa, 
       description = "If LEAD panel user thought self-neglect occurred"
     ) %>%
   
     cb_add_col_attributes( 
-      comments_lpc, 
+      comments_lpa, 
       description = "Any assessment comments added by the LEAD panel user"
     ) %>%
   
     cb_add_col_attributes( 
-      xc_join_lpc, 
+      xc_join_lpa, 
       description = "Internal system variable"
     ) %>%
   
     cb_add_col_attributes( 
-      x_username_lpc, 
+      x_username_lpa, 
       description = "Internal system variable"
     ) %>%
   
     cb_add_col_attributes( 
-      panelist_discipline_5cat_f_lpc, 
+      panelist_discipline_5cat_f_lpa, 
       description = "Panelist's professional discipline"
     ) %>%
   
     cb_add_col_attributes( 
-      healthcare_worker_2cat_f_lpc, 
+      healthcare_worker_2cat_f_lpa, 
       description   = "Does the panelist's discipline fall under the classification of healthcare worker?",
       value_labesls = c(
         "Yes" = 1,
@@ -1911,12 +1914,12 @@ detect_fu_merge <- detect_fu_merge %>%
     ) %>%
   
     cb_add_col_attributes( 
-      xc_assessment_screened_2cat_f_lpc, 
+      xc_assessment_screened_2cat_f_lpa, 
       description = "Calculation determining if the participant screened 'positive' or 'negative'"
     ) %>%
   
     cb_add_col_attributes( 
-      xc_assessment_screened_2cat_lpc, 
+      xc_assessment_screened_2cat_lpa, 
       description = "Calculation determining if the participant screened 'positive' or 'negative'"
     )
 
@@ -6080,5 +6083,5 @@ detect_fu_merged_codebook <- codebook(
 ```
 
 ```{r}
-print(detect_fu_merged_codebook, "detect_fu_merge_codebook.docx")
+print(detect_fu_merged_codebook, "../codebooksdetect_fu_merge_codebook.docx")
 ```

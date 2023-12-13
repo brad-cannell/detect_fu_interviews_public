@@ -14,21 +14,20 @@ library(dplyr, warn.conflicts = FALSE)
 library(readr)
 library(purrr)
 library(stringr)
-# library(janitor)
+library(janitor)
 ```
-
 
 # Load data
 
 Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki/Using-this-repository. 
 
 ```{r}
-general_health <- read_csv("../data/filemaker_pro_exports/General Health.csv")
+general_health <- read_csv("../data/filemaker_pro_exports/general_health_import.csv")
 ```
 
 ```{r}
 # Data check
-dim(general_health) # 955  63
+dim(general_health) # 955 65
 ```
 
 
@@ -39,45 +38,7 @@ We will create categorical variables with numerical values that match the codebo
 ## Convert all variable names to snake case
 
 ```{r}
-walk(
-  # Grab the names of all data frames in the global environment
-  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
-  .f = function(x) {
-    # Grab individual df from environment
-    df <- get(x)
-    # Grab the variables names
-    var_names <- names(df)
-    # Convert variable names to snake case
-    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
-    # Convert variable names to lower case
-    var_names <- str_to_lower(var_names)
-    # Fix medstar_id
-    var_names[var_names == "medstar_i_d"] <- "medstar_id"
-    # assign back to the dataframe
-    names(df) <- var_names
-    # Replace df with new names in global environment
-    assign(x, df, envir = .GlobalEnv)
-  }
-)
-```
-
-```{r}
-# Fix one additional column name
-general_health <- general_health |> 
-  rename(outcomes_4weeks_pain = outcomes4_weeks_pain)
-```
-
-Change all instances of "Very severe" to "Very Severe" to match codebook.
-
-```{r}
-general_health <- general_health |>
-  mutate(across(everything(), ~ str_replace_all(.x, "Very severe", "Very Severe")))
-```
-
-Remove unwanted characters and replace with "Don't know"
-
-```{r}
-general_health[general_health == "Dont know"] <- "Don't know"
+general_health <- clean_names(general_health, replace = c("4Weeks" = "_4weeks"))
 ```
 
 ## Create recoded variables and factor variables to match levels in follow-up interview protocol
@@ -547,15 +508,17 @@ general_health <- general_health %>%
 
 ```{r}
 general_health <- general_health %>% 
-  select(-c(
-    # Don't drop by number like this...
-    9:47,49:55,59:61,63:65
-  ))
+  select(
+    -c((starts_with("audit") & !contains("_7cat")), (starts_with("depres") & !contains("_2cat")), starts_with("health"),
+       (starts_with("ls_") & !contains("_4cat")), (starts_with("nesarc") & !contains("_4cat")), (starts_with("outcomes") & !matches("_[0-9]cat")),
+       (starts_with("peg") & !contains("_12cat"))
+       )
+  )
 ```
 
 ```{r}
 # Data check
-dim(general_health) # 955 155
+dim(general_health) # 955 105
 ```
 
 

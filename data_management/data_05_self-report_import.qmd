@@ -1,15 +1,18 @@
 ---
-title: "data_01_self_report_import.qmd"
-format: html
+title: "Import Data from FileMaker Pro: Self Report"
 ---
+
+# Overview
+
+In this file, we import and do some initial cleaning of the Observational Measures data collected and stored in FileMaker Pro.
 
 ```{r, message= FALSE}
 # Load all necessary libraries
 library(readr)
 library(purrr)
 library(stringr)
-library(tidyverse)
 library(dplyr)
+library(janitor)
 ```
 
 
@@ -18,51 +21,23 @@ library(dplyr)
 Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r}
-
-self_report_import.csv <- file.choose()
-self_report <- read_csv(self_report_import.csv)
-
+self_rep <- read_csv("../data/filemaker_pro_exports/self_report_import.csv")
 ```
-
 # Clean data
 
 Here we will convert all variable names to snake case so that everything is uniform.
 
 ```{r}
-# Convert all variable names to snake case
-walk(
-  # Grab the names of all data frames in the global environment
-  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
-  .f = function(x) {
-    # Grab individual df from environment
-    df <- get(x)
-    # Grab the variables names
-    var_names <- names(df)
-    # Convert variable names to snake case
-    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
-    # Convert variable names to lower case
-    var_names <- str_to_lower(var_names)
-    # Fix medstar_id
-    var_names[var_names == "medstar_i_d"] <- "medstar_id"
-    # assign back to the dataframe
-    names(df) <- var_names
-    # Replace df with new names in global environment
-    assign(x, df, envir = .GlobalEnv)
-  }
-)
-
+self_rep <- clean_names(self_rep,
+                        replace = c("60" = "_60",
+                                    "65" = "_65"))
 ```
-
-## Change column positions
 
 ```{r}
-self_rep <- self_report %>% relocate(xc_case_i_d, .after=	x_error_message)
-self_rep <- self_rep %>% relocate(xc_lead_panel_summary_count, .after =	xc_case_i_d)	
-self_rep <- self_rep %>% relocate(x_record_month, .after = xc_lead_panel_summary_count)	
-self_rep <- self_rep %>% relocate(x_record_year, .after =	x_record_month)	
-self_rep <- self_rep %>% relocate(x_record_comment, .after =	x_record_year)	
-
+# Data check
+dim(self_rep) # 956 209
 ```
+
 
 ## Create factor variables to match levels in follow-up interview protocol
 
@@ -627,7 +602,7 @@ self_rep <- self_rep %>%
       .cols = starts_with("fear") & !ends_with("response"),
       .fns  = ~ case_when(
         .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
+        .x == "Refused"    ~ 9
       ),
       .names = "{col}_2cat"
     ),
@@ -673,33 +648,31 @@ self_rep <- self_rep %>%
   )
 ```
 
-
 ## Remove raw character variables that have recoded forms
 
 ```{r}
-#keep all variables before and after self_rep[15:209]
-keep_vars <- c(1:14,210:497)
-self_rep1 <- self_rep[, keep_vars]
-
-#keep additional variables within self_rep[15:209] that do not have recoded versions
-more_keep_vars<-self_rep[15:209] %>% select(-c(!matches("age") & !matches("_times_times") & !matches("response") & !matches("xc_") & !matches("finance_stranger_forged_times")))
-self_rep <- cbind(self_rep1,more_keep_vars)
-                          
+self_rep <- self_rep %>% select(
+  -c(
+    (starts_with("emotional") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
+    (starts_with("fear") & (!matches("[0-9]cat") & !matches("_response$"))),
+    (starts_with("finance") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times") & !matches("_stranger_forged_times"))),
+    (starts_with("neglect") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
+    (starts_with("physical") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
+    (starts_with("report") & !matches("[0-9]cat")),
+    (starts_with("sexual") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times")))
+    )
+)
 ```
 
-# Change column names
 
 ```{r}
-
-colnames(self_rep)[8]  <- "xc_case_id"
-regmatches(names(self_rep), regexpr("60", names(self_rep), fixed=TRUE)) <- "_60"
-regmatches(names(self_rep), regexpr("65", names(self_rep), fixed=TRUE)) <- "_65"
-
+# Data check
+dim(self_rep) # 956 353
 ```
+
 
 # Save as rds file
 
 ```{r}
-saveRDS(self_rep, "self_report_import.rds")
-
+write_rds(self_rep, "../data/cleaned_rds_files/self_report_import.rds")
 ```

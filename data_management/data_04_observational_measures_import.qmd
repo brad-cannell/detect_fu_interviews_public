@@ -1,15 +1,18 @@
 ---
-title: "data_05_observational_measures_import.qmd"
-format: html
+title: "Import Data from FileMaker Pro: Observational Measures"
 ---
+
+# Overview
+
+In this file, we import and do some initial cleaning of the Observational Measures data collected and stored in FileMaker Pro.
 
 ```{r, message= FALSE}
 # Load all necessary libraries
 library(readr)
 library(purrr)
 library(stringr)
-library(tidyverse)
-
+library(dplyr)
+library(janitor)
 ```
 
 
@@ -18,9 +21,11 @@ library(tidyverse)
 Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ```{r}
-observational_measures_import.csv <- file.choose()
-obs_meas <- read_csv(observational_measures_import.csv)
-
+obs_meas <- read_csv("../data/filemaker_pro_exports/observational_measures_import.csv")
+```
+```{r}
+# Data check
+dim(obs_meas) # 935 107
 ```
 
 # Clean data
@@ -29,40 +34,8 @@ Here we will convert all variable names to snake case so that everything is unif
 
 ```{r}
 # Convert all variable names to snake case
-walk(
-  # Grab the names of all data frames in the global environment
-  .x = ls()[map_lgl(ls(), ~ is.data.frame(get(.)))],
-  .f = function(x) {
-    # Grab individual df from environment
-    df <- get(x)
-    # Grab the variables names
-    var_names <- names(df)
-    # Convert variable names to snake case
-    var_names <- str_replace_all(var_names, '(\\B)([A-Z])', '_\\2')
-    # Convert variable names to lower case
-    var_names <- str_to_lower(var_names)
-    # Fix medstar_id
-    var_names[var_names == "medstar_i_d"] <- "medstar_id"
-    # assign back to the dataframe
-    names(df) <- var_names
-    # Replace df with new names in global environment
-    assign(x, df, envir = .GlobalEnv)
-  }
-)
+obs_meas <- clean_names(obs_meas)
 
-```
-
-## Re-order column variables to match organization in DETECT Follow-up Interview Instruments Version 1
-
-```{r}
-col_order <- c(1:7, 66, 67, 83:89, 104:107, 51:65, 9, 11, 13, 8, 14, 15, 16:19, 80:81, 20:25, 12, 26, 10, 27:30, 31:35, 36:38, 73, 39:43, 68, 44:47, 69, 48, 49, 50, 74:77, 70:72, 78, 79, 82, 90:103)
-obs_meas <- obs_meas[, col_order]
-```
-
-## Change column name
-
-```{r}
-colnames(obs_meas)[16]  <- "xc_case_id"
 ```
 
 ## Create factor variables to match levels in follow-up interview protocol
@@ -73,7 +46,9 @@ colnames(obs_meas)[16]  <- "xc_case_id"
 obs_meas <- obs_meas %>%
   mutate(
     across(
-      .cols  = ("unusual_odor": "hoarding_medications" ),
+      .cols  = c(unusual_odor, disarray_hoarding, health_safety_concern, caregiver_lack_knowledge, caregiver_unengaged, caregiver_frustrated,
+                 caregiver_anxious, isolated_home, depressed, poor_personal_hygiene, inadequately_clothed, difficulty_medications, unmet_needs,
+                 report_elder_abuse, hoarding_medications),
       .fns   = ~ factor(.x, levels= c("Yes", "No", "No caregiver present", "Unable to assess", "Did not enter patient’s home")),
       .names = "{col}_f"
     )
@@ -84,11 +59,11 @@ obs_meas <- obs_meas %>%
 
 #### General Assessment
 ```{r}
-# Hygeine to skin integrity
+# Hygiene to skin integrity
 obs_meas <- obs_meas %>%
   mutate(
     across(
-      .cols  = ("hygiene": "skin_integrity" ),
+      .cols  = c(hygiene, nutrition, skin_integrity),
       .fns   = ~ factor(.x, levels = c("Very good", "Good", "Poor", "Very poor", 
       "Unable to assess")),
       .names = "{col}_f"
@@ -142,7 +117,10 @@ obs_meas <- obs_meas %>%
 obs_meas <- obs_meas %>%
   mutate(
     across(
-      .cols  = ("bruising": "abandonment_statement"),
+      .cols  = c(bruising, fractures, stages_healing, abuse_statement, lacerations, sexual_abuse, contracture, decubitus, dehydration, diarrhea, depression,
+                 impaction, malnutrition, urine_burn, poor_hygiene, obvious_disease, inappropriate_medication, repetitive_hosp_admission, neglect_statement,
+                 money_misuse, evidence, goods_for_services, inability_account_money, exploitation_statement, caretaker_withdrawn_care, left_alone_unsafe,
+                 abandonment_statement),
       .fns   = ~ factor(.x, levels = c("No evidence", "Possible Evidence", "Probable evidence", "Definite evidence", "Unable to assess")),
       .names = "{col}_f"
     )
@@ -399,13 +377,30 @@ obs_meas <- obs_meas %>%
 ## Remove raw variables that have recoded forms and move a column
 
 ```{r}
-obs_meas<-obs_meas%>%select(-c(13,15,20:87,94,96,98,100,102,104,106))
-obs_meas<-obs_meas %>% relocate(aps_reported_confirmation_number, .after=aps_reported_method_f)
+obs_meas<-obs_meas %>% 
+  select(
+    -c(
+      ends_with("_statement"), ends_with("reported"), ends_with("reported_method"), (starts_with("at_") & !(ends_with("why") | contains("_4cat"))),
+      (contains("_cleanliness") & !matches("_[0-9]cat")), bruising, c_detect_status, (starts_with("care") & !ends_with("_f")), clothes, clutter,
+      contracture, decubitus, dehydration, depressed, depression, diarrhea, difficulty_medications, disarray_hoarding, evidence, exterior_condition, 
+      fractures, goods_for_services, hair, health_safety_concern, hoarding_medications, (contains("hygiene") & !ends_with("_f")), impaction,
+      inability_account_money, inadequately_clothed, inappropriate_medication, interior_condition, isolated_home, lacerations, left_alone_unsafe,
+      malnutrition, money_misuse, nails, nutrition, obvious_disease, odor, pets, repetitive_hosp_admission, report_elder_abuse, roof, sexual_abuse,
+      skin_integrity, stages_healing, structural_problems, (starts_with("summary_evidence") & !ends_with("_f")), unmet_needs, unusual_odor, urine_burn, 
+      utilities, walls, windows, yard_sidewalk
+      )
+  )
+
+```
+
+```{r}
+# Data check
+dim(obs_meas) # 935 132
 ```
 
 # Save as rds file
 
 ```{r}
-  saveRDS(obs_meas, "observational_measures_import.rds")
+write_rds(obs_meas, "../data/cleaned_rds_files/observational_measures_import.rds")
 
 ```
