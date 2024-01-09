@@ -1,0 +1,118 @@
+---
+title: "Composite scores for Data"
+author: "Marissa Curtis Gough"
+---
+
+```{r}
+library(dplyr, warn.conflicts = FALSE)
+```
+
+# Purpose of the program
+
+We will create composite scores for PEG, Geriatric Depression Score and UCLA 3-item loneliness scale) variables to use in data analysis. 
+
+```{r}
+# Load data from general health data set
+geheal_composite <- read_rds("~.../detect_public/data/geheal.rds") #598 155
+```
+
+#Create composite scores
+
+## Composite score for PEG: A Three-Item Scale Assessing Pain Intensity and Interference
+
+If we do not exclude the 99 values which indicate the subject refused to answer a question, we would have 7 values for which the composite score is greater than 10. All values of 99 will be excluded from the calculations. 
+
+```{r}
+# Create a function that will calculate a mean excluding missing variables and exclude entries of 99, which is the code for refused
+sp_mean <- function(x) mean(x[!is.na(x) & x != 99])
+
+geheal_composite <- geheal_composite %>%
+  rowwise() %>%
+  mutate(
+    peg_composite = sp_mean(c(peg_pain_12cat, peg_activity_12cat, peg_enjoyment_12cat))
+  )
+```
+
+```{r}
+#Move composite column to be next to the variables that created it.
+geheal_composite <- geheal_composite %>%
+  relocate(peg_composite, .after =peg_activity_12cat)
+```
+
+
+## Composite score for Geriatric Depression Score
+
+```{r}
+geheal_composite <- geheal_composite %>%
+  mutate(
+    gds_composite  = rowSums(across(c(depres_satisfied_2cat, depres_hopeless_2cat,
+                                      depres_better_2cat, depres_activities_2cat,
+                                      depres_activities_2cat, depres_empty_2cat, 
+                                      depres_bored_2cat, depres_spirits_2cat, 
+                                      depres_afraid_2cat, depres_happy_2cat, 
+                                      depres_helpless_2cat, depres_home_2cat, 
+                                      depres_memory_2cat, depres_alive_2cat, 
+                                      depres_worthless_2cat, depres_energy_2cat)), na.rm = T)
+    )
+```
+
+```{r}
+
+
+  
+  
+geheal_composite <- geheal_composite %>% 
+  rowwise() %>% 
+  mutate(count = sum(is.na(across(c(depres_satisfied_2cat, depres_hopeless_2cat,
+                                      depres_better_2cat, depres_activities_2cat,
+                                      depres_activities_2cat, depres_empty_2cat, 
+                                      depres_bored_2cat, depres_spirits_2cat, 
+                                      depres_afraid_2cat, depres_happy_2cat, 
+                                      depres_helpless_2cat, depres_home_2cat, 
+                                      depres_memory_2cat, depres_alive_2cat, 
+                                      depres_worthless_2cat, depres_energy_2cat)))
+    ),
+         gds_missing = count) %>% 
+  select(-count)
+```
+
+
+```{r}
+# Move composite column to be next to the variables that created it.
+geheal_composite <- geheal_composite %>%
+  relocate(gds_missing, gds_composite, .after = depres_energy_2cat_f)
+```
+
+## Composite Score UCLA 3-item Loneliness Scale 
+
+```{r}
+sp_sum <- function(x) sum(x[!is.na(x) & x != 9])
+
+geheal_composite <- geheal_composite %>%
+  rowwise() %>%
+  mutate(
+    ls_composite = sp_sum(c(ls_lack_companionship_4cat, ls_feel_left_out_4cat,
+                            ls_feel_isolated_4cat))
+  )
+
+```
+
+```{r}
+# Move composite column to be next to the variables that created it.
+geheal_composite <- geheal_composite %>%
+  relocate(ls_composite, .after = ls_feel_isolated_4cat)
+```
+
+# Write files to csv and rds
+
+```{r}
+# Write to csv
+write_csv(geheal_composite, "geheal_composite.csv") # 598 159
+```
+
+```{r}
+# Write to rds
+write_rds(geheal_composite, "geheal_composite.rds") # 598 159
+```
+
+
