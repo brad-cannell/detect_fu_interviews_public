@@ -42,6 +42,9 @@ source("../user_defined_functions/unique_case_count.R")
 
 # Create summary of dissenting votes by discipline
 source("../user_defined_functions/vote_agreement.R")
+
+# Import function that will be used to add shade to the table by variable name
+source("../R/add_shade_column.R")
 ```
 
 
@@ -972,9 +975,34 @@ For cases that did not have congruence (or at least initially) – were there ce
 ```{r}
 panelist_vote_agree <- panelist_vote_agreement(lpa)
 
-panelist_vote_agree_flex <- flextable(panelist_vote_agree)
+panelist_vote_agree_shade <- add_shade_column(panelist_vote_agree, abuse_type)
 
-panelist_vote_agree_flex
+# Create and format a flextable that can be downloaded in a Word document
+lpa_dis_votes_flex_table   <- flextable(panelist_vote_agree_shade,  
+                  col_keys = c('panelist_discipline_5cat_f', 'abuse_type', 'n_votes_Initial assessment', 'n_perc_diss_votes_Initial assessment', 'n_votes_Secondary assessment', 'n_perc_diss_votes_Secondary assessment', 'n_votes_Post-detect assessment', 'n_perc_diss_votes_Post-detect assessment')) %>%
+  # Set caption
+  set_caption("Count and Percentage of Dissenting Votes for Each Panelist Discipline") %>%
+
+  
+  # Alternatively shade each group
+  bg(i = ~ shade == "FALSE", bg = "#ededed", part = "body") %>% 
+  
+  # Rename columns
+  set_header_labels(
+    var = "Variable", 
+    cat = "Category", 
+    "panelist_discipline_5cat_f" = "Panelist Discipline",
+    "abuse_type" = "Abuse Type",
+    "n_votes_Initial assessment" = "N Initial Assessment Votes",
+    "n_perc_diss_votes_Initial assessment" = "N (%) Dissenting Votes - Initial Assessment", 
+    "n_votes_Secondary assessment" = "N Secondary Assessment Votes", 
+    "n_perc_diss_votes_Secondary assessment" = "N (%) Dissenting Votes - Secondary Assessment", 
+    "n_votes_Post-detect assessment" = "N Post-DETECT Assessment Votes", 
+    "n_perc_diss_votes_Post-detect assessment" = "N (%) Dissenting Votes - Post-DETECT Assessment"
+  ) %>%
+  
+  # Format width of table
+  width(width = 0.88) 
 ```
 
 

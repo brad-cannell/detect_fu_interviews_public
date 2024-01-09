@@ -6083,5 +6083,5 @@ detect_fu_merged_codebook <- codebook(
 ```
 
 ```{r}
-print(detect_fu_merged_codebook, "../codebooksdetect_fu_merge_codebook.docx")
+print(detect_fu_merged_codebook, "../codebooks/detect_fu_merge_codebook.docx")
 ```
