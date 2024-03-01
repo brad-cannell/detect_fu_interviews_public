@@ -107,9 +107,10 @@ obs_meas <- obs_meas %>%
     ),
     nails_5cat_f = factor(
       nails,
-      levels = c("0 - Clean/neat", 1, 2, 3, "4 - Long/untrimmed/dirty")),
+      levels = c("0 - Clean/trimmed", 1, 2, 3, "4 - Long/untrimmed/dirty")),
     )
 ```
+
 
 #### Possible Abuse, Neglect, Exploitation and Abandonment Indicators
 

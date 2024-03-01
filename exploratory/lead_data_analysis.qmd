@@ -325,7 +325,7 @@ final_determination <- initial_pos_votes[!initial_pos_votes$medstar_id %in% seco
 final_determination <- rbind(final_determination, secondary_pos_votes)
 ```
 
-## Participants who with a positive abuse LEAD Panel Assessment determination for any abuse type.
+## Cases with a positive abuse LEAD Panel Assessment determination for any abuse type.
 
 ```{r}
 part_id <- participant %>% select(medstar_id, name_full)

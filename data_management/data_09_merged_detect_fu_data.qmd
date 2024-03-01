@@ -24,6 +24,7 @@ obs <- read_rds("../data/cleaned_rds_files/observational_measures_import.rds")
 par <- read_rds("../data/unique_id_creation/participant_unique_id.rds")
 sfr <- read_rds("../data/cleaned_rds_files/self_report_import.rds")
 soc <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.rds")
+con <- read_rds("../data/cleaned_rds_files/consent_import.rds")
 
 ```
 
@@ -31,7 +32,7 @@ soc <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.r
 
 ```{r}
 # Create vectors, each containing the medstar IDS for each DETECT FU data set.
-vec_list <- list(aps_id = aps, cls_id = cls, glh_id = glh, lpa_id = lpa, obs_id = obs, par_id = par, sfr_id = sfr, soc_id = soc)
+vec_list <- list(aps_id = aps, cls_id = cls, glh_id = glh, lpa_id = lpa, obs_id = obs, par_id = par, sfr_id = sfr, soc_id = soc, con_id = con)
 
 medstar_id_lists <- lapply(vec_list, function(vec) {
  vec_ID <-  unique(vec$medstar_id)
@@ -44,7 +45,7 @@ list2env(medstar_id_lists, envir = .GlobalEnv)
 
 ## Intersect of MedStar IDS across all DETECT FU datasets
 ```{r}
-intersect_detect <- Reduce(intersect, list(aps_id, cls_id, glh_id, lpa_id, obs_id, par_id, sfr_id, soc_id))
+intersect_detect <- Reduce(intersect, list(aps_id, cls_id, glh_id, lpa_id, obs_id, par_id, sfr_id, soc_id, con_id))
 cat("There are", length(intersect_detect), "Medstar IDs that are present in all the DETECT FU Interview datasets")
 ```
 
@@ -54,7 +55,7 @@ cat("There are", length(intersect_detect), "Medstar IDs that are present in all 
 common_id <- function(vec) {
   #  List of vectors to check each vector against
   vec_ref_list <- list(aps_id = aps_id, cls_id = cls_id, glh_id = glh_id, lpa_id = lpa_id, obs_id = obs_id, 
-                     par_id = par_id, sfr_id = sfr_id, soc_id = soc_id)
+                     par_id = par_id, sfr_id = sfr_id, soc_id = soc_id, con_id = con_id)
   
   # Function for comparing 2 vectors
   compare_vec <- function(vec, ref_vec) {
@@ -63,12 +64,12 @@ common_id <- function(vec) {
     select(-key) %>% 
       mutate(
         in_both = case_when(
-          is.na(ref_vec) == T & is.na(vec) == F ~ "Only in test vector",
-          is.na(ref_vec) == F & is.na(vec) == T ~ "Only in reference",
+          is.na(ref_vec) == T & is.na(vec) == F ~ "Only in this dataset",
+          is.na(ref_vec) == F & is.na(vec) == T ~ "Only in dataset being compared to",
           ref_vec == vec                        ~ "In both"    
         ),
         in_both = factor(in_both,
-                         levels = c("In both", "Only in reference", "Only in test vector"))
+                         levels = c("In both", "Only in this dataset", "Only in dataset being compared to"))
       )
     tab <- as.data.frame(table(comparison_column$in_both))
     tab
@@ -144,6 +145,13 @@ soc_id_compare <- common_id(soc_id)
 soc_id_compare
 ```
 
+### Consent dataset
+```{r, tbl}
+# Comparison of MedStar IDs in the consent dataset to those in the other DETECT FU Interviews datasets
+con_id_compare <- common_id(con_id)
+con_id_compare
+```
+
 # Select Only the Needed Variables and Merge the Subsetted Data Frames
 
 ```{r}
@@ -187,8 +195,13 @@ soc_merge <- soc %>% select(-c(x_primary_key, name_full, xc_case_id))
 ```
 
 ```{r}
+# Consent
+con_merge <- con %>% select(-c(x_primary_key, name_full))
+```
+
+```{r}
 # Merge the data and add suffixes to the column names to indicate the data sets of origin
-detect_fu_merge <-lst(par = par_merge, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpa = lpa_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge) %>%
+detect_fu_merge <-lst(par = par_merge, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpa = lpa_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge, con = con_merge) %>%
   imap(
     function(x, y) x %>% 
       rename_with(~ paste(., y, sep = '_'), -medstar_id

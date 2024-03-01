@@ -1,0 +1,123 @@
+---
+title: "Check consent"
+---
+
+# Purpose
+The consent dataset does not contain all the Medstar IDs seen in the other datasets. The purpose of the code in this file is to double check the Medstar IDs not found in the consent dataset to make sure they shouldn't be included in the count of DETECT follow up interviews completed.
+
+# Load Packages
+
+```{r}
+library(dplyr)
+library(readr)
+library(purrr)
+```
+
+# Load DETECT F/U Data
+
+```{r}
+aps <- read_rds("../data/cleaned_rds_files/aps_investigations_import.rds")
+cls <- read_rds("../data/cleaned_rds_files/clutter_scale_import.rds")
+glh <- read_rds("../data/cleaned_rds_files/general_health_import.rds")
+lpa <- read_rds("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
+obs <- read_rds("../data/cleaned_rds_files/observational_measures_import.rds")
+sfr <- read_rds("../data/cleaned_rds_files/self_report_import.rds")
+soc <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.rds")
+con <- read_rds("../data/cleaned_rds_files/consent_import.rds")
+detect_fu_data_merged <- read_rds("../data/cleaned_rds_files/detect_fu_data_merged.rds")
+
+
+```
+
+# Summarize the Medstar ID commonalities and differences across all the datasets
+
+```{r}
+# Create vectors, each containing the medstar IDS for each DETECT FU data set.
+vec_list <- list(aps_id = aps, cls_id = cls, glh_id = glh, lpa_id = lpa, obs_id = obs, par_id = par, sfr_id = sfr, soc_id = soc, con_id = con)
+
+medstar_id_lists <- lapply(vec_list, function(vec) {
+ vec_ID <-  unique(vec$medstar_id)
+})
+
+# Push the vectors to the Global environment
+list2env(medstar_id_lists, envir = .GlobalEnv)
+
+```
+
+```{r}
+
+#  List of vectors to check consent vector against
+vec_ref_list <- list(aps_id = aps_id, cls_id = cls_id, glh_id = glh_id, lpa_id = lpa_id, obs_id = obs_id, 
+                     sfr_id = sfr_id, soc_id = soc_id, con_id = con_id)
+  
+# Function for comparing 2 vectors
+compare_vec <- function(vec, ref_vec) {
+  comparison_column <- full_join(data.frame(key = ref_vec, ref_vec), 
+            data.frame(key = vec, vec), by ="key") %>%
+  select(-key) %>% 
+    mutate(
+      in_both = case_when(
+        is.na(ref_vec) == T & is.na(vec) == F ~ "Only in this dataset",
+        is.na(ref_vec) == F & is.na(vec) == T ~ "Only in dataset being compared to",
+        ref_vec == vec                        ~ "In both"    
+      ),
+      in_both = factor(in_both,
+                       levels = c("In both", "Only in this dataset", "Only in dataset being compared to"))
+    )
+  comparison_column
+}
+
+  
+# Apply the compare_vec function to the consent vector to produce a list of comparison outputs.
+comparisons <- lapply(vec_ref_list, compare_vec, vec = con_id)
+```
+
+```{r}
+comparisons <- comparisons %>%  
+  # Filter all the dataframes for medstar_ids "Only in dataset being compared to"
+  map(., ~filter(.x, in_both == "Only in dataset being compared to")) %>%
+  
+  # Remove dataframes with empty rows 
+  purrr::keep(., ~nrow(.) >0) %>%
+  
+  # Bind filtered rows together
+  do.call(rbind, .) %>%
+  
+  # make row names column
+  tibble::rownames_to_column() %>%
+  select(c(rowname, ref_vec)) %>%
+  rename(
+    "dataframe" = "rowname",
+    "ID"        = "ref_vec"
+  ) %>%
+  mutate(
+    dataframe = gsub("_id.*","", dataframe)
+  )
+```
+
+```{r}
+# Check participant consent in the other data sets
+check_error_message <- detect_fu_data_merged %>% filter(medstar_id %in% comparisons$ID) %>% select(c(medstar_id, contains("x_error_message"))) %>%
+  left_join(comparisons, by = c("medstar_id" = "ID"))
+
+check_error_message
+```
+```{r}
+# Filter MedStar IDs that don't have the error message "Participant consent not recorded" for any of the datasets
+no_error <- check_error_message %>% filter(if_all(contains("x_error_message"), ~is.na(.) == T))
+no_error
+```
+
+Two of the 13 MedStar IDs don't have the error message "Participant consent not recorded" for any of the datasets.
+Both medstar_ids are in the observational measures data set.
+
+```{r}
+# check the status of these medStar IDs in the observational measures dataset 
+check_obs <- detect_fu_data_merged %>% filter(medstar_id %in% no_error$medstar_id) %>% select(x_record_status_obs)
+check_obs
+```
+Both have incomplete status. 
+
+# Conclusion
+None of the Medstar IDs not found in the consent dataset need to be included in the count of DETECT follow up interviews completed.
+

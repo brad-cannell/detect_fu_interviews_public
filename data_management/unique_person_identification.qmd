@@ -19,7 +19,7 @@ library(igraph)
 # Load the participant dataset and the fastlink output
 
 ```{r}
-flo <- read_rds("../data/fastlink_output/fast_link_output.rds")
+flo <- read_rds("../data/unique_id_creation/fast_link_output.rds")
 par <- read_rds("../data/cleaned_rds_files/participant_import.rds")
 ```
 
@@ -170,6 +170,7 @@ Name
 The first and last name were taken into consideration in every case. Since the majority of middle initials were missing, they were only considered if they were present. There were names with typographical errors and sometimes nicknames not very similar to their full versions were used e.g Betsy vs Elizabeth or Bill vs William. People with hyphenated last names or last names with multiple parts sometimes included only one part or the other. Some names are more rare and more weight was given to the name if it was rare.
 
 DOB
+
 The presence of typos was assumed in cases were all other values were the same but the dob differed by a few months a year or a few days. If only one digit was different, the presence of a typo was also assumed. In cases were the dob was the same but only the first name was different, the possibility of the observations being for twins was considered. Related people with the same name could live in the same house and this was also taken into consideration.
 
 
@@ -496,7 +497,7 @@ veri_match_wide <- veri_matches %>% pivot_wider(names_from = pair_index, values_
   pair_index_2 = "2"
   ) %>%
   ungroup() %>%
-  right_join(veri_match_test, by = "pair") 
+  right_join(veri_matches, by = "pair") 
 ```
 
 ```{r}
@@ -551,6 +552,6 @@ cat("The mumber of IDs assigned using exact matching is", e, "while the number a
 # Save the RDS file
 
 ```{r}
-saveRDS(par_unique_id, "participant_unique_id.rds")
+saveRDS(par_unique_id, "../data/unique_id_creation/participant_unique_id.rds")
 ```
 

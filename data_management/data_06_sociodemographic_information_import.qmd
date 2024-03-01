@@ -3,6 +3,7 @@ title: "Import Data from FileMaker Pro: Sociodemographic Information"
 ---
 
 ```{r, message= FALSE}
+library(dplyr)
 library(readr)
 library(purrr)
 library(stringr)
@@ -39,7 +40,7 @@ dim(sociodemographic_information) # 963  28
 
 ### Sociodemographic Information
 
-Create factor variables and match levels to codebook for all categorical variables except sode_race.
+#### Create factor variables for all categorical variables.
 
 ```{r}
 soc_dem <- sociodemographic_information %>%
@@ -286,9 +287,55 @@ soc_dem <- soc_dem %>%
                 )
     )
   )
-```
 
-Create dummy variables for the sode_race variable
+soc_dem <- soc_dem %>% 
+  mutate(
+   sode_race_8cat = case_when(
+      is.na(sode_race)                                         ~ NA_integer_,
+      sode_race == "American Indian or Alaskan Native"         ~ 1,
+      sode_race == "Asian"                                     ~ 2,
+      sode_race == "Black or African American"                 ~ 3,
+      sode_race == "Native Hawaiian or Other Pacific Islander" ~ 4,
+      sode_race == "White"                                     ~ 5,
+      sode_race == "Don't know"                                ~ 7, 
+      sode_race == "Refused"                                   ~ 8,  
+      TRUE                                                     ~ 6  # "Other race or multiple races",
+                                  
+      
+    ),
+   sode_race_8cat_f = factor(
+     sode_race_8cat, 
+     levels = c(1,2,3,4,5,6, 7, 8),
+     labels = c("American Indian or Alaskan Native","Asian", "Black or African American", "Native Hawaiian or Other Pacific Islander",
+                "White", "Other race or multiple races", "Don't know", "Refused")
+   ),
+   sode_race_eth_6cat = case_when(
+      is.na(sode_hispanic_4cat_f)                              ~ NA_integer_,
+      sode_hispanic_4cat_f == "Yes"                            ~ 1, # "Hispanic, any race"
+      sode_race == "Black or African American"                 ~ 2, # "Black, non-Hispanic"
+      sode_race == "White"                                     ~ 3, # "White, non-Hispanic"
+      sode_hispanic_4cat_f == "Don't know"                     ~ 5, 
+      sode_hispanic_4cat_f == "Refused"                        ~ 6,                     
+      TRUE                                                     ~ 4, # "Other race or multiple races, non-Hispanic"
+    ),
+   sode_race_eth_6cat_f = factor(
+     sode_race_eth_6cat, 
+     levels = c(1,2,3,4,5,6),
+     labels = c("Hispanic, any race", "Black, non-Hispanic", "White, non-Hispanic", "Other race or multiple races, non-Hispanic", "Don't know", "Refused")
+     ) 
+   )
+
+# Create a numerical continuous variable for sode_people
+soc_dem <- soc_dem %>%
+  mutate(
+    sode_people_cont = case_when(
+      sode_people == "Don't know"
+      | is.na(sode_people)        ~ NA_integer_,
+      TRUE                        ~ as.numeric(sode_people)
+    )
+  )
+```
+#### Create dummy variables for the sode_race variable
 
 ```{r}
 soc_dem <- soc_dem %>% 
@@ -319,19 +366,20 @@ soc_dem <- soc_dem %>%
 ### Remove variables that have recoded forms
 
 ```{r}
-soc_dem <- soc_dem %>% select(-c("sode_marital" : "sode_hispanic", "sode_school" : "hsi_contact", 
-                                 "sogi_identity", "sogi_orientation", "sode_people_def"))
+soc_dem <- soc_dem %>% 
+  select(-c("sode_people_def", "sode_marital", "sode_age", "sode_hispanic", "sode_race", "sode_school", "sode_employed", "sode_income", "sode_military",
+            "sode_unwanted", "sode_sexual", "hsi_contact", "sogi_identity", "sogi_orientation"))
 ```
 
 ### Re-order columns
 
 ```{r}
-soc_dem <- soc_dem %>% relocate(c("american_indian_or_alaska_native" : "other"), .after = sode_race)
+soc_dem <- soc_dem %>% relocate(c("american_indian_or_alaska_native" : "other", contains("sode_race_")), .after = sode_race_8cat_f)
 ```
 
 ```{r}
 # Data check
-dim(soc_dem) # 963 48
+dim(soc_dem) # 963 52
 ```
 
 # Save as rds file
