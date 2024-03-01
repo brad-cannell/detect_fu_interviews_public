@@ -1,0 +1,55 @@
+---
+title: "Import Data from FileMaker Pro: Consent"
+---
+
+
+```{r, message= FALSE}
+library(readr)
+library(dplyr)
+library(janitor)
+```
+# Load the data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+consent <- read_csv("../data/filemaker_pro_exports/consent_import.csv")
+```
+
+# Clean the data
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+consent <- clean_names(consent)
+```
+
+```{r}
+# Data check
+dim(consent) # 1013 16
+```
+
+## Coerce categorical variables to factor variables
+
+```{r}
+consent <- consent %>%
+  mutate(
+    consent_given = case_when(
+      x_record_status == "Consent received/Participating" ~ 1,
+      TRUE                                                ~ 0
+      )
+    )
+```
+
+
+```{r}
+# Data check
+dim(consent) # 1013 17
+```
+
+# Save as rds file
+
+```{r}
+write_rds(consent, "../data/cleaned_rds_files/consent_import.rds")
+
+```
