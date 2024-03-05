@@ -3,10 +3,11 @@ title: "Create Self Report Codebook"
 ---
 
 ```{r}
-# Load necessary packages
+# Load necessary packages and functions
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(readr)
+source("../r/variable_descriptions.R")
 ```
 
 # Purpose of the program
@@ -48,57 +49,57 @@ no_stats_vars <- colnames(no_stats)
 self_report <- sr %>%
   cb_add_col_attributes( 
       x_created_by, 
-      description = "Person who created the record"
+      description = "Person who created the record."
     ) %>%
   
     cb_add_col_attributes( 
       x_created_timestamp, 
-      description = "Timestamp when the record was created"
+      description = "Timestamp when the record was created."
     ) %>%
   
     cb_add_col_attributes( 
       x_modified_by, 
-      description = "Person who modified the record"
+      description = "Person who modified the record."
     ) %>%
   
     cb_add_col_attributes( 
       x_modified_timestamp, 
-      description = "Timestamp when the record was modified"
+      description = "Timestamp when the record was modified."
     ) %>%
   
     cb_add_col_attributes( 
       x_error_message, 
-      description = "Error message entered by research team"
+      description = "Error message entered by research team."
     ) %>%
   
     cb_add_col_attributes( 
       x_record_month, 
-      description = "Month record was created"
+      description = "Month record was created."
     ) %>%
   
     cb_add_col_attributes( 
       x_record_year, 
-      description = "Year record was created"
+      description = "Year record was created."
     ) %>%
   
     cb_add_col_attributes( 
       x_record_status, 
-      description = "Status of the record as determined by research team"
+      description = "Status of the record as determined by research team."
     ) %>%
   
     cb_add_col_attributes( 
       x_record_comment, 
-      description = "Comments by interviewer"
+      description = "Comments by interviewer."
     ) %>%
   
     cb_add_col_attributes( 
       medstar_id, 
-      description = "Unique record number in MedStar System"
+      description = "Unique record number in MedStar System."
     ) %>%
   
     cb_add_col_attributes( 
       name_full, 
-      description = "Full name of older individual"
+      description = "Full name of older individual."
     ) %>%
 
     cb_add_col_attributes( 
@@ -999,7 +1000,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       emotional_incident_60_4cat, 
-      description = "Question used in older version of the follow-up interview",
+      description = "(Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question used in older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -1011,7 +1012,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       emotional_incident_reported_4cat, 
-      description = "Question used in older version of the follow-up interview",
+      description = "Thinking about the most recent incident where someone emotionally or verbally mistreated you, was this incident reported to the police or other authorities? (Question used in older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -1023,7 +1024,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       emotional_person_live_4cat, 
-      description = "Question used in older version of the follow-up interview",
+      description = "Did that person live with you at the time of the incident, or does (he/she) live with you now? (Question used in older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -1241,17 +1242,17 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       emotional_incident_60_4cat_f, 
-      description = "Question used in older version of the follow-up interview"
+      description = "(Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question used in older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       emotional_incident_reported_4cat_f, 
-      description = "Question used in older version of the follow-up interview"
+      description = "Thinking about the most recent incident where someone emotionally or verbally mistreated you, was this incident reported to the police or other authorities? (Question used in older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       emotional_person_live_4cat_f, 
-      description = "Question used in older version of the follow-up interview"
+      description = "Did that person live with you at the time of the incident, or does (he/she) live with you now? (Question used in older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -1326,12 +1327,12 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       emotional_incident_person_12cat_f, 
-      description = "Question used in older version of the follow-up interview"
+      description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question used in older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       emotional_incident_person_12cat, 
-      description = "Question used in older version of the follow-up interview",
+      description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question used in older version of the follow-up interview.)",
       value_labels = c(
     "A spouse or partner"     = 1, 
     "An ex spouse or partner" = 2, 
@@ -1600,7 +1601,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_incident_60_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "(Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -1612,7 +1613,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_incident_reported_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "Thinking about the most recent incident where someone physically mistreated you, was this incident reported to the police or other authorities? (Question from an older version of the follow-up interview)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -1624,7 +1625,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_incident_person_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "Thinking about the most recent incident, was the person(s) who physically mistreated you someone you have seen before? (Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -1636,7 +1637,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_person_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -1648,7 +1649,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_person_live_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "Did that person live with you at the time of the incident, or does (he/she) live with you now? (Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -1733,7 +1734,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_hit_65_4cat, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_34c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern =  "If yes, go to SR_T6. Else, go to SR_T7",
       value_labels = c(
         "Yes"        = 1,
@@ -1746,7 +1747,7 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_restrain_65_4cat, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_35c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern =  "If yes, go to SR_T6. Else, go to SR_T7",
       value_labels = c(
         "Yes"        = 1,
@@ -1759,7 +1760,7 @@ self_report <- sr %>%
    
     cb_add_col_attributes( 
       physical_hurt_65_4cat, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_36c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern =  "If yes, go to SR_T6. Else, go to SR_T7",
       value_labels = c(
         "Yes"        = 1,
@@ -1826,27 +1827,27 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_incident_60_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "(Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       physical_incident_reported_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "Thinking about the most recent incident where someone physically mistreated you, was this incident reported to the police or other authorities? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       physical_incident_person_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "Thinking about the most recent incident, was the person(s) who physically mistreated you someone you have seen before? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       physical_person_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "What was that person's (those persons') relationship to you? (MULTIPLE RECORD)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       physical_person_live_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "Did that person live with you at the time of the incident, or does (he/she) live with you now? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -1882,19 +1883,19 @@ self_report <- sr %>%
   
     cb_add_col_attributes( 
       physical_hit_65_4cat_f, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_34c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern =  "If yes, go to SR_T6. Else, go to SR_T7"
     ) %>%
   
     cb_add_col_attributes( 
       physical_restrain_65_4cat_f, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_35c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern =  "If yes, go to SR_T6. Else, go to SR_T7"
     ) %>%
   
     cb_add_col_attributes( 
       physical_hurt_65_4cat_f, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_36c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern =  "If yes, go to SR_T6. Else, go to SR_T7"
     ) %>%
   
@@ -2084,12 +2085,12 @@ cb_add_col_attributes(
 
 cb_add_col_attributes( 
   physical_person_12cat_f, 
-  description = "Question from an older version of the follow-up interview"
+  description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question from an older version of the follow-up interview.)"
 ) %>%
   
   cb_add_col_attributes( 
     physical_person_12cat, 
-    description = "Question from an older version of the follow-up interview",
+    description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question from an older version of the follow-up interview.)",
     value_labels = c(
       "A spouse or partner"     = 1, 
       "An ex spouse or partner" = 2, 
@@ -2122,7 +2123,7 @@ cb_add_col_attributes(
 
     cb_add_col_attributes( 
       sexual_touched_4cat, 
-      description = "SR_50a. Females- Has anyone ever touched your breasts or pubic area or made you touch his penis by using force or threat of force? Males - Has anyone ever touched your pubic area or made you touch their pubic area by using force or threat of force?",
+      description = "SR_50a. Females - Has anyone ever touched your breasts or pubic area or made you touch his penis by using force or threat of force? Males - Has anyone ever touched your pubic area or made you touch their pubic area by using force or threat of force?",
       skip_pattern = "If 'Yes', go to SR_50b. All other answers, go to SR_51a",
       value_labels = c(
         "Yes"        = 1,
@@ -2135,7 +2136,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_forced_4cat, 
-      description = "SR_51a. Females- Has anyone ever forced you to undress or expose your breasts or pubic area when you didn’t want to? Males- Has anyone ever forced you to undress or expose your pubic area when you didn’t want to?",
+      description = "SR_51a. Females - Has anyone ever forced you to undress or expose your breasts or pubic area when you didn’t want to? Males- Has anyone ever forced you to undress or expose your pubic area when you didn’t want to?",
       skip_pattern = "If 'Yes', go to SR_51b. All other answers, go to SR_52_a",
       value_labels = c(
         "Yes"        = 1,
@@ -2161,7 +2162,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_incident_60_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "(Did this/Have any of these) incidents (happen/happened) since you were 60 years old?(Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -2173,7 +2174,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_incident_reported_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "Thinking about the most recent incident where someone sexually mistreated you, was this incident reported to the police or other authorities? (Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -2185,7 +2186,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_incident_person_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "Thinking about the most recent incident, was the person(s) who sexually mistreated you someone you have seen before? (Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -2197,7 +2198,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_person_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -2209,7 +2210,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_person_live_4cat, 
-      description = "Question from an older version of the follow-up interview",
+      description = "Did that person live with you at the time of the incident, or does (he/she) live with you now? (Question from an older version of the follow-up interview.)",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -2295,7 +2296,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_harm_65_4cat, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_49c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern = "If yes, go to SR_T8. Else, go to FNW_T1",
       value_labels = c(
         "Yes"        = 1,
@@ -2308,7 +2309,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_touched_65_4cat, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_50c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern = "If yes, go to SR_T8. Else, go to FNW_T1",
       value_labels = c(
         "Yes"        = 1,
@@ -2321,7 +2322,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_forced_65_4cat, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_51c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern = "If yes, go to SR_T8. Else, go to FNW_T1",
       value_labels = c(
         "Yes"        = 1,
@@ -2334,7 +2335,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_picture_65_4cat, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_52c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern = "If yes, go to SR_T8. Else, go to FNW_T1",
       value_labels = c(
         "Yes"        = 1,
@@ -2406,27 +2407,27 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_incident_60_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = " (Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_incident_reported_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "Thinking about the most recent incident where someone sexually mistreated you, was this incident reported to the police or other authorities? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_incident_person_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "Thinking about the most recent incident, was the person(s) who sexually mistreated you someone you have seen before? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_person_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_person_live_4cat_f, 
-      description = "Question from an older version of the follow-up interview"
+      description = "Did that person live with you at the time of the incident, or does (he/she) live with you now? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2463,25 +2464,25 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_harm_65_4cat_f, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_49c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern = "If yes, go to SR_T8. Else, go to FNW_T1"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_touched_65_4cat_f, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_50c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern = "If yes, go to SR_T8. Else, go to FNW_T1"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_forced_65_4cat_f, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_51c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern = "If yes, go to SR_T8. Else, go to FNW_T1"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_picture_65_4cat_f, 
-      description = "Were you age 65 or older the last time (most recent time) this happened?",
+      description = "SR_52c. Were you age 65 or older the last time (most recent time) this happened?",
       skip_pattern = "If yes, go to SR_T8. Else, go to FNW_T1"
     ) %>%
   
@@ -2520,7 +2521,7 @@ self_report <- self_report %>%
   
     cb_add_col_attributes( 
       sexual_touched_last_time_8cat, 
-      description = "SR_49d. How long ago was the last time (most recent time) this happened?",
+      description = "SR_50d. How long ago was the last time (most recent time) this happened?",
       value_labels = c(
         "Less than 1 month ago"                       = 1,
         "Between 1 month and less than 3 months ago"  = 2,
@@ -2536,7 +2537,7 @@ self_report <- self_report %>%
 
     cb_add_col_attributes( 
       sexual_forced_last_time_8cat, 
-      description = "SR_49d. How long ago was the last time (most recent time) this happened?",
+      description = "SR_51d. How long ago was the last time (most recent time) this happened?",
       value_labels = c(
         "Less than 1 month ago"                       = 1,
         "Between 1 month and less than 3 months ago"  = 2,
@@ -2552,7 +2553,7 @@ self_report <- self_report %>%
 
     cb_add_col_attributes( 
       sexual_picture_last_time_8cat, 
-      description = "SR_49d. How long ago was the last time (most recent time) this happened?",
+      description = "SR_52d. How long ago was the last time (most recent time) this happened?",
       value_labels = c(
         "Less than 1 month ago"                       = 1,
         "Between 1 month and less than 3 months ago"  = 2,
@@ -2573,22 +2574,22 @@ self_report <- self_report %>%
   
     cb_add_col_attributes( 
       sexual_touched_last_time_8cat_f, 
-      description = "SR_49d. How long ago was the last time (most recent time) this happened?"
+      description = "SR_50d. How long ago was the last time (most recent time) this happened?"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_forced_last_time_8cat_f, 
-      description = "SR_49d. How long ago was the last time (most recent time) this happened?"
+      description = "SR_51d. How long ago was the last time (most recent time) this happened?"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_picture_last_time_8cat_f, 
-      description = "SR_49d. How long ago was the last time (most recent time) this happened?"
+      description = "SR_52d. How long ago was the last time (most recent time) this happened?"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_harm_times_7cat, 
-      description = "SR_51b. About how many times has this happened to you in your lifetime?",
+      description = "SR_49b. About how many times has this happened to you in your lifetime?",
       value_labels = c(
         "1 or 2 times"                      = 1,
         "Between 3 and less than 5 times"   = 2,
@@ -2603,7 +2604,7 @@ self_report <- self_report %>%
   
     cb_add_col_attributes( 
       sexual_touched_times_7cat, 
-      description = "SR_51b. About how many times has this happened to you in your lifetime?",
+      description = "SR_50b. About how many times has this happened to you in your lifetime?",
       value_labels = c(
         "1 or 2 times"                      = 1,
         "Between 3 and less than 5 times"   = 2,
@@ -2633,7 +2634,7 @@ self_report <- self_report %>%
  
     cb_add_col_attributes( 
       sexual_picture_times_7cat, 
-      description = "SR_51b. About how many times has this happened to you in your lifetime?",
+      description = "SR_52b. About how many times has this happened to you in your lifetime?",
       value_labels = c(
         "1 or 2 times"                      = 1,
         "Between 3 and less than 5 times"   = 2,
@@ -2648,12 +2649,12 @@ self_report <- self_report %>%
   
     cb_add_col_attributes( 
       sexual_harm_times_7cat_f, 
-      description = "SR_51b. About how many times has this happened to you in your lifetime?"
+      description = "SR_49b. About how many times has this happened to you in your lifetime?"
     ) %>%
   
     cb_add_col_attributes( 
       sexual_touched_times_7cat_f, 
-      description = "SR_51b. About how many times has this happened to you in your lifetime?"
+      description = "SR_50b. About how many times has this happened to you in your lifetime?"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2663,7 +2664,7 @@ self_report <- self_report %>%
   
     cb_add_col_attributes( 
       sexual_picture_times_7cat_f, 
-      description = "SR_51b. About how many times has this happened to you in your lifetime?"
+      description = "SR_52b. About how many times has this happened to you in your lifetime?"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2714,12 +2715,12 @@ cb_add_col_attributes(
   
 cb_add_col_attributes( 
   sexual_person_12cat_f, 
-  description = "Question from an older version of the follow-up interview"
+  description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question from an older version of the follow-up interview.)"
 ) %>%
   
   cb_add_col_attributes( 
     sexual_person_12cat, 
-    description = "Question from an older version of the follow-up interview",
+    description = "What was that person's (those persons') relationship to you (MULTIPLE RECORD)? (Question from an older version of the follow-up interview.)",
     value_labels = c(
       "A spouse or partner"     = 1, 
       "An ex spouse or partner" = 2, 
@@ -2855,7 +2856,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       emotional_yelled_age, 
-      description = "Question from earlier version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2870,7 +2871,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       emotional_embarrassed_age, 
-      description = "Question from earlier version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2885,7 +2886,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       emotional_harassed_age, 
-      description = "Question from earlier version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2900,7 +2901,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       emotional_refused_age, 
-      description = "Question from earlier version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
     ) %>%
 
       cb_add_col_attributes( 
@@ -2915,7 +2916,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       physical_hit_age, 
-      description = "Question from an older version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2930,7 +2931,7 @@ cb_add_col_attributes(
 
     cb_add_col_attributes( 
       physical_restrain_age, 
-      description = "Question from an older version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2945,7 +2946,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       physical_hurt_age, 
-      description = "Question from an older version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2960,7 +2961,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_harm_age, 
-      description = "Question from an older version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2975,7 +2976,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_touched_age, 
-      description = "Question from an older version of the follow-up interview"
+      description = " How old were you when this happened (most recently)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -2990,7 +2991,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_forced_age, 
-      description = "Question from an older version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -3005,7 +3006,7 @@ cb_add_col_attributes(
   
     cb_add_col_attributes( 
       sexual_picture_age, 
-      description = "Question from an older version of the follow-up interview"
+      description = "How old were you when this happened (most recently)? (Question from an older version of the follow-up interview.)"
     ) %>%
   
     cb_add_col_attributes( 
@@ -3090,7 +3091,7 @@ cb_add_col_attributes(
  
     cb_add_col_attributes( 
       xc_physical_list, 
-      description = "Calculated comma-separated list of the selected physical mistreatment that the participant reported; used internally by the database to display a customized follow-up question to the participant"
+      description = "Calculated comma-separated list of the selected physical mistreatment that the participant reported; used internally by the database to display a customized follow-up question to the participant."
     ) %>% 
   
     cb_add_col_attributes( 
@@ -3100,18 +3101,29 @@ cb_add_col_attributes(
 
     cb_add_col_attributes( 
       xc_case_id, 
-      description = "Calculated by the database from the last 5 characters of the MedstarID"
+      description = "Calculated by the database from the last 5 characters of the MedstarID."
     ) %>% 
 
     cb_add_col_attributes( 
       x_primary_key, 
-      description = "unique record id"
+      description = "Unique record ID."
     ) %>%   
 
     cb_add_col_attributes( 
       xc_lead_panel_summary_count, 
-      description = "Calculated count of positive abuse instances across SelfReport, ApsInvestigations, and ObservationalMeasures"
+      description = "Calculated count of positive abuse instances across SelfReport, ApsInvestigations, and ObservationalMeasures."
     )   
+```
+
+# Create a data frame containing the column names and their descriptions using the df_descriptions function
+
+```{r}
+self_rep_desc <- var_descriptions(self_report)
+```
+
+## Save as rds file
+```{r}
+write_rds(self_rep_desc, "../codebooks/variable_descriptions/self_report_var_desc.rds")
 ```
 
 # Pass data frame to the codebook() function

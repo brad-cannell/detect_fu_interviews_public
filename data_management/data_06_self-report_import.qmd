@@ -1,0 +1,678 @@
+---
+title: "Import Data from FileMaker Pro: Self Report"
+---
+
+# Overview
+
+In this file, we import and do some initial cleaning of the Observational Measures data collected and stored in FileMaker Pro.
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(purrr)
+library(stringr)
+library(dplyr)
+library(janitor)
+```
+
+
+# Load data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+self_rep <- read_csv("../data/filemaker_pro_exports/self_report_import.csv")
+```
+# Clean data
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+self_rep <- clean_names(self_rep,
+                        replace = c("60" = "_60",
+                                    "65" = "_65"))
+```
+
+```{r}
+# Data check
+dim(self_rep) # 956 209
+```
+
+
+## Create factor variables to match levels in follow-up interview protocol
+
+### Self-report injury, violence, neglect, and exploitation
+
+```{r}
+
+# Set levels for factors for different types of questions
+levels_yes_no   <- c("Yes", "No", "Don't know", "Refused")
+levels_help     <- c("Yes, one person", "Yes, more than one person", "No",
+                     "Don't know", "Refused")
+levels_reliable <- c("Not at all reliable", "Somewhat reliable", 
+                     "Very reliable", "Completely reliable", "Don’t know",
+                     "Refused")
+levels_person   <- c("A spouse or partner", "An ex spouse or partner", 
+                     "A parent or step-parent", "A brother or sister", 
+                     "A son or daughter", "Another relative", "A coworker", 
+                     "A neighbor", "A friend", "Some other non-relative",
+                     "Don't know", "Refused")
+```
+
+
+### Neglect variables
+```{r}
+self_rep <- self_rep %>%
+  mutate(
+    across(
+      .cols = starts_with("neglect") & !ends_with("help") &
+        !ends_with("reliable") & !ends_with("person"),
+      .fns  = ~ case_when(
+        .x == "Yes"        ~ 1,
+        .x == "No"         ~ 2,
+        .x == "Don't know" ~ 7,
+        .x == "Refused"    ~ 9 
+      ),
+      .names = "{col}_4cat"
+    ),
+    across(
+      .cols = starts_with("neglect") & !ends_with("help") &
+        !ends_with("reliable") & !ends_with("person") & !ends_with("4cat"),
+      .fn    = ~ factor(.x, levels = levels_yes_no),
+      .names = "{col}_4cat_f"
+    ), 
+    across(
+      .cols  = starts_with("neglect") & ends_with("help"),
+      .fns   = ~ case_when(
+        .x == "Yes, one person"           ~ 1, 
+        .x == "Yes, more than one person" ~ 2, 
+        .x == "No"                        ~ 3,
+        .x == "Don't know"                ~ 7, 
+        .x == "Refused"                   ~ 9
+      ),
+      .names = "{col}_5cat" 
+    ),
+    across(
+      .cols  = starts_with("neglect") & ends_with("help"),
+      .fns   = ~ factor(.x, levels = levels_help),
+      .names = "{col}_5cat_f"
+    ),
+    across(
+      .cols  = starts_with("neglect") & ends_with("reliable"),
+      .fns   = ~ case_when(
+        .x == "Not at all reliable" ~ 1, 
+        .x == "Somewhat reliable"   ~ 2, 
+        .x == "Very reliable"       ~ 3, 
+        .x == "Completely reliable" ~ 4, 
+        .x == "Don't know"          ~ 7,
+        .x == "Refused"             ~ 9
+      ),
+      .names = "{col}_6cat" 
+    ),
+    across(
+      .cols  = starts_with("neglect") & ends_with("reliable"),
+      .fns   = ~ factor(.x, levels = levels_reliable),
+      .names = "{col}_6cat_f"
+    ),
+    neglect_person_12cat = case_when(
+      neglect_person == "A spouse or partner"     ~ 1, 
+      neglect_person == "An ex spouse or partner" ~ 2, 
+      neglect_person == "A parent or step-parent" ~ 3, 
+      neglect_person == "A brother or sister"     ~ 4, 
+      neglect_person == "A son or daughter"       ~ 5, 
+      neglect_person == "Another relative"        ~ 6, 
+      neglect_person == "A coworker"              ~ 7, 
+      neglect_person == "A neighbor"              ~ 8, 
+      neglect_person == "A friend"                ~ 9, 
+      neglect_person == "Some other non-relative" ~ 10,
+      neglect_person == "Don't know"              ~ 77, 
+      neglect_person == "Refused"                 ~ 99
+    ),
+    neglect_person_12cat_f = factor(
+      neglect_person,
+      levels = levels_person
+    )
+  )
+
+```
+  
+### Financial Exploitation Variables
+
+#### Set levels for factors used in these variables
+```{r}
+# Not needed, this variable is not used in this CSV
+levels_last_time <- c("Less than 1 month ago", 
+                      "Between 1 month and less than 3 months ago",
+                      "Between 3 months and less than 6 months ago",
+                      "Between 6 months and less than 1 year ago",
+                      "Between 1 year and less than 3 years ago",
+                      "3 or more years ago", "Don't know", "Refused")
+```
+
+
+#### Recode categorical variables to factor variables
+```{r}
+self_rep <- self_rep %>%
+  mutate(
+    across(
+      .cols = starts_with("finance") & !ends_with("years") &
+        !ends_with("times") &  !ends_with("age") & !ends_with("person") &
+        !ends_with("last_time"),
+      .fns  = ~ case_when(
+        .x == "Yes"        ~ 1,
+        .x == "No"         ~ 2,
+        .x == "Don't know" ~ 7,
+        .x == "Refused"    ~ 9 
+      ),
+      .names = "{col}_4cat"
+    ),
+    across(
+      .cols = starts_with("finance") & !ends_with("years") &
+        !ends_with("times") &  !ends_with("age") & !ends_with("person") &
+        !ends_with("last_time") & !ends_with("4cat"),
+      .fns  = ~ factor(.x, levels = levels_yes_no),
+      .names = "{col}_4cat_f"
+    ),
+
+    finance_person_12cat = case_when(
+      finance_person == "A spouse or partner"     ~ 1, 
+      finance_person == "An ex spouse or partner" ~ 2, 
+      finance_person == "A parent or step-parent" ~ 3, 
+      finance_person == "A brother or sister"     ~ 4, 
+      finance_person == "A son or daughter"       ~ 5, 
+      finance_person == "Another relative"        ~ 6, 
+      finance_person == "A coworker"              ~ 7, 
+      finance_person == "A neighbor"              ~ 8, 
+      finance_person == "A friend"                ~ 9, 
+      finance_person == "Some other non-relative" ~ 10,
+      finance_person == "Don't know"              ~ 77, 
+      finance_person == "Refused"                 ~ 99
+    ),
+    finance_person_12cat_f = factor(
+      finance_person,
+      levels = levels_person
+    ),
+    across(
+      .cols = starts_with("finance") & ends_with("last_time"),
+      .fns  = ~ case_when(
+        .x == "Less than 1 month ago"                       ~ 1,
+        .x == "Between 1 month and less than 3 months ago"  ~ 2,
+        .x == "Between 3 months and less than 6 months ago" ~ 3,
+        .x == "Between 6 months and less than 1 year ago"   ~ 4,
+        .x == "Between 1 year and less than 3 years ago"    ~ 5,
+        .x == "3 or more years ago"                         ~ 6, 
+        .x == "Don't know"                                  ~ 7,
+        .x == "Refused"                                     ~ 9),
+      .names = "{col}_8cat"
+    ),
+    across(
+      .cols  = starts_with("finance") & ends_with("last_time"),
+      .fns   = ~ factor(.x, levels = levels_last_time),
+      .names =  "{col}_8cat_f"
+    )
+  )
+     
+```
+
+### Emotional Mistreatment Variables
+
+#### Set levels to be used with these variables
+
+```{r}
+levels_times <- c("1 or 2 times", "Between 3 and less than 5 times",
+                  "Between 5 and less than 10 times", 
+                  "Between 10 and less than 20 times", "20 or more times",
+                  "Don't know", "Refused")
+
+levels_friends <- c("None", "Very few (1-3)", "Some (4-6)", "A lot (7+)",
+                    "Don't know", "Refused")
+
+levels_person_v2 <- c("A stranger", "A spouse or partner", "An ex spouse or partner", 
+                      "A parent or step-parent", "A brother or sister",
+                      "A son or daughter", "Another relative", "A coworker", 
+                      "A neighbor", "A friend", "Some other non-relative",
+                      "Don't know", "Refused")
+```
+ 
+
+#### Recode categorical variables to factor variables
+
+```{r}
+self_rep <- self_rep %>%
+  mutate(
+    across(
+      .cols = starts_with("emotional") & !ends_with("years") &
+        !ends_with("times") &  !ends_with("age") & !ends_with("person") &
+        !ends_with("last_time") & !ends_with("friends") &
+        !ends_with("person_v2"),
+      .fns  = ~ case_when(
+        .x == "Yes"        ~ 1,
+        .x == "No"         ~ 2,
+        .x == "Don't know" ~ 7,
+        .x == "Refused"    ~ 9 
+      ),
+      .names = "{col}_4cat"
+    ),
+    across(
+      .cols = starts_with("emotional") & !ends_with("years") &
+        !ends_with("times") &  !ends_with("age") & !ends_with("person") &
+        !ends_with("last_time") & !ends_with("friends") & !ends_with("4cat") &
+        !ends_with("person_v2"),
+      .fns  = ~ factor(.x, levels = levels_yes_no),
+      .names = "{col}_4cat_f"
+    ),
+
+    emotional_incident_person_12cat = case_when(
+      emotional_incident_person == "A stranger"              ~ 1,
+      emotional_incident_person == "A spouse or partner"     ~ 2, 
+      emotional_incident_person == "An ex spouse or partner" ~ 3, 
+      emotional_incident_person == "A parent or step-parent" ~ 4, 
+      emotional_incident_person == "A brother or sister"     ~ 5, 
+      emotional_incident_person == "A son or daughter"       ~ 6, 
+      emotional_incident_person == "Another relative"        ~ 7, 
+      emotional_incident_person == "A coworker"              ~ 8, 
+      emotional_incident_person == "A neighbor"              ~ 9, 
+      emotional_incident_person == "A friend"                ~ 10, 
+      emotional_incident_person == "Some other non-relative" ~ 11,
+      emotional_incident_person == "Don't know"              ~ 77, 
+      emotional_incident_person == "Refused"                 ~ 99
+  ),
+  emotional_incident_person_12cat_f = factor(
+    emotional_incident_person,
+    levels = levels_person_v2
+  ),
+  across(
+    .cols = starts_with("emotional") & ends_with("last_time"),
+    .fns  = ~ case_when(
+      .x == "Less than 1 month ago"                       ~ 1,
+      .x == "Between 1 month and less than 3 months ago"  ~ 2,
+      .x == "Between 3 months and less than 6 months ago" ~ 3,
+      .x == "Between 6 months and less than 1 year ago"   ~ 4,
+      .x == "Between 1 year and less than 3 years ago"    ~ 5,
+      .x == "3 or more years ago"                         ~ 6, 
+      .x == "Don't know"                                  ~ 7,
+      .x == "Refused"                                     ~ 9),
+    .names = "{col}_8cat"
+  ),
+  across(
+    .cols  = starts_with("emotional") & ends_with("last_time"),
+    .fns   = ~ factor(.x, levels = levels_last_time),
+    .names =  "{col}_8cat_f"
+  ),
+  across(
+    .cols = starts_with("emotional") & ends_with("times") & 
+            !ends_with("times_times"),
+    .fns = ~ case_when(
+      .x == "1 or 2 times"                      ~ 1, 
+      .x == "Between 3 and less than 5 times"   ~ 2,
+      .x == "Between 5 and less than 10 times"  ~ 3, 
+      .x == "Between 10 and less than 20 times" ~ 4, 
+      .x == "20 or more times"                  ~ 5,
+      .x == "Don't know"                        ~ 7, 
+      .x == "Refused"                           ~ 9),
+    .names = "{col}_7cat"
+  ),
+  across(
+    .cols  = starts_with("emotional") & ends_with("times") & 
+            !ends_with("times_times"),
+    .fns   = ~ factor(.x, levels = levels_times),
+    .names = "{col}_7cat_f"
+  ),
+  emotional_person_friends_6cat = case_when(
+    emotional_person_friends == "None"           ~ 0, 
+    emotional_person_friends == "Very few (1-3)" ~ 1, 
+    emotional_person_friends == "Some (4-6)"     ~ 2, 
+    emotional_person_friends == "A lot (7+)"     ~ 3,
+    emotional_person_friends == "Don't know"     ~ 7, 
+    emotional_person_friends == "Refused"        ~ 9
+  ),
+  emotional_person_friends_6cat_f = factor(
+    emotional_person_friends,
+    levels = levels_friends
+  ),
+  # Are the levels the same for v2 and v1?
+   emotional_incident_person_v2_12cat = case_when(
+      emotional_incident_person_v2 == "A stranger"              ~ 1,
+      emotional_incident_person_v2 == "A spouse or partner"     ~ 2, 
+      emotional_incident_person_v2 == "An ex spouse or partner" ~ 3, 
+      emotional_incident_person_v2 == "A parent or step-parent" ~ 4, 
+      emotional_incident_person_v2 == "A brother or sister"     ~ 5, 
+      emotional_incident_person_v2 == "A son or daughter"       ~ 6, 
+      emotional_incident_person_v2 == "Another relative"        ~ 7, 
+      emotional_incident_person_v2 == "A coworker"              ~ 8, 
+      emotional_incident_person_v2 == "A neighbor"              ~ 9, 
+      emotional_incident_person_v2 == "A friend"                ~ 10, 
+      emotional_incident_person_v2 == "Some other non-relative" ~ 11,
+      emotional_incident_person_v2 == "Don't know"              ~ 77, 
+      emotional_incident_person_v2 == "Refused"                 ~ 99
+  ),
+  emotional_incident_person_v2_12cat_f = factor(
+    emotional_incident_person_v2,
+    levels = levels_person_v2
+  ),
+)
+```
+ 
+### Physical Mistreatment Variables
+
+#### Recode categorical variables to factor variables
+
+
+```{r}
+self_rep <- self_rep %>%
+  mutate(
+    across(
+      .cols = starts_with("physical") & !ends_with("years") &
+        !ends_with("times") &  !ends_with("age") &
+        !ends_with("last_time") & !ends_with("friends") &
+        !ends_with("person_v2"),
+      .fns  = ~ case_when(
+        .x == "Yes"        ~ 1,
+        .x == "No"         ~ 2,
+        .x == "Don't know" ~ 7,
+        .x == "Refused"    ~ 9 
+      ),
+      .names = "{col}_4cat"
+    ),
+    across(
+      .cols = starts_with("physical") & !ends_with("years") &
+        !ends_with("times") &  !ends_with("age")  &
+        !ends_with("last_time") & !ends_with("friends") & !ends_with("4cat") &
+        !ends_with("person_v2"),
+      .fns  = ~ factor(.x, levels = levels_yes_no),
+    .names = "{col}_4cat_f"
+      ),
+  across(
+    .cols = starts_with("physical") & ends_with("last_time"),
+    .fns  = ~ case_when(
+      .x == "Less than 1 month ago"                       ~ 1,
+      .x == "Between 1 month and less than 3 months ago"  ~ 2,
+      .x == "Between 3 months and less than 6 months ago" ~ 3,
+      .x == "Between 6 months and less than 1 year ago"   ~ 4,
+      .x == "Between 1 year and less than 3 years ago"    ~ 5,
+      .x == "3 or more years ago"                         ~ 6, 
+      .x == "Don't know"                                  ~ 7,
+      .x == "Refused"                                     ~ 9),
+    .names = "{col}_8cat"
+  ),
+  across(
+    .cols  = starts_with("physical") & ends_with("last_time"),
+    .fns   = ~ factor(.x, levels = levels_last_time),
+    .names =  "{col}_8cat_f"
+  ),
+  across(
+    .cols = starts_with("physical") & ends_with("times") & 
+            !ends_with("times_times"),
+    .fns = ~ case_when(
+      .x == "1 or 2 times"                      ~ 1, 
+      .x == "Between 3 and less than 5 times"   ~ 2,
+      .x == "Between 5 and less than 10 times"  ~ 3, 
+      .x == "Between 10 and less than 20 times" ~ 4, 
+      .x == "20 or more times"                  ~ 5,
+      .x == "Don't know"                        ~ 7, 
+      .x == "Refused"                           ~ 9),
+    .names = "{col}_7cat"
+  ),
+  across(
+    .cols  = starts_with("physical") & ends_with("times") & 
+            !ends_with("times_times"),
+    .fns   = ~ factor(.x, levels = levels_times),
+    .names = "{col}_7cat_f"
+  ),
+  physical_person_friends_6cat = case_when(
+    physical_person_friends == "None"           ~ 0, 
+    physical_person_friends == "Very few (1-3)" ~ 1, 
+    physical_person_friends == "Some (4-6)"     ~ 2, 
+    physical_person_friends == "A lot (7+)"     ~ 3,
+    physical_person_friends == "Don't know"     ~ 7, 
+    physical_person_friends == "Refused"        ~ 9
+  ),
+  physical_person_friends_6cat_f = factor(
+    physical_person_friends,
+    levels = levels_friends
+  ),
+   physical_incident_person_v2_12cat = case_when(
+      physical_incident_person_v2 == "A stranger"              ~ 1,
+      physical_incident_person_v2 == "A spouse or partner"     ~ 2, 
+      physical_incident_person_v2 == "An ex spouse or partner" ~ 3, 
+      physical_incident_person_v2 == "A parent or step-parent" ~ 4, 
+      physical_incident_person_v2 == "A brother or sister"     ~ 5, 
+      physical_incident_person_v2 == "A son or daughter"       ~ 6, 
+      physical_incident_person_v2 == "Another relative"        ~ 7, 
+      physical_incident_person_v2 == "A coworker"              ~ 8, 
+      physical_incident_person_v2 == "A neighbor"              ~ 9, 
+      physical_incident_person_v2 == "A friend"                ~ 10, 
+      physical_incident_person_v2 == "Some other non-relative" ~ 11,
+      physical_incident_person_v2 == "Don't know"              ~ 77, 
+      physical_incident_person_v2 == "Refused"                 ~ 99
+  ),
+  physical_incident_person_v2_12cat_f = factor(
+    physical_incident_person_v2,
+    levels = levels_person_v2
+  ),
+  physical_person_12cat = case_when(
+      physical_person == "A stranger"              ~ 1,
+      physical_person == "A spouse or partner"     ~ 2, 
+      physical_person == "An ex spouse or partner" ~ 3, 
+      physical_person == "A parent or step-parent" ~ 4, 
+      physical_person == "A brother or sister"     ~ 5, 
+      physical_person == "A son or daughter"       ~ 6, 
+      physical_person == "Another relative"        ~ 7, 
+      physical_person == "A coworker"              ~ 8, 
+      physical_person == "A neighbor"              ~ 9, 
+      physical_person == "A friend"                ~ 10, 
+      physical_person == "Some other non-relative" ~ 11,
+      physical_person == "Don't know"              ~ 77, 
+      physical_person == "Refused"                 ~ 99
+  ),
+  physical_person_12cat_f = factor(
+    physical_person,
+    levels = levels_person_v2
+  )
+  )
+```
+
+
+### Sexual mistreatment variables
+
+#### Recode categorical variables to factor variables
+
+```{r}
+self_rep <- self_rep %>%
+  mutate(
+    across(
+      .cols = starts_with("sexual") & !ends_with("years") &
+        !ends_with("times") &  !ends_with("age") &
+        !ends_with("last_time") & !ends_with("friends") &
+        !ends_with("person_v2"),
+      .fns  = ~ case_when(
+        .x == "Yes"        ~ 1,
+        .x == "No"         ~ 2,
+        .x == "Don't know" ~ 7,
+        .x == "Refused"    ~ 9 
+      ),
+      .names = "{col}_4cat"
+    ),
+    across(
+      .cols = starts_with("sexual") & !ends_with("years") &
+        !ends_with("times") &  !ends_with("age") &
+        !ends_with("last_time") & !ends_with("friends") & !ends_with("4cat") &
+        !ends_with("person_v2"),
+      .fns  = ~ factor(.x, levels = levels_yes_no),
+    .names = "{col}_4cat_f"
+      ),
+    across(
+      .cols = starts_with("sexual") & ends_with("last_time"),
+      .fns  = ~ case_when(
+        .x == "Less than 1 month ago"                       ~ 1,
+        .x == "Between 1 month and less than 3 months ago"  ~ 2,
+        .x == "Between 3 months and less than 6 months ago" ~ 3,
+        .x == "Between 6 months and less than 1 year ago"   ~ 4,
+        .x == "Between 1 year and less than 3 years ago"    ~ 5,
+        .x == "3 or more years ago"                         ~ 6, 
+        .x == "Don't know"                                  ~ 7,
+        .x == "Refused"                                     ~ 9),
+      .names = "{col}_8cat"
+    ),
+    across(
+      .cols  = starts_with("sexual") & ends_with("last_time"),
+      .fns   = ~ factor(.x, levels = levels_last_time),
+      .names =  "{col}_8cat_f"
+    ),
+    across(
+      .cols = starts_with("sexual") & ends_with("times") & 
+            !ends_with("times_times"),
+      .fns = ~ case_when(
+        .x == "1 or 2 times"                      ~ 1, 
+        .x == "Between 3 and less than 5 times"   ~ 2,
+        .x == "Between 5 and less than 10 times"  ~ 3, 
+        .x == "Between 10 and less than 20 times" ~ 4, 
+        .x == "20 or more times"                  ~ 5,
+        .x == "Don't know"                        ~ 7, 
+        .x == "Refused"                           ~ 9),
+      .names = "{col}_7cat"
+    ),
+    across(
+      .cols  = starts_with("sexual") & ends_with("times") & 
+            !ends_with("times_times"),
+      .fns   = ~ factor(.x, levels = levels_times),
+      .names = "{col}_7cat_f"
+    ),
+    sexual_person_friends_6cat = case_when(
+      sexual_person_friends == "None"           ~ 0, 
+      sexual_person_friends == "Very few (1-3)" ~ 1, 
+      sexual_person_friends == "Some (4-6)"     ~ 2, 
+      sexual_person_friends == "A lot (7+)"     ~ 3,
+      sexual_person_friends == "Don't know"     ~ 7, 
+      sexual_person_friends == "Refused"        ~ 9
+    ),
+    sexual_person_friends_6cat_f = factor(
+      sexual_person_friends,
+      levels = levels_friends
+    ),
+    sexual_incident_person_v2_12cat = case_when(
+      sexual_incident_person_v2 == "A stranger"              ~ 1,
+      sexual_incident_person_v2 == "A spouse or partner"     ~ 2, 
+      sexual_incident_person_v2 == "An ex spouse or partner" ~ 3, 
+      sexual_incident_person_v2 == "A parent or step-parent" ~ 4, 
+      sexual_incident_person_v2 == "A brother or sister"     ~ 5, 
+      sexual_incident_person_v2 == "A son or daughter"       ~ 6, 
+      sexual_incident_person_v2 == "Another relative"        ~ 7, 
+      sexual_incident_person_v2 == "A coworker"              ~ 8, 
+      sexual_incident_person_v2 == "A neighbor"              ~ 9, 
+      sexual_incident_person_v2 == "A friend"                ~ 10, 
+      sexual_incident_person_v2 == "Some other non-relative" ~ 11,
+      sexual_incident_person_v2 == "Don't know"              ~ 77, 
+      sexual_incident_person_v2 == "Refused"                 ~ 99
+    ),
+    sexual_incident_person_v2_12cat_f = factor(
+      sexual_incident_person_v2,
+      levels = levels_person_v2
+    ),
+    sexual_person_12cat = case_when(
+      sexual_person == "A stranger"              ~ 1,
+      sexual_person == "A spouse or partner"     ~ 2, 
+      sexual_person == "An ex spouse or partner" ~ 3, 
+      sexual_person == "A parent or step-parent" ~ 4, 
+      sexual_person == "A brother or sister"     ~ 5, 
+      sexual_person == "A son or daughter"       ~ 6, 
+      sexual_person == "Another relative"        ~ 7, 
+      sexual_person == "A coworker"              ~ 8, 
+      sexual_person == "A neighbor"              ~ 9, 
+      sexual_person == "A friend"                ~ 10, 
+      sexual_person == "Some other non-relative" ~ 11,
+      sexual_person == "Don't know"              ~ 77, 
+      sexual_person == "Refused"                 ~ 99
+    ),
+    sexual_person_12cat_f = factor(
+      sexual_person,
+      levels = levels_person_v2
+    )
+  )
+```
+
+### Fears, wants, needs variables
+
+#### Recode categorical variables to factor variables
+
+```{r}
+self_rep <- self_rep %>%
+  mutate(
+    across(
+      .cols = starts_with("fear") & !ends_with("response"),
+      .fns  = ~ case_when(
+        .x == "Don't know" ~ 7,
+        .x == "Refused"    ~ 9
+      ),
+      .names = "{col}_2cat"
+    ),
+    across(
+      .cols  = starts_with("fear") & !ends_with("response") &
+        !ends_with("2cat"),
+      .fns   = ~ factor(.x, levels = c("Don't know", "Refused")),
+      .names = "{col}_2cat_f"
+    )
+  )
+```
+
+
+### Environment Variables
+
+#### Recode categorical variables to factor variables
+
+```{r}
+self_rep <- self_rep %>%
+  mutate(
+    report_private_5cat = case_when(
+      report_private == "Yes, for the entire time"                     ~ 1,
+      report_private == "Yes, for part of the time"                    ~ 2,
+      report_private == "No, but they were still close enough to hear" ~ 3,
+      report_private == "No"                                           ~ 4,
+      report_private == "Don't know"                                   ~ 7
+    ),
+    report_private_5cat_f = factor(
+      report_private,
+      levels = c("Yes, for the entire time", "Yes, for part of the time",
+                "No, but they were still close enough to hear", "No",
+                "Don't know")),
+    report_influence_4cat = case_when(
+      report_influence == "Yes"        ~ 1,
+      report_influence == "No"         ~ 2,
+      report_influence == "Don't know" ~ 7,
+      report_influence == "Refused"    ~ 9
+    ),
+    report_influence_4cat_f = factor(
+      report_influence,
+      levels = levels_yes_no
+    )
+  )
+```
+
+## Remove raw character variables that have recoded forms
+
+```{r}
+self_rep <- self_rep %>% select(
+  -c(
+    (starts_with("emotional") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
+    (starts_with("fear") & (!matches("[0-9]cat") & !matches("_response$"))),
+    (starts_with("finance") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times") & !matches("_stranger_forged_times"))),
+    (starts_with("neglect") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
+    (starts_with("physical") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
+    (starts_with("report") & !matches("[0-9]cat")),
+    (starts_with("sexual") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times")))
+    )
+)
+```
+
+
+```{r}
+# Data check
+dim(self_rep) # 956 353
+```
+
+
+# Save as rds file
+
+```{r}
+write_rds(self_rep, "../data/cleaned_rds_files/self_report_import.rds")
+```

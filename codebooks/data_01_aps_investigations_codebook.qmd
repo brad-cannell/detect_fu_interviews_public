@@ -2,13 +2,14 @@
 title: "Create APS Investigations Codebook"
 ---
 
-# Load the necessary packages
+# Load the necessary packages and functions
 ```{r}
 #| warning: false
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(haven)
 library(readr)
+source("../r/variable_descriptions.R")
 ```
 
 # Purpose of the program
@@ -150,7 +151,7 @@ aps_inv <- aps_inv %>%
   
     cb_add_col_attributes( 
       aps_first_8cat, 
-      description = "When was the first time APS attempted to do an investigation?",
+      description = "AI_3. When was the first time APS attempted to do an investigation?",
       skip_pattern = "If answer is Refused, go to Section 6. If answer is 1 to 7, go to AI_4.",
       value_labels = c(
         "10 or more years ago"                       = 1, 
@@ -167,7 +168,7 @@ aps_inv <- aps_inv %>%
   
     cb_add_col_attributes( 
       aps_first_8cat_f, 
-      description = "When was the first time APS attempted to do an investigation?",
+      description = "AI_3. When was the first time APS attempted to do an investigation?",
       skip_pattern = "If answer is Refused, go to Section 6. If answer is 1 to 7, go to AI_4."
     ) %>%
   
@@ -204,6 +205,18 @@ no_stats <- aps_inv %>%
 
 no_stats_vars <- colnames(no_stats)
 
+```
+
+# Create a data frame containing the column names and their descriptions using the df_descriptions function
+
+```{r}
+aps_inv_desc <- var_descriptions(aps_inv)
+```
+
+
+## Save as rds file
+```{r}
+write_rds(aps_inv_desc, "../codebooks/variable_descriptions/aps_investigations_var_desc.rds")
 ```
 
 

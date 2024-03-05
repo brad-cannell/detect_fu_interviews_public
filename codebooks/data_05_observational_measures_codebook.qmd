@@ -3,10 +3,11 @@ title: "Create Observational Measures Codebook"
 ---
 
 ```{r}
-# Load necessary packages
+# Load necessary packages and functions
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(readr)
+source("../r/variable_descriptions.R")
 ```
 
 # Purpose of the program
@@ -47,71 +48,71 @@ no_stats_vars <- colnames(no_stats)
 observational_measures <- obs %>%
     cb_add_col_attributes( 
       x_primary_key, 
-      description = "Unique record ID used internally by the database"
+      description = "Unique record ID used internally by the database."
     ) %>%
   
     cb_add_col_attributes( 
       x_created_by, 
-      description = "Person who created the record"
+      description = "Person who created the record."
     ) %>%
   
     cb_add_col_attributes( 
       x_created_timestamp, 
-      description = "Timestamp when the record was created",
+      description = "Timestamp when the record was created.",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
       x_modified_by, 
-      description = "Person who modified the record"
+      description = "Person who modified the record."
     ) %>%
   
     cb_add_col_attributes( 
       x_modified_timestamp, 
-      description = "Timestamp when the record was modified",
+      description = "Timestamp when the record was modified.",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
       x_error_message, 
-      description = "Error message entered by research team"
+      description = "Error message entered by research team."
     ) %>%
   
     cb_add_col_attributes( 
       medstar_id, 
-      description = "Unique record number in MedStar System"
+      description = "Unique record number in MedStar System."
     ) %>%
   
     cb_add_col_attributes( 
       name_full, 
-      description = "Full name of older individual"
+      description = "Full name of older individual."
     ) %>%
   
     cb_add_col_attributes( 
       x_record_status, 
-      description = "Status of the record as determined by research team"
+      description = "Status of the record as determined by research team."
     ) %>%
   
     cb_add_col_attributes( 
       x_record_month, 
-      description = "Month record was created",
+      description = "Month record was created.",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
       x_record_year, 
-      description = "Year record was created",
+      description = "Year record was created.",
       col_type = "Time"
     ) %>%
   
     cb_add_col_attributes( 
       x_record_comment, 
-      description = "Comments by interviewer"
+      description = "Comments by interviewer."
     ) %>%
   
      cb_add_col_attributes( 
       xc_case_id, 
-      description = "Calculated by the database from the last 5 characters of the MedstarID"
+      description = "Identifier derived by the database from the last 5 characters of the MedstarID."
     ) %>%
   
      cb_add_col_attributes( 
@@ -121,7 +122,7 @@ observational_measures <- obs %>%
   
      cb_add_col_attributes( 
        xc_lead_panel_summary_comment_count, 
-       description = "Calculated count of comments provided by the medic, excluding for phrases such as 'No', 'Nothing to report', etc."
+       description = "Calculated count of comments provided by the medic, excluding for phrases such as 'No', 'Nothing to report.', etc."
      ) %>%
     
      cb_add_col_attributes( 
@@ -325,7 +326,7 @@ observational_measures <- obs %>%
   
     cb_add_col_attributes( 
       obvious_disease_f, 
-      description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators:  Failure to respond to warning of obvious disease Question from earlier version of follow-up interview."
+      description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators:  Failure to respond to warning of obvious disease. Question from earlier version of follow-up interview."
     ) %>%
   
     cb_add_col_attributes( 
@@ -747,7 +748,7 @@ observational_measures <- obs %>%
   
     cb_add_col_attributes( 
       at_self_4cat, 
-      description = "Recoded at_self variable to match levels in follow-up interview protocol",
+      description = "AT_7. Do you believe self-neglect has occurred?",
       value_labels = c(
         "Yes"        = 1,
         "No"         = 2,
@@ -819,7 +820,16 @@ observational_measures <- obs %>%
     )
   
 ```
+# Create a data frame containing the column names and their descriptions using the df_descriptions function
 
+```{r}
+obs_meas_desc <- var_descriptions(observational_measures)
+```
+
+## Save as rds file
+```{r}
+write_rds(obs_meas_desc, "../codebooks/variable_descriptions/observational_measures_var_desc.rds")
+```
 
 # Pass data frame to the codebook() function
 

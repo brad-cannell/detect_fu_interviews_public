@@ -5887,11 +5887,6 @@ detect_fu_merge <- detect_fu_merge %>%
     ) %>%
   
     cb_add_col_attributes( 
-      sode_race_soc, 
-      description = "SI_5. Which of the following racial categories describes you? You may select more than one."
-    ) %>%
-  
-    cb_add_col_attributes( 
       american_indian_or_alaska_native_soc, 
       description = "sode_race dummy variable for american inidian or alaska native category"
     ) %>%
@@ -6068,8 +6063,53 @@ detect_fu_merge <- detect_fu_merge %>%
     cb_add_col_attributes( 
       sode_people_3cat_f_soc, 
       description = "SI_1. Including you how many people live in this household?"
+    )%>%
+  
+    cb_add_col_attributes( 
+      sode_people_cont_soc, 
+      description = "SI_1. Including you how many people live in this household? (continuous variable that excludes non-numerical responses in sode_people)."
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sode_race_8cat_soc, 
+      description = "SI_5. Which of the following racial categories describes you? You may select more than one.",
+      value_labels = c(
+        "American Indian or Alaskan Native"         = 1,
+        "Asian"                                     = 2,
+        "Black or African American"                 = 3,
+        "Native Hawaiian or Other Pacific Islander" = 4,
+        "White"                                     = 5,
+        "Other race or multiple races"              = 6, 
+        "Don't know"                                = 7, 
+        "Refused"                                   = 8
+ 
+        )
+    ) %>%
+    cb_add_col_attributes( 
+      sode_race_8cat_f_soc, 
+      description = "SI_5. Which of the following racial categories describes you? You may select more than one."
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sode_race_eth_6cat_soc, 
+      description = "Ethnicity the participant self-identifies with. Derived from sode_race and sode_hispanic variables.",
+      value_labels = c(
+      "Hispanic, any race"                         = 1, 
+      "Black, non-Hispanic"                        = 2, 
+      "White, non-Hispanic"                        = 3,
+      "Other race or multiple races, non-Hispanic" = 4,
+      "Don't know"                                 = 5, 
+      "Refused"                                    = 6                    
+
+      )
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sode_race_eth_6cat_f_soc, 
+      description = "Ethnicity the participant self-identifies with. Derived from sode_race and sode_hispanic variables."
     )
 ```
+
 
 # Pass data frame to the codebook() function
 

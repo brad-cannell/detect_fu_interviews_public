@@ -3,10 +3,11 @@ title: "Sociodemographic Information Codebook"
 ---
 
 ```{r}
-# Load necessary packages
+# Load necessary packages and functions
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(readr)
+source("../r/variable_descriptions.R")
 ```
 
 # Purpose of the program
@@ -18,7 +19,6 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 #| warning: false
 socdem <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.rds")
 ```
-
 # Set column attributes
 
 ```{r}
@@ -212,12 +212,7 @@ sociodemographic_information <- socdem %>%
       sode_hispanic_4cat_f, 
       description = "SI_4. Are you of Hispanic or Latino origin?"
     ) %>%
-  
-    cb_add_col_attributes( 
-      sode_race, 
-      description = "SI_5. Which of the following racial categories describes you? You may select more than one."
-    ) %>%
-  
+
     cb_add_col_attributes( 
       american_indian_or_alaska_native, 
       description = "sode_race dummy variable for american inidian or alaska native category"
@@ -395,8 +390,62 @@ sociodemographic_information <- socdem %>%
     cb_add_col_attributes( 
       sode_people_3cat_f, 
       description = "SI_1. Including you how many people live in this household?"
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sode_people_cont, 
+      description = "SI_1. Including you how many people live in this household? (continuous variable that excludes non-numerical responses in sode_people)."
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sode_race_8cat, 
+      description = "SI_5. Which of the following racial categories describes you? You may select more than one.",
+      value_labels = c(
+        "American Indian or Alaskan Native"         = 1,
+        "Asian"                                     = 2,
+        "Black or African American"                 = 3,
+        "Native Hawaiian or Other Pacific Islander" = 4,
+        "White"                                     = 5,
+        "Other race or multiple races"              = 6, 
+        "Don't know"                                = 7, 
+        "Refused"                                   = 8
+ 
+        )
+    ) %>%
+    cb_add_col_attributes( 
+      sode_race_8cat_f, 
+      description = "SI_5. Which of the following racial categories describes you? You may select more than one."
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sode_race_eth_6cat, 
+      description = "Ethnicity the participant self-identifies with. Derived from sode_race and sode_hispanic variables.",
+      value_labels = c(
+      "Hispanic, any race"                         = 1, 
+      "Black, non-Hispanic"                        = 2, 
+      "White, non-Hispanic"                        = 3,
+      "Other race or multiple races, non-Hispanic" = 4,
+      "Don't know"                                 = 5, 
+      "Refused"                                    = 6                    
+
+      )
+    ) %>%
+  
+    cb_add_col_attributes( 
+      sode_race_eth_6cat_f, 
+      description = "Ethnicity the participant self-identifies with. Derived from sode_race and sode_hispanic variables."
     )
 
+```
+# Create a data frame containing the column names and their descriptions using the var_descriptions function
+
+```{r}
+soc_desc <- var_descriptions(sociodemographic_information)
+```
+
+## Save as rds file
+```{r}
+write_rds(soc_desc, "../codebooks/variable_descriptions/sociodemographic_information_var_desc.rds")
 ```
 
 # Pass data frame to the codebook() function

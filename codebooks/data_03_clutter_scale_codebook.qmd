@@ -3,11 +3,12 @@ title: "Create Clutter Scale Codebook"
 ---
 
 ```{r}
-# Load needed packages
+# Load needed packages and functions
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(haven)
 library(readr)
+source("../r/variable_descriptions.R")
 ```
 
 # Purpose of the program
@@ -233,6 +234,18 @@ clutter_scale <- clutter_scale %>%
     ) 
 
 ```
+
+# Create a data frame containing the column names and their descriptions using the df_descriptions function
+
+```{r}
+cls_desc <- var_descriptions(clutter_scale)
+```
+
+## Save as rds file
+```{r}
+write_rds(cls_desc, "../codebooks/variable_descriptions/clutter_scale_var_desc.rds")
+```
+
 
 # Exclude summary stats for certain variables in word doc
 
