@@ -50,28 +50,28 @@ general_health <- general_health %>%
   mutate(
     across(
       .cols = starts_with("peg"),
-      .fns  = ~case_when(
-        .x == "0 - No pain"                         ~ 0,
-        .x == "1"                                   ~ 1,
-        .x == "2"                                   ~ 2,
-        .x == "3"                                   ~ 3,
-        .x == "4"                                   ~ 4,
-        .x == "5"                                   ~ 5,
-        .x == "6"                                   ~ 6,
-        .x == "7"                                   ~ 7,
-        .x == "8"                                   ~ 8,
-        .x == "9"                                   ~ 9,
+      .fns = ~ case_when(
+        .x == "0 - No pain" ~ 0,
+        .x == "1" ~ 1,
+        .x == "2" ~ 2,
+        .x == "3" ~ 3,
+        .x == "4" ~ 4,
+        .x == "5" ~ 5,
+        .x == "6" ~ 6,
+        .x == "7" ~ 7,
+        .x == "8" ~ 8,
+        .x == "9" ~ 9,
         .x == "10 - Pain as bad as you can imagine" ~ 10,
-        .x == "Refused"                             ~ 99
-        ),
+        .x == "Refused" ~ 99
+      ),
       .names = "{col}_12cat"
     ),
     across(
-      .cols  = setdiff(starts_with("peg"), ends_with("_12cat")),
-      .fns   = ~ factor(
-        .x, 
+      .cols = setdiff(starts_with("peg"), ends_with("_12cat")),
+      .fns = ~ factor(
+        .x,
         levels = c(
-          "0 - No pain", "1", "2", "3", "4", "5", "6", "7", "8", "9", 
+          "0 - No pain", "1", "2", "3", "4", "5", "6", "7", "8", "9",
           "10 - Pain as bad as you can imagine", "Refused"
         )
       ),
@@ -88,24 +88,24 @@ Create categorical and factor variables for variables beginning with "outcomes_h
 general_health <- general_health %>%
   mutate(
     across(
-      .cols  = setdiff(
+      .cols = setdiff(
         starts_with("outcomes_health"), ends_with(c("keep", "general", "unable"))
       ),
-      .fn  =  ~ case_when(
+      .fn = ~ case_when(
         .x == "Yes, limited for more than 3 months" ~ 1,
-        .x == "Yes, limited for 3 months or less"   ~ 2,
-        .x == "Not limited at all"                  ~ 3,
-        .x == "Don't know"                          ~ 7,
-        .x == "Refused"                             ~ 9
+        .x == "Yes, limited for 3 months or less" ~ 2,
+        .x == "Not limited at all" ~ 3,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
       ),
       .names = "{col}_5cat"
     ),
     across(
-      .cols  = setdiff(
+      .cols = setdiff(
         starts_with("outcomes_health"), ends_with(c("keep", "general", "unable", "_5cat"))
       ),
       .fn = ~ factor(
-        .x, 
+        .x,
         levels = c(
           "Yes, limited for more than 3 months", "Yes, limited for 3 months or less",
           "Not limited at all", "Don't know", "Refused"
@@ -119,20 +119,20 @@ general_health <- general_health %>%
 ```{r}
 # Create categorical and factor variables for outcomes_health_general
 general_health <- general_health %>%
-  mutate (
+  mutate(
     outcomes_health_general_7cat = case_when(
-      outcomes_health_general == "Excellent"  ~ 1,
-      outcomes_health_general == "Very good"  ~ 2,
-      outcomes_health_general == "Good"       ~ 3,
-      outcomes_health_general == "Fair"       ~ 4,
-      outcomes_health_general == "Poor"       ~ 5,
+      outcomes_health_general == "Excellent" ~ 1,
+      outcomes_health_general == "Very good" ~ 2,
+      outcomes_health_general == "Good" ~ 3,
+      outcomes_health_general == "Fair" ~ 4,
+      outcomes_health_general == "Poor" ~ 5,
       outcomes_health_general == "Don't know" ~ 7,
-      outcomes_health_general == "Refused"    ~ 9
+      outcomes_health_general == "Refused" ~ 9
     ),
     outcomes_health_general_7cat_f = factor(
       outcomes_health_general,
       levels = c(
-        "Excellent", "Very good", "Good", "Fair", "Poor", "Don't know", 
+        "Excellent", "Very good", "Good", "Fair", "Poor", "Don't know",
         "Refused"
       )
     )
@@ -144,19 +144,19 @@ general_health <- general_health %>%
 general_health <- general_health %>%
   mutate(
     outcomes_4weeks_pain_8cat = case_when(
-      outcomes_4weeks_pain == "None"        ~ 0,
-      outcomes_4weeks_pain == "Very mild"   ~ 1,
-      outcomes_4weeks_pain == "Mild"        ~ 2,
-      outcomes_4weeks_pain == "Moderate"    ~ 3,
-      outcomes_4weeks_pain == "Severe"      ~ 4,
+      outcomes_4weeks_pain == "None" ~ 0,
+      outcomes_4weeks_pain == "Very mild" ~ 1,
+      outcomes_4weeks_pain == "Mild" ~ 2,
+      outcomes_4weeks_pain == "Moderate" ~ 3,
+      outcomes_4weeks_pain == "Severe" ~ 4,
       outcomes_4weeks_pain == "Very Severe" ~ 5,
-      outcomes_4weeks_pain == "Don’t know"  ~ 7,
-      outcomes_4weeks_pain == "Refused"     ~ 9
+      outcomes_4weeks_pain == "Don’t know" ~ 7,
+      outcomes_4weeks_pain == "Refused" ~ 9
     ),
     outcomes_4weeks_pain_8cat_f = factor(
       outcomes_4weeks_pain,
       levels = c(
-        "None", "Very mild", "Mild", "Moderate", "Severe", "Very Severe", 
+        "None", "Very mild", "Mild", "Moderate", "Severe", "Very Severe",
         "Don't know", "Refused"
       )
     )
@@ -168,22 +168,22 @@ general_health <- general_health %>%
 general_health <- general_health %>%
   mutate(
     across(
-      .cols  = contains(c("keep", "unable")),
-      .fn  =  ~ case_when(
+      .cols = contains(c("keep", "unable")),
+      .fn = ~ case_when(
         .x == "Yes, for more than 3 months" ~ 1,
-        .x == "Yes, for 3 months or less"   ~ 2,
-        .x == "No"                          ~ 3,
-        .x == "Don't know"                  ~ 7,
-        .x == "Refused"                     ~ 9
+        .x == "Yes, for 3 months or less" ~ 2,
+        .x == "No" ~ 3,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
       ),
       .names = "{col}_5cat"
     ),
     across(
-      .cols  = setdiff(contains(c("keep", "unable")), ends_with("_5cat")),
+      .cols = setdiff(contains(c("keep", "unable")), ends_with("_5cat")),
       .fn = ~ factor(
-        .x, 
+        .x,
         levels = c(
-          "Yes, for more than 3 months", "Yes, for 3 months or less", "No", 
+          "Yes, for more than 3 months", "Yes, for 3 months or less", "No",
           "Don't know", "Refused"
         )
       ),
@@ -197,25 +197,25 @@ general_health <- general_health %>%
 general_health <- general_health %>%
   mutate(
     across(
-      .col =  starts_with("outcomes_month"),
-      .fn  =  ~ case_when(
-        .x == "All of the time"      ~ 1,
-        .x == "Most of the time"     ~ 2,
-        .x == "Some of the time"     ~ 3,
+      .col = starts_with("outcomes_month"),
+      .fn = ~ case_when(
+        .x == "All of the time" ~ 1,
+        .x == "Most of the time" ~ 2,
+        .x == "Some of the time" ~ 3,
         .x == "A little of the time" ~ 4,
-        .x == "None of the time"     ~ 5,
-        .x == "Don't know"           ~ 7,
-        .x == "Refused"              ~ 9
+        .x == "None of the time" ~ 5,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
       ),
       .names = "{col}_7cat"
     ),
     across(
       .col = setdiff(starts_with("outcomes_month"), ends_with("_7cat")),
       .fn = ~ factor(
-        .x, 
+        .x,
         levels = c(
-          "All of the time", "Most of the time", "Some of the time", 
-          "A little of the time", "None of the time", "Don't know", 
+          "All of the time", "Most of the time", "Some of the time",
+          "A little of the time", "None of the time", "Don't know",
           "Refused"
         )
       ),
@@ -225,27 +225,27 @@ general_health <- general_health %>%
 ```
 
 ```{r}
-#Create categorical and factor variables for variables that start with "outcomes_tf"
+# Create categorical and factor variables for variables that start with "outcomes_tf"
 general_health <- general_health %>%
   mutate(
     across(
-      .col =  starts_with("outcomes_tf"),
-      .fn  =  ~ case_when(
-        .x == "Definitely true"  ~ 1,
-        .x == "Mostly true"      ~ 2,
-        .x == "Don't know"       ~ 3,
-        .x == "Mostly false"     ~ 4,
+      .col = starts_with("outcomes_tf"),
+      .fn = ~ case_when(
+        .x == "Definitely true" ~ 1,
+        .x == "Mostly true" ~ 2,
+        .x == "Don't know" ~ 3,
+        .x == "Mostly false" ~ 4,
         .x == "Definitely false" ~ 5,
-        .x == "Refused"          ~ 9
+        .x == "Refused" ~ 9
       ),
       .names = "{col}_6cat"
     ),
     across(
       .col = setdiff(starts_with("outcomes_tf"), ends_with("_6cat")),
       .fn = ~ factor(
-        .x, 
+        .x,
         levels = c(
-          "Definitely true", "Mostly true", "Don't know", "Mostly false", 
+          "Definitely true", "Mostly true", "Don't know", "Mostly false",
           "Definitely false", "Refused"
         )
       ),
@@ -263,14 +263,14 @@ general_health <- general_health %>%
   mutate(
     depres_satisfied_2cat = case_when(
       depres_satisfied == "Yes" ~ 0,
-      depres_satisfied == "No"  ~ 1
+      depres_satisfied == "No" ~ 1
     ),
     depres_satisfied_2cat_f = factor(
       depres_satisfied,
       levels = c("Yes", "No")
     ),
     depres_hopeless_2cat = case_when(
-      depres_hopeless == "No"  ~ 0,
+      depres_hopeless == "No" ~ 0,
       depres_hopeless == "Yes" ~ 1
     ),
     depres_hopeless_2cat_f = factor(
@@ -278,7 +278,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_better_2cat = case_when(
-      depres_better == "No"  ~ 0,
+      depres_better == "No" ~ 0,
       depres_better == "Yes" ~ 1
     ),
     depres_better_2cat_f = factor(
@@ -286,7 +286,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_activities_2cat = case_when(
-      depres_activities == "No"  ~ 0,
+      depres_activities == "No" ~ 0,
       depres_activities == "Yes" ~ 1
     ),
     depres_activities_2cat_f = factor(
@@ -294,7 +294,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_empty_2cat = case_when(
-      depres_empty == "No"  ~ 0,
+      depres_empty == "No" ~ 0,
       depres_empty == "Yes" ~ 1
     ),
     depres_empty_2cat_f = factor(
@@ -302,7 +302,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_bored_2cat = case_when(
-      depres_bored == "No"  ~ 0,
+      depres_bored == "No" ~ 0,
       depres_bored == "Yes" ~ 1
     ),
     depres_bored_2cat_f = factor(
@@ -310,7 +310,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_spirits_2cat = case_when(
-      depres_spirits == "Yes"  ~ 0,
+      depres_spirits == "Yes" ~ 0,
       depres_spirits == "No" ~ 1
     ),
     depres_spirits_2cat_f = factor(
@@ -318,7 +318,7 @@ general_health <- general_health %>%
       levels = c("Yes", "No")
     ),
     depres_afraid_2cat = case_when(
-      depres_afraid == "No"  ~ 0,
+      depres_afraid == "No" ~ 0,
       depres_afraid == "Yes" ~ 1
     ),
     depres_afraid_2cat_f = factor(
@@ -326,7 +326,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_happy_2cat = case_when(
-      depres_happy == "Yes"  ~ 0,
+      depres_happy == "Yes" ~ 0,
       depres_happy == "No" ~ 1
     ),
     depres_happy_2cat_f = factor(
@@ -334,7 +334,7 @@ general_health <- general_health %>%
       levels = c("Yes", "No")
     ),
     depres_helpless_2cat = case_when(
-      depres_helpless == "No"  ~ 0,
+      depres_helpless == "No" ~ 0,
       depres_helpless == "Yes" ~ 1
     ),
     depres_helpless_2cat_f = factor(
@@ -342,7 +342,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_home_2cat = case_when(
-      depres_home == "No"  ~ 0,
+      depres_home == "No" ~ 0,
       depres_home == "Yes" ~ 1
     ),
     depres_home_2cat_f = factor(
@@ -350,7 +350,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_memory_2cat = case_when(
-      depres_memory == "No"  ~ 0,
+      depres_memory == "No" ~ 0,
       depres_memory == "Yes" ~ 1
     ),
     depres_memory_2cat_f = factor(
@@ -358,7 +358,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_alive_2cat = case_when(
-      depres_alive == "Yes"  ~ 0,
+      depres_alive == "Yes" ~ 0,
       depres_alive == "No" ~ 1
     ),
     depres_alive_2cat_f = factor(
@@ -366,7 +366,7 @@ general_health <- general_health %>%
       levels = c("Yes", "No")
     ),
     depres_worthless_2cat = case_when(
-      depres_worthless == "No"  ~ 0,
+      depres_worthless == "No" ~ 0,
       depres_worthless == "Yes" ~ 1
     ),
     depres_worthless_2cat_f = factor(
@@ -374,7 +374,7 @@ general_health <- general_health %>%
       levels = c("No", "Yes")
     ),
     depres_energy_2cat = case_when(
-      depres_energy == "Yes"  ~ 0,
+      depres_energy == "Yes" ~ 0,
       depres_energy == "No" ~ 1
     ),
     depres_energy_2cat_f = factor(
@@ -391,19 +391,20 @@ general_health <- general_health %>%
   mutate(
     across(
       .col = starts_with("ls"),
-      .fn  =  ~ case_when(
-        .x == "Hardly ever"      ~ 1,
+      .fn = ~ case_when(
+        .x == "Hardly ever" ~ 1,
         .x == "Some of the time" ~ 2,
-        .x == "Often"            ~ 3,
-        .x == "Refused"          ~ 9
+        .x == "Often" ~ 3,
+        .x == "Refused" ~ 9
       ),
       .names = "{col}_4cat"
     ),
     across(
       .col = setdiff(starts_with("ls"), ends_with("_4cat")),
       .fn = ~ factor(
-        .x, 
-        levels = c("Hardly ever", "Some of the time", "Often", "Refused")),
+        .x,
+        levels = c("Hardly ever", "Some of the time", "Often", "Refused")
+      ),
       .names = "{col}_4cat_f"
     )
   )
@@ -415,12 +416,12 @@ general_health <- general_health %>%
 general_health <- general_health %>%
   mutate(
     across(
-      .col =  starts_with("nesarc"),
-      .fn  =  ~ case_when(
-        .x == "Yes"        ~ 1,
-        .x == "No"         ~ 2,
+      .col = starts_with("nesarc"),
+      .fn = ~ case_when(
+        .x == "Yes" ~ 1,
+        .x == "No" ~ 2,
         .x == "Don't know" ~ 7,
-        .x == "Refused"    ~ 9
+        .x == "Refused" ~ 9
       ),
       .names = "{col}_4cat"
     ),
@@ -435,27 +436,26 @@ general_health <- general_health %>%
 ### Alcohol Use Disorders Test, Consumption Questions (AUDIT-C) variables
 
 ```{r}
-#Create categorical and factor variables for the auditc_drink variable
+# Create categorical and factor variables for the auditc_drink variable
 general_health <- general_health %>%
   mutate(
     auditc_drink_7cat = case_when(
-      auditc_drink == "Never"                  ~ 0,
-      auditc_drink == "Monthly or less"        ~ 1,
-      auditc_drink == "2-4 times a month"      ~ 2,
-      auditc_drink == "2-3 times a week"       ~ 3,
+      auditc_drink == "Never" ~ 0,
+      auditc_drink == "Monthly or less" ~ 1,
+      auditc_drink == "2-4 times a month" ~ 2,
+      auditc_drink == "2-3 times a week" ~ 3,
       auditc_drink == "4 or more times a week" ~ 4,
-      auditc_drink == "Don't know"             ~ 7,
-      auditc_drink == "Refused"                ~ 9
+      auditc_drink == "Don't know" ~ 7,
+      auditc_drink == "Refused" ~ 9
     ),
     auditc_drink_7cat_f = factor(
       auditc_drink,
       levels = c(
-        "Never", "Monthly or less", "2-4 times a month", "2-3 times a week", 
+        "Never", "Monthly or less", "2-4 times a month", "2-3 times a week",
         "4 or more times a week", "Don't know", "Refused"
       )
     )
   )
-  
 ```
 
 ```{r}
@@ -463,18 +463,18 @@ general_health <- general_health %>%
 general_health <- general_health %>%
   mutate(
     auditc_day_7cat = case_when(
-      auditc_day == "1 or 2"     ~ 1,
-      auditc_day == "3 or 4"     ~ 2,
-      auditc_day == "5 or 6"     ~ 3,
-      auditc_day == "7 to 9"     ~ 4,
+      auditc_day == "1 or 2" ~ 1,
+      auditc_day == "3 or 4" ~ 2,
+      auditc_day == "5 or 6" ~ 3,
+      auditc_day == "7 to 9" ~ 4,
       auditc_day == "10 or more" ~ 5,
       auditc_day == "Don't know" ~ 7,
-      auditc_day == "Refused"    ~ 9
+      auditc_day == "Refused" ~ 9
     ),
     auditc_day_7cat_f = factor(
       auditc_day,
       levels = c(
-        "1 or 2", "3 or 4", "5 or 6", "7 to 9", "10 or more", "Don't know", 
+        "1 or 2", "3 or 4", "5 or 6", "7 to 9", "10 or more", "Don't know",
         "Refused"
       )
     )
@@ -486,18 +486,18 @@ general_health <- general_health %>%
 general_health <- general_health %>%
   mutate(
     auditc_five_7cat = case_when(
-      auditc_five == "Never"                 ~ 0,
-      auditc_five == "Less than monthly"     ~ 1,
-      auditc_five == "Monthly"               ~ 2,
-      auditc_five == "Weekly"                ~ 3,
+      auditc_five == "Never" ~ 0,
+      auditc_five == "Less than monthly" ~ 1,
+      auditc_five == "Monthly" ~ 2,
+      auditc_five == "Weekly" ~ 3,
       auditc_five == "Daily or almost daily" ~ 4,
-      auditc_five == "Don't know"            ~ 7,
-      auditc_five == "Refused"               ~ 9
+      auditc_five == "Don't know" ~ 7,
+      auditc_five == "Refused" ~ 9
     ),
     auditc_five_7cat_f = factor(
       auditc_five,
       levels = c(
-        "Never", "Less than monthly", "Monthly", "Weekly", 
+        "Never", "Less than monthly", "Monthly", "Weekly",
         "Daily or almost daily", "Don't know", "Refused"
       )
     )
@@ -507,12 +507,13 @@ general_health <- general_health %>%
 ## Remove raw variables that have recoded forms
 
 ```{r}
-general_health <- general_health %>% 
+general_health <- general_health %>%
   select(
-    -c((starts_with("audit") & !contains("_7cat")), (starts_with("depres") & !contains("_2cat")), starts_with("health"),
-       (starts_with("ls_") & !contains("_4cat")), (starts_with("nesarc") & !contains("_4cat")), (starts_with("outcomes") & !matches("_[0-9]cat")),
-       (starts_with("peg") & !contains("_12cat"))
-       )
+    -c(
+      (starts_with("audit") & !contains("_7cat")), (starts_with("depres") & !contains("_2cat")), starts_with("health"),
+      (starts_with("ls_") & !contains("_4cat")), (starts_with("nesarc") & !contains("_4cat")), (starts_with("outcomes") & !matches("_[0-9]cat")),
+      (starts_with("peg") & !contains("_12cat"))
+    )
   )
 ```
 

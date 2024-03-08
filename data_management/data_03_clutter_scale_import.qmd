@@ -47,8 +47,8 @@ clutter_scale <- clean_names(clutter_scale)
 clutter_scale <- clutter_scale %>%
   mutate(
     look_living_3cat = case_when(
-      look_living == "No"             ~ 0,
-      look_living == "Yes"            ~ 1,
+      look_living == "No" ~ 0,
+      look_living == "Yes" ~ 1,
       look_living == "No living room" ~ 7
     ),
     # Create factor variable for look_living
@@ -68,8 +68,8 @@ clutter_scale <- clutter_scale %>%
     ),
     # Create recoded variable for clutter_living_photo
     clutter_living_photo_3cat = case_when(
-      clutter_living_photo == "No"             ~ 0,
-      clutter_living_photo == "Yes"            ~ 1,
+      clutter_living_photo == "No" ~ 0,
+      clutter_living_photo == "Yes" ~ 1,
       clutter_living_photo == "No living room" ~ 7
     ),
     # Create factor variable for clutter_living_photo
@@ -85,8 +85,8 @@ clutter_scale <- clutter_scale %>%
 clutter_scale <- clutter_scale %>%
   mutate(
     look_kitchen_3cat = case_when(
-      look_kitchen == "No"         ~ 0,
-      look_kitchen == "Yes"        ~ 1,
+      look_kitchen == "No" ~ 0,
+      look_kitchen == "Yes" ~ 1,
       look_kitchen == "No kitchen" ~ 7
     ),
     # Create factor variable for look_kitchen
@@ -106,8 +106,8 @@ clutter_scale <- clutter_scale %>%
     ),
     # Create recoded variable for clutter_kitchen_photo
     clutter_kitchen_photo_3cat = case_when(
-      clutter_kitchen_photo == "No"         ~ 0,
-      clutter_kitchen_photo == "Yes"        ~ 1,
+      clutter_kitchen_photo == "No" ~ 0,
+      clutter_kitchen_photo == "Yes" ~ 1,
       clutter_kitchen_photo == "No kitchen" ~ 7
     ),
     # Create factor variable for clutter_kitchen_photo
@@ -119,12 +119,12 @@ clutter_scale <- clutter_scale %>%
 ```
 
 ```{r}
-#Create recoded variable for look_bedroom
+# Create recoded variable for look_bedroom
 clutter_scale <- clutter_scale %>%
   mutate(
     look_bedroom_3cat = case_when(
-      look_bedroom == "No"         ~ 0,
-      look_bedroom == "Yes"        ~ 1,
+      look_bedroom == "No" ~ 0,
+      look_bedroom == "Yes" ~ 1,
       look_bedroom == "No bedroom" ~ 7
     ),
     # Create factor variable for look_bedroom
@@ -144,8 +144,8 @@ clutter_scale <- clutter_scale %>%
     ),
     # Create recoded variable for clutter_bedroom_photo
     clutter_bedroom_photo_3cat = case_when(
-      clutter_bedroom_photo == "No"         ~ 0,
-      clutter_bedroom_photo == "Yes"        ~ 1,
+      clutter_bedroom_photo == "No" ~ 0,
+      clutter_bedroom_photo == "Yes" ~ 1,
       clutter_bedroom_photo == "No bedroom" ~ 7
     ),
     # Create factor variable for clutter_bedroom_photo
@@ -159,7 +159,7 @@ clutter_scale <- clutter_scale %>%
 ## Remove raw variables that have recoded forms
 
 ```{r}
-clutter_scale <- clutter_scale %>% 
+clutter_scale <- clutter_scale %>%
   select(-c(
     look_living, clutter_living, clutter_living_photo, look_kitchen, clutter_kitchen,
     clutter_kitchen_photo, look_bedroom, clutter_bedroom, clutter_bedroom_photo

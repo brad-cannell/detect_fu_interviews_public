@@ -3,11 +3,12 @@ title: "Create Clutter Scale Codebook"
 ---
 
 ```{r}
-# Load needed packages
+# Load needed packages and functions
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(haven)
 library(readr)
+source("../r/variable_descriptions.R")
 ```
 
 # Purpose of the program
@@ -24,10 +25,10 @@ clutter_scale <- read_rds("../data/cleaned_rds_files/clutter_scale_import.rds")
 
 ```{r}
 # Set the source to "DETECT Follow-up Interview home inspection and the clutter image rating scale data" for all the variables
-clutter_scale_vars <- clutter_scale %>% 
+clutter_scale_vars <- clutter_scale %>%
   names()
 
-for(i in clutter_scale_vars) {
+for (i in clutter_scale_vars) {
   attr(clutter_scale[[i]], "source") <- "DETECT Follow-up Interview Clutter Scale"
 }
 ```
@@ -35,204 +36,187 @@ for(i in clutter_scale_vars) {
 ```{r}
 # Add column attributes to all variables
 clutter_scale <- clutter_scale %>%
-    cb_add_col_attributes( 
-      x_primary_key, 
-      description = "Unique record ID used internally by the database"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_created_by, 
-      description = "Person who created the record"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_created_timestamp, 
-      description = "Timestamp when the record was created",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_modified_by, 
-      description = "Person who modified the record"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_modified_timestamp, 
-      description = "Timestamp when the record was modified",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_error_message, 
-      description = "Error message entered by research team"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      medstar_id, 
-      description = "Unique record number in MedStar System"
-    ) %>%  
-  
-    cb_add_col_attributes( 
-      name_full, 
-      description = "Full name of older individual"
-    ) %>%
-
-      cb_add_col_attributes( 
-      x_record_status, 
-      description = "Status of the record as determined by research team"
-    ) %>%
- 
-    cb_add_col_attributes( 
-      name_last, 
-      description = "Last name of older individual"
-    ) %>% 
-
-    cb_add_col_attributes( 
-      x_record_month, 
-      description = "Month record was created",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_year, 
-      description = "Year record was created",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_comment, 
-      description = "Comments by interviewer"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      xc_case_id, 
-      description = "Calculated by the database from the last 5 characters of the MedstarID"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      look_living_3cat, 
-      description = "CL_1a. May I take a look at your living room?",
-      skip_pattern = "If answer is No, go to CL_2a.",
-      value_labels = c(
-        "Yes"            = 1, 
-        "No"             = 0, 
-        "No living room" = 7
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      look_living_3cat_f, 
-      description = "CL_1a. May I take a look at your living room?",
-      skip_pattern = "If answer is No, go to CL_2a."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      clutter_living_f, 
-      description = "Clutter Image Rating Scale: Living Room. Please select the photo that most accurately reflects the amount of clutter in the room"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      clutter_living_photo_3cat, 
-      description = "CL_1b. May I take a picture of your living room?",
-      skip_pattern = "If answer is No, go to CL_2a.",
-      value_labels = c(
-        "Yes"            = 1, 
-        "No"             = 0, 
-        "No living room" = 7
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      clutter_living_photo_3cat_f, 
-      description = "CL_1b. May I take a picture of your living room?",
-      skip_pattern = "If answer is No, go to CL_2a."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      look_kitchen_3cat, 
-      description = "CL_2a. May I take a look at your kitchen?",
-      skip_pattern = "If answer is No, go to CL_3a.",
-      value_labels = c(
-        "Yes"            = 1, 
-        "No"             = 0, 
-        "No kitchen"     = 7
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      look_kitchen_3cat_f, 
-      description = "CL_2a. May I take a look at your kitchen?",
-      skip_pattern = "If answer is No, go to CL_3a."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      clutter_kitchen_f, 
-      description = "Clutter Image Rating Scale: Kitchen. Please select the photo that most accurately reflects the amount of clutter in the room"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      clutter_kitchen_photo_3cat, 
-      description = "CL_2b. May I take a picture of your kitchen?",
-      skip_pattern = "If answer is No, go to CL_3a.",
-      value_labels = c(
-        "Yes"            = 1, 
-        "No"             = 0, 
-        "No kitchen"     = 7
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      clutter_kitchen_photo_3cat_f, 
-      description = "CL_2b. May I take a picture of your kitchen?",
-      skip_pattern = "If answer is No, go to CL_3a."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      look_bedroom_3cat, 
-      description = "CL_3a. May I take a look at the bedroom where you sleep most regularly?",
-      skip_pattern = "If answer is No, go to section 4.",
-      value_labels = c(
-        "Yes"            = 1, 
-        "No"             = 0, 
-        "No bedroom"     = 7
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      look_bedroom_3cat_f, 
-      description = "CL_3a. May I take a look at the bedroom where you sleep most regularly?",
-      skip_pattern = "If answer is No, go to section 4."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      clutter_bedroom_f, 
-      description = "Clutter Image Rating Scale: Bedroom. Please select the photo that most accurately reflects the amount of clutter in the room"
-    ) %>%
-
-    cb_add_col_attributes( 
-      clutter_bedroom_photo_3cat, 
-      description = "CL_3b. May I take a picture of your bedroom?",
-      skip_pattern = "If answer is No, go to section 4.",
-      value_labels = c(
-        "Yes"            = 1, 
-        "No"             = 0, 
-        "No bedroom"     = 7
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      clutter_bedroom_photo_3cat_f, 
-      description = "CL_3b. May I take a picture of your bedroom?",
-      skip_pattern = "If answer is No, go to section 4."
-    ) 
-
+  cb_add_col_attributes(
+    x_primary_key,
+    description = "Unique record ID used internally by the database"
+  ) %>%
+  cb_add_col_attributes(
+    x_created_by,
+    description = "Person who created the record"
+  ) %>%
+  cb_add_col_attributes(
+    x_created_timestamp,
+    description = "Timestamp when the record was created",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_modified_by,
+    description = "Person who modified the record"
+  ) %>%
+  cb_add_col_attributes(
+    x_modified_timestamp,
+    description = "Timestamp when the record was modified",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_error_message,
+    description = "Error message entered by research team"
+  ) %>%
+  cb_add_col_attributes(
+    medstar_id,
+    description = "Unique record number in MedStar System"
+  ) %>%
+  cb_add_col_attributes(
+    name_full,
+    description = "Full name of older individual"
+  ) %>%
+  cb_add_col_attributes(
+    x_record_status,
+    description = "Status of the record as determined by research team"
+  ) %>%
+  cb_add_col_attributes(
+    name_last,
+    description = "Last name of older individual"
+  ) %>%
+  cb_add_col_attributes(
+    x_record_month,
+    description = "Month record was created",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_record_year,
+    description = "Year record was created",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_record_comment,
+    description = "Comments by interviewer"
+  ) %>%
+  cb_add_col_attributes(
+    xc_case_id,
+    description = "Calculated by the database from the last 5 characters of the MedstarID"
+  ) %>%
+  cb_add_col_attributes(
+    look_living_3cat,
+    description = "CL_1a. May I take a look at your living room?",
+    skip_pattern = "If answer is No, go to CL_2a.",
+    value_labels = c(
+      "Yes"            = 1,
+      "No"             = 0,
+      "No living room" = 7
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    look_living_3cat_f,
+    description = "CL_1a. May I take a look at your living room?",
+    skip_pattern = "If answer is No, go to CL_2a."
+  ) %>%
+  cb_add_col_attributes(
+    clutter_living_f,
+    description = "Clutter Image Rating Scale: Living Room. Please select the photo that most accurately reflects the amount of clutter in the room"
+  ) %>%
+  cb_add_col_attributes(
+    clutter_living_photo_3cat,
+    description = "CL_1b. May I take a picture of your living room?",
+    skip_pattern = "If answer is No, go to CL_2a.",
+    value_labels = c(
+      "Yes"            = 1,
+      "No"             = 0,
+      "No living room" = 7
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    clutter_living_photo_3cat_f,
+    description = "CL_1b. May I take a picture of your living room?",
+    skip_pattern = "If answer is No, go to CL_2a."
+  ) %>%
+  cb_add_col_attributes(
+    look_kitchen_3cat,
+    description = "CL_2a. May I take a look at your kitchen?",
+    skip_pattern = "If answer is No, go to CL_3a.",
+    value_labels = c(
+      "Yes"            = 1,
+      "No"             = 0,
+      "No kitchen"     = 7
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    look_kitchen_3cat_f,
+    description = "CL_2a. May I take a look at your kitchen?",
+    skip_pattern = "If answer is No, go to CL_3a."
+  ) %>%
+  cb_add_col_attributes(
+    clutter_kitchen_f,
+    description = "Clutter Image Rating Scale: Kitchen. Please select the photo that most accurately reflects the amount of clutter in the room"
+  ) %>%
+  cb_add_col_attributes(
+    clutter_kitchen_photo_3cat,
+    description = "CL_2b. May I take a picture of your kitchen?",
+    skip_pattern = "If answer is No, go to CL_3a.",
+    value_labels = c(
+      "Yes"            = 1,
+      "No"             = 0,
+      "No kitchen"     = 7
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    clutter_kitchen_photo_3cat_f,
+    description = "CL_2b. May I take a picture of your kitchen?",
+    skip_pattern = "If answer is No, go to CL_3a."
+  ) %>%
+  cb_add_col_attributes(
+    look_bedroom_3cat,
+    description = "CL_3a. May I take a look at the bedroom where you sleep most regularly?",
+    skip_pattern = "If answer is No, go to section 4.",
+    value_labels = c(
+      "Yes"            = 1,
+      "No"             = 0,
+      "No bedroom"     = 7
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    look_bedroom_3cat_f,
+    description = "CL_3a. May I take a look at the bedroom where you sleep most regularly?",
+    skip_pattern = "If answer is No, go to section 4."
+  ) %>%
+  cb_add_col_attributes(
+    clutter_bedroom_f,
+    description = "Clutter Image Rating Scale: Bedroom. Please select the photo that most accurately reflects the amount of clutter in the room"
+  ) %>%
+  cb_add_col_attributes(
+    clutter_bedroom_photo_3cat,
+    description = "CL_3b. May I take a picture of your bedroom?",
+    skip_pattern = "If answer is No, go to section 4.",
+    value_labels = c(
+      "Yes"            = 1,
+      "No"             = 0,
+      "No bedroom"     = 7
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    clutter_bedroom_photo_3cat_f,
+    description = "CL_3b. May I take a picture of your bedroom?",
+    skip_pattern = "If answer is No, go to section 4."
+  )
 ```
+
+# Create a data frame containing the column names and their descriptions using the df_descriptions function
+
+```{r}
+cls_desc <- var_descriptions(clutter_scale)
+```
+
+## Save as rds file
+```{r}
+write_rds(cls_desc, "../codebooks/variable_descriptions/clutter_scale_var_desc.rds")
+```
+
 
 # Exclude summary stats for certain variables in word doc
 
@@ -244,7 +228,6 @@ no_stats <- clutter_scale %>%
   )
 
 no_stats_vars <- colnames(no_stats)
-
 ```
 
 # Pass data frame to the codebook function
@@ -254,7 +237,8 @@ clutter_scale_codebook <- codebook(
   df = clutter_scale,
   title = "Clutter Scale Dataset",
   description = "Data collected during DETECT follow-up interviews regarding the patient's home inspection and clutter image rating scale",
-  no_summary_stats = no_stats_vars)
+  no_summary_stats = no_stats_vars
+)
 ```
 
 ```{r}

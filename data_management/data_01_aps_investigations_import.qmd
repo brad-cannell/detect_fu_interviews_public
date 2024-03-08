@@ -47,15 +47,15 @@ aps_inv <- clean_names(aps_inv)
 aps_inv <- aps_inv %>%
   mutate(
     aps_report_4cat = case_when(
-      aps_report == "Yes"        ~ 1,
-      aps_report == "No"         ~ 2,
+      aps_report == "Yes" ~ 1,
+      aps_report == "No" ~ 2,
       aps_report == "Don't know" ~ 7,
-      aps_report == "Refused"    ~ 9
+      aps_report == "Refused" ~ 9
     ),
     aps_report_4cat_f = factor(
       aps_report,
       levels = c("Yes", "No", "Don't know", "Refused")
-      )
+    )
   )
 ```
 
@@ -64,16 +64,16 @@ aps_inv <- aps_inv %>%
 aps_inv <- aps_inv %>%
   mutate(
     aps_times_5cat = case_when(
-      aps_times == "0"          ~ 0,
-      aps_times == "1"          ~ 1,
-      aps_times == "2+"         ~ 2,
+      aps_times == "0" ~ 0,
+      aps_times == "1" ~ 1,
+      aps_times == "2+" ~ 2,
       aps_times == "Don't know" ~ 7,
-      aps_times == "Refused"    ~ 9
+      aps_times == "Refused" ~ 9
     ),
     aps_times_5cat_f = factor(
       aps_times,
       levels = c("0", "1", "2+", "Don't know", "Refused")
-      )
+    )
   )
 ```
 
@@ -82,20 +82,20 @@ aps_inv <- aps_inv %>%
 aps_inv <- aps_inv %>%
   mutate(
     aps_first_8cat = case_when(
-      aps_first == "10 or more years ago"                       ~ 1,
-      aps_first == "5-10 years ago"                             ~ 2,
-      aps_first == "1-5 years ago"                              ~ 3,
+      aps_first == "10 or more years ago" ~ 1,
+      aps_first == "5-10 years ago" ~ 2,
+      aps_first == "1-5 years ago" ~ 3,
       aps_first == "In the past year but more than a month ago" ~ 4,
-      aps_first == "In the past month"                          ~ 5,
-      aps_first == "In the past week"                           ~ 6,
-      aps_first == "Don't know"                                 ~ 7,
-      aps_first == "Refused"                                    ~ 9
+      aps_first == "In the past month" ~ 5,
+      aps_first == "In the past week" ~ 6,
+      aps_first == "Don't know" ~ 7,
+      aps_first == "Refused" ~ 9
     ),
     aps_first_8cat_f = factor(
       aps_first,
       levels = c(
-        "10 or more years ago", "5-10 years ago", "1-5 years ago", 
-        "In the past year but more than a month ago", "In the past month" , 
+        "10 or more years ago", "5-10 years ago", "1-5 years ago",
+        "In the past year but more than a month ago", "In the past month",
         "In the past week", "Don't know", "Refused"
       )
     )
@@ -107,20 +107,20 @@ aps_inv <- aps_inv %>%
 aps_inv <- aps_inv %>%
   mutate(
     aps_recent_8cat = case_when(
-      aps_recent == "In the past week"                           ~ 1,
-      aps_recent == "In the past month"                          ~ 2,
+      aps_recent == "In the past week" ~ 1,
+      aps_recent == "In the past month" ~ 2,
       aps_recent == "In the past year but more than a month ago" ~ 3,
-      aps_recent == "1-5 years ago"                              ~ 4,
-      aps_recent == "5-10 years ago"                             ~ 5, 
-      aps_recent == "10 or more years ago"                       ~ 6,
-      aps_recent == "Don’t know"                                 ~ 7,
-      aps_recent == "Refused"                                    ~ 9
+      aps_recent == "1-5 years ago" ~ 4,
+      aps_recent == "5-10 years ago" ~ 5,
+      aps_recent == "10 or more years ago" ~ 6,
+      aps_recent == "Don’t know" ~ 7,
+      aps_recent == "Refused" ~ 9
     ),
     aps_recent_8cat_f = factor(
       aps_recent,
       levels = c(
-        "In the past week", "In the past month", 
-        "In the past year but more than a month ago", "1-5 years ago", 
+        "In the past week", "In the past month",
+        "In the past year but more than a month ago", "1-5 years ago",
         "5-10 years ago", "10 or more years ago", "Don’t know", "Refused"
       )
     )
@@ -130,7 +130,7 @@ aps_inv <- aps_inv %>%
 ## Remove raw variables that have recoded forms
 
 ```{r}
-aps_inv <- aps_inv %>% 
+aps_inv <- aps_inv %>%
   select(-c(aps_report, aps_times, aps_first, aps_recent))
 ```
 

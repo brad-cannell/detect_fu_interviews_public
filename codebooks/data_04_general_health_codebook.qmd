@@ -2,11 +2,11 @@
 title: "Create General Health Codebook"
 ---
 ```{r}
-# Load needed packages
+# Load needed packages and functions
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
-library(haven)
 library(readr)
+source("../r/variable_descriptions.R")
 ```
 
 # Purpose of the program
@@ -23,11 +23,11 @@ general_health <- read_rds("../data/cleaned_rds_files/general_health_import.rds"
 # Set column attributes
 
 ```{r}
-#Set the source to "DETECT Follow-up Interview General Health" for all the variables
-general_health_vars <- general_health %>% 
+# Set the source to "DETECT Follow-up Interview General Health" for all the variables
+general_health_vars <- general_health %>%
   names()
 
-for(i in general_health_vars) {
+for (i in general_health_vars) {
   attr(general_health[[i]], "source") <- "DETECT Follow-up Interview General Health"
 }
 ```
@@ -36,918 +36,823 @@ for(i in general_health_vars) {
 ```{r}
 # Add column attributes to all variables
 general_health <- general_health %>%
-    cb_add_col_attributes( 
-      x_primary_key, 
-      description = "Unique record ID used internally by the database"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_created_by, 
-      description = "Person who created the record"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_created_timestamp, 
-      description = "Timestamp when the record was created",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_modified_by, 
-      description = "Person who modified the record"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_modified_timestamp, 
-      description = "Timestamp when the record was modified",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_error_message, 
-      description = "Error message entered by research team"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      medstar_id, 
-      description = "Unique record number in MedStar System"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      name_full, 
-      description = "Full name of older individual"
-    ) %>%
+  cb_add_col_attributes(
+    x_primary_key,
+    description = "Unique record ID used internally by the database."
+  ) %>%
+  cb_add_col_attributes(
+    x_created_by,
+    description = "Person who created the record."
+  ) %>%
+  cb_add_col_attributes(
+    x_created_timestamp,
+    description = "Timestamp when the record was created.",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_modified_by,
+    description = "Person who modified the record."
+  ) %>%
+  cb_add_col_attributes(
+    x_modified_timestamp,
+    description = "Timestamp when the record was modified.",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_error_message,
+    description = "Error message entered by research team."
+  ) %>%
+  cb_add_col_attributes(
+    medstar_id,
+    description = "Unique record number in MedStar System."
+  ) %>%
+  cb_add_col_attributes(
+    name_full,
+    description = "Full name of older individual."
+  ) %>%
+  cb_add_col_attributes(
+    xc_case_id,
+    description = "Calculated by the database from the last 5 characters of the MedstarID"
+  ) %>%
+  cb_add_col_attributes(
+    peg_pain_12cat,
+    description = "PEG_1. What number best describes your pain on average in the past week?",
+    value_labels = c(
+      "No Pain"                        = 0,
+      "1"                              = 1,
+      "2"                              = 2,
+      "3"                              = 3,
+      "4"                              = 4,
+      "5"                              = 5,
+      "6"                              = 6,
+      "7"                              = 7,
+      "8"                              = 8,
+      "9"                              = 9,
+      "Pain as bad as you can imagine" = 10,
+      "Refused"                        = 99
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    peg_enjoyment_12cat,
+    description = "PEG_2. What number best describes how, during the past week, pain has interfered with your enjoyment of life?",
+    value_labels = c(
+      "No Pain"                        = 0,
+      "1"                              = 1,
+      "2"                              = 2,
+      "3"                              = 3,
+      "4"                              = 4,
+      "5"                              = 5,
+      "6"                              = 6,
+      "7"                              = 7,
+      "8"                              = 8,
+      "9"                              = 9,
+      "Pain as bad as you can imagine" = 10,
+      "Refused"                        = 99
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    peg_activity_12cat,
+    description = "PEG_3. What number best describes how, during the past week, pain has interfered with your general activity?",
+    value_labels = c(
+      "0 - No Pain" = 0,
+      "1" = 1,
+      "2" = 2,
+      "3" = 3,
+      "4" = 4,
+      "5" = 5,
+      "6" = 6,
+      "7" = 7,
+      "8" = 8,
+      "9" = 9,
+      "10 - Pain as bad as you can imagine" = 10,
+      "Refused" = 99
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    peg_pain_12cat_f,
+    description = "PEG_1. What number best describes your pain on average in the past week?"
+  ) %>%
+  cb_add_col_attributes(
+    peg_enjoyment_12cat_f,
+    description = "PEG_2. What number best describes how, during the past week, pain has interfered with your enjoyment of life?"
+  ) %>%
+  cb_add_col_attributes(
+    peg_activity_12cat_f,
+    description = "PEG_3. What number best describes how, during the past week, pain has interfered with your general activity?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_general_7cat,
+    description = "MO_2. In general, would you say your health is...",
+    value_labels = c(
+      "Excellent"  = 1,
+      "Very good"  = 2,
+      "Good"       = 3,
+      "Fair"       = 4,
+      "Poor"       = 5,
+      "Don't know" = 7,
+      "Refused"    = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_general_7cat_f,
+    description = "MO_2. In general, would you say your health is..."
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_vigorous_5cat,
+    description = "MO_3. The kinds or amounts of vigorous activities you can do, like lifting heavy objects, running or participating in strenuous sports",
+    value_labels = c(
+      "Yes, limited for more than 3 months" = 1,
+      "Yes, limited for 3 months or less"   = 2,
+      "Not limited at all"                  = 3,
+      "Don’t know"                          = 7,
+      "Refused"                             = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_moderate_5cat,
+    description = "MO_4. The kinds or amounts of moderate activities you can do, like moving a table, carrying groceries, or bowling",
+    value_labels = c(
+      "Yes, limited for more than 3 months" = 1,
+      "Yes, limited for 3 months or less"   = 2,
+      "Not limited at all"                  = 3,
+      "Don’t know"                          = 7,
+      "Refused"                             = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_uphill_5cat,
+    description = "MO_5. Walking uphill or climbing a few flights of stairs",
+    value_labels = c(
+      "Yes, limited for more than 3 months" = 1,
+      "Yes, limited for 3 months or less"   = 2,
+      "Not limited at all"                  = 3,
+      "Don’t know"                          = 7,
+      "Refused"                             = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_bend_5cat,
+    description = "MO_6. Bending, lifting, or stooping",
+    value_labels = c(
+      "Yes, limited for more than 3 months" = 1,
+      "Yes, limited for 3 months or less"   = 2,
+      "Not limited at all"                  = 3,
+      "Don’t know"                          = 7,
+      "Refused"                             = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_block_5cat,
+    description = "MO_7. Walking one block",
+    value_labels = c(
+      "Yes, limited for more than 3 months" = 1,
+      "Yes, limited for 3 months or less"   = 2,
+      "Not limited at all"                  = 3,
+      "Don’t know"                          = 7,
+      "Refused"                             = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_bathe_5cat,
+    description = "MO_8. Eating, dressing, bathing or using the toilet",
+    value_labels = c(
+      "Yes, limited for more than 3 months" = 1,
+      "Yes, limited for 3 months or less"   = 2,
+      "Not limited at all"                  = 3,
+      "Don’t know"                          = 7,
+      "Refused"                             = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_vigorous_5cat_f,
+    description = "MO_3. The kinds or amounts of vigorous activities you can do, like lifting heavy objects, running or participating in strenuous sports"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_moderate_5cat_f,
+    description = "MO_4. The kinds or amounts of moderate activities you can do, like moving a table, carrying groceries, or bowling"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_uphill_5cat_f,
+    description = "MO_5. Walking uphill or climbing a few flights of stairs"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_bend_5cat_f,
+    description = "MO_6. Bending, lifting, or stooping"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_block_5cat_f,
+    description = "MO_7. Walking one block"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_bathe_5cat_f,
+    description = "MO_8. Eating, dressing, bathing or using the toilet"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_4weeks_pain_8cat,
+    description = "MO_1. How much bodily pain have you had during the past 4 weeks?",
+    value_labels = c(
+      "None"        = 0,
+      "Very mild"   = 1,
+      "Mild"        = 2,
+      "Moderate"    = 3,
+      "Severe"      = 4,
+      "Very Severe" = 5,
+      "Don't know"  = 7,
+      "Refused"     = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_4weeks_pain_8cat_f,
+    description = "MO_1. How much bodily pain have you had during the past 4 weeks?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_keep_5cat,
+    description = "MO_9. Does your health keep you from working at a job, doing work around the house, or going to school?",
+    value_labels = c(
+      "Yes, for more than 3 months" = 1,
+      "Yes, for 3 months or less"   = 2,
+      "No"                          = 3,
+      "Don’t know"                  = 7,
+      "Refused"                     = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_unable_5cat,
+    description = "MO_10. Have you been unable to do certain kinds or amounts of work, housework, or schoolwork because of your health?",
+    value_labels = c(
+      "Yes, for more than 3 months" = 1,
+      "Yes, for 3 months or less"   = 2,
+      "No"                          = 3,
+      "Don’t know"                  = 7,
+      "Refused"                     = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_keep_5cat_f,
+    description = "MO_9. Does your health keep you from working at a job, doing work around the house, or going to school?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_health_unable_5cat_f,
+    description = "MO_10. Have you been unable to do certain kinds or amounts of work, housework, or schoolwork because of your health?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_social_7cat,
+    description = "MO_11. How much of the time during the past month has your health limited your social activities (like visiting with friends or close relatives)?",
+    value_labels = c(
+      "All of the time"      = 1,
+      "Most of the time"     = 2,
+      "Some of the time"     = 3,
+      "A little of the time" = 4,
+      "None of the time"     = 5,
+      "Don’t know"           = 7,
+      "Refused"              = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_nervous_7cat,
+    description = "MO_12. How much of the time, during the past month, have you been a very nervous person?",
+    value_labels = c(
+      "All of the time"      = 1,
+      "Most of the time"     = 2,
+      "Some of the time"     = 3,
+      "A little of the time" = 4,
+      "None of the time"     = 5,
+      "Don’t know"           = 7,
+      "Refused"              = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_calm_7cat,
+    description = "MO_13. During the past month, how much of the time have you felt calm and peaceful?",
+    value_labels = c(
+      "All of the time"      = 1,
+      "Most of the time"     = 2,
+      "Some of the time"     = 3,
+      "A little of the time" = 4,
+      "None of the time"     = 5,
+      "Don’t know"           = 7,
+      "Refused"              = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_blue_7cat,
+    description = "MO_14. How much of the time, during the past month, have you felt downhearted and blue?",
+    value_labels = c(
+      "All of the time"      = 1,
+      "Most of the time"     = 2,
+      "Some of the time"     = 3,
+      "A little of the time" = 4,
+      "None of the time"     = 5,
+      "Don’t know"           = 7,
+      "Refused"              = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_happy_7cat,
+    description = "MO_15. During the past month, how much of the time have you been a happy person?",
+    value_labels = c(
+      "All of the time"      = 1,
+      "Most of the time"     = 2,
+      "Some of the time"     = 3,
+      "A little of the time" = 4,
+      "None of the time"     = 5,
+      "Don’t know"           = 7,
+      "Refused"              = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_dumps_7cat,
+    description = "MO_16. How often, during the past month, have you felt so down in the dumps that nothing could cheer you up?",
+    value_labels = c(
+      "All of the time"      = 1,
+      "Most of the time"     = 2,
+      "Some of the time"     = 3,
+      "A little of the time" = 4,
+      "None of the time"     = 5,
+      "Don’t know"           = 7,
+      "Refused"              = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_social_7cat_f,
+    description = "MO_11. How much of the time during the past month has your health limited your social activities (like visiting with friends or close relatives)?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_nervous_7cat_f,
+    description = "MO_12. How much of the time, during the past month, have you been a very nervous person?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_calm_7cat_f,
+    description = "MO_13. During the past month, how much of the time have you felt calm and peaceful?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_blue_7cat_f,
+    description = "MO_14. How much of the time, during the past month, have you felt downhearted and blue?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_happy_7cat_f,
+    description = "MO_15. During the past month, how much of the time have you been a happy person?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_month_dumps_7cat_f,
+    description = "MO_16. How often, during the past month, have you felt so down in the dumps that nothing could cheer you up?"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_tf_ill_6cat,
+    description = "MO_17. I am somewhat ill.",
+    value_labels = c(
+      "Definitely true"  = 1,
+      "Mostly true"      = 2,
+      "Don't know"       = 3,
+      "Mostly false"     = 4,
+      "Definitely false" = 5,
+      "Refused"          = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_tf_anybody_6cat,
+    description = "MO_18. I am as healthy as anybody I know.",
+    value_labels = c(
+      "Definitely true"  = 1,
+      "Mostly true"      = 2,
+      "Don't know"       = 3,
+      "Mostly false"     = 4,
+      "Definitely false" = 5,
+      "Refused"          = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_tf_health_6cat,
+    description = "MO_19. My health is excellent.",
+    value_labels = c(
+      "Definitely true"  = 1,
+      "Mostly true"      = 2,
+      "Don't know"       = 3,
+      "Mostly false"     = 4,
+      "Definitely false" = 5,
+      "Refused"          = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_tf_bad_6cat,
+    description = "MO_20. I have been feeling bad lately",
+    value_labels = c(
+      "Definitely true"  = 1,
+      "Mostly true"      = 2,
+      "Don't know"       = 3,
+      "Mostly false"     = 4,
+      "Definitely false" = 5,
+      "Refused"          = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_tf_ill_6cat_f,
+    description = "MO_17. I am somewhat ill"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_tf_anybody_6cat_f,
+    description = "MO_18. I am as healthy as anybody I know"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_tf_health_6cat_f,
+    description = "MO_19. My health is excellent"
+  ) %>%
+  cb_add_col_attributes(
+    outcomes_tf_bad_6cat_f,
+    description = "MO_20. I have been feeling bad lately"
+  ) %>%
+  cb_add_col_attributes(
+    depres_satisfied_2cat,
+    description = "GD_1. Are you basically satisfied with your life?",
+    value_labels = c(
+      "Yes"  = 0,
+      "No"   = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_satisfied_2cat_f,
+    description = "GD_1. Are you basically satisfied with your life?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_hopeless_2cat,
+    description = "GD_2. Do you feel that your situation is hopeless?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_hopeless_2cat_f,
+    description = "GD_2. Do you feel that your situation is hopeless?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_better_2cat,
+    description = "GD_3. Do you think that most people are better off than you are?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_better_2cat_f,
+    description = "GD_3. Do you think that most people are better off than you are?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_activities_2cat,
+    description = "GD_4. Have you dropped many of your activities and interests",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_activities_2cat_f,
+    description = "GD_4. Have you dropped many of your activities and interests"
+  ) %>%
+  cb_add_col_attributes(
+    depres_empty_2cat,
+    description = "GD_5. Do you feel that your life is empty?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_empty_2cat_f,
+    description = "GD_5. Do you feel that your life is empty?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_bored_2cat,
+    description = "GD_6. Do you often get bored?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_bored_2cat_f,
+    description = "GD_6. Do you often get bored?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_spirits_2cat,
+    description = "GD_7. Are you in good spirits most of the time?",
+    value_labels = c(
+      "Yes"  = 0,
+      "No"   = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_spirits_2cat_f,
+    description = "GD_7. Are you in good spirits most of the time?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_afraid_2cat,
+    description = "GD_8. Are you afraid that something bad is going to happen to you?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_afraid_2cat_f,
+    description = "GD_8. Are you afraid that something bad is going to happen to you?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_happy_2cat,
+    description = "GD_9. Do you feel happy most of the time?",
+    value_labels = c(
+      "Yes"  = 0,
+      "No"   = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_happy_2cat_f,
+    description = "GD_9. Do you feel happy most of the time?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_helpless_2cat,
+    description = "GD_10. Do you often feel helpless?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_helpless_2cat_f,
+    description = "GD_10. Do you often feel helpless?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_home_2cat,
+    description = "GD_11. Do you prefer to stay at home, rather than going out and doing things?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_home_2cat_f,
+    description = "GD_11. Do you prefer to stay at home, rather than going out and doing things?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_memory_2cat,
+    description = "GD_12. Do you feel that you have more problems with your memory than most?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_memory_2cat_f,
+    description = "GD_12. Do you feel that you have more problems with your memory than most?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_alive_2cat,
+    description = "GD_13. Do you think it is wonderful to be alive now?",
+    value_labels = c(
+      "Yes"  = 0,
+      "No"   = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_alive_2cat_f,
+    description = "GD_13. Do you think it is wonderful to be alive now?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_worthless_2cat,
+    description = "GD_14. Do you feel worthless the way you are now?",
+    value_labels = c(
+      "No"  = 0,
+      "Yes" = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_worthless_2cat_f,
+    description = "GD_14. Do you feel worthless the way you are now?"
+  ) %>%
+  cb_add_col_attributes(
+    depres_energy_2cat,
+    description = "GD_15. Do you feel full of energy?",
+    value_labels = c(
+      "Yes"  = 0,
+      "No"   = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    depres_energy_2cat_f,
+    description = "GD_15. Do you feel full of energy?"
+  ) %>%
+  cb_add_col_attributes(
+    ls_lack_companionship_4cat,
+    description = "LS_1. First, how often do you feel that you lack companionship?",
+    value_labels = c(
+      "Hardly ever"      = 1,
+      "Some of the time" = 2,
+      "Often"            = 3,
+      "Refused"          = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    ls_feel_left_out_4cat,
+    description = "LS_2. How often do you feel left out?",
+    value_labels = c(
+      "Hardly ever"      = 1,
+      "Some of the time" = 2,
+      "Often"            = 3,
+      "Refused"          = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    ls_feel_isolated_4cat,
+    description = "LS_3. How often do you feel isolated from others?",
+    value_labels = c(
+      "Hardly ever"      = 1,
+      "Some of the time" = 2,
+      "Often"            = 3,
+      "Refused"          = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    ls_lack_companionship_4cat_f,
+    description = "LS_1. First, how often do you feel that you lack companionship?"
+  ) %>%
+  cb_add_col_attributes(
+    ls_feel_left_out_4cat_f,
+    description = "LS_2. How often do you feel left out?"
+  ) %>%
+  cb_add_col_attributes(
+    ls_feel_isolated_4cat_f,
+    description = "LS_3. How often do you feel isolated from others?"
+  ) %>%
+  cb_add_col_attributes(
+    nesarc_drink_4cat,
+    description = "NC_1. In your entire life, have you had at least 1 drink of any kind of alcohol, not counting small tastes or sips?",
+    skip_pattern = "If 'Yes', go to Section 3. All other answers, go to NC_2",
+    value_labels = c(
+      "Yes"        = 1,
+      "No"         = 2,
+      "Don't know" = 3,
+      "Refused"    = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    nesarc_months_4cat,
+    description = "NC_2. During the last 12 months, did you have at least 1 drink of any kind of alcohol?",
+    skip_pattern = "If 'Yes', go to Section 3. All other answers, go to AC_1",
+    value_labels = c(
+      "Yes"        = 1,
+      "No"         = 2,
+      "Don't know" = 3,
+      "Refused"    = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    nesarc_drink_4cat_f,
+    description = "NC_1. In your entire life, have you had at least 1 drink of any kind of alcohol, not counting small tastes or sips?",
+    skip_pattern = "If 'Yes', go to Section 3. All other answers, go to NC_2"
+  ) %>%
+  cb_add_col_attributes(
+    nesarc_months_4cat_f,
+    description = "NC_2. During the last 12 months, did you have at least 1 drink of any kind of alcohol?",
+    skip_pattern = "If 'Yes', go to Section 3. All other answers, go to AC_1"
+  ) %>%
+  cb_add_col_attributes(
+    auditc_drink_7cat,
+    description = "AC_1. How often do you have a drink containing alcohol?",
+    skip_pattern = "If 'Never', go to Section 3. All other answers, go to AC_2",
+    value_labels = c(
+      "Never"                  = 0,
+      "Monthly or less"        = 1,
+      "2-4 times a month"      = 2,
+      "2-3 times a week"       = 3,
+      "4 or more times a week" = 4,
+      "Don't know"             = 7,
+      "Refused"                = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    auditc_drink_7cat_f,
+    description = "AC_1. How often do you have a drink containing alcohol?",
+    skip_pattern = "If 'Never', go to Section 3. All other answers, go to AC_2"
+  ) %>%
+  cb_add_col_attributes(
+    auditc_day_7cat,
+    description = "AC_2. How many standard drinks containing alcohol do you have on a typical day?",
+    value_labels = c(
+      "1 or 2"     = 1,
+      "3 or 4"     = 2,
+      "5 or 6"     = 3,
+      "7 to 9"     = 4,
+      "10 or more" = 5,
+      "Don't know" = 7,
+      "Refused"    = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    auditc_day_7cat_f,
+    description = "AC_2. How many standard drinks containing alcohol do you have on a typical day?"
+  ) %>%
+  cb_add_col_attributes(
+    auditc_five_7cat,
+    description = "AC_3. How often do you have five or more drinks on one occasion?",
+    value_labels = c(
+      "Never"                 = 0,
+      "Less than monthly"     = 1,
+      "Monthly"               = 2,
+      "Weekly"                = 3,
+      "Daily or almost daily" = 4,
+      "Don't know"            = 7,
+      "Refused"               = 9
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    auditc_five_7cat_f,
+    description = "AC_5. How often do you have five or more drinks on one occasion?"
+  ) %>%
+  cb_add_col_attributes(
+    x_record_month,
+    description = "Month record was created."
+  ) %>%
+  cb_add_col_attributes(
+    x_record_year,
+    description = "Year record was created."
+  ) %>%
+  cb_add_col_attributes(
+    x_record_status,
+    description = "Status of the record as determined by research team."
+  ) %>%
+  cb_add_col_attributes(
+    x_record_comment,
+    description = "Comments by interviewer."
+  )
+```
 
-    cb_add_col_attributes( 
-      xc_case_id, 
-      description = "Calculated by the database from the last 5 characters of the MedstarID"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      peg_pain_12cat, 
-      description  = "PEG_1. What number best describes your pain on average in the past week?",
-      value_labels = c(
-        "No Pain"                        = 0, 
-        "1"                              = 1, 
-        "2"                              = 2, 
-        "3"                              = 3,
-        "4"                              = 4,
-        "5"                              = 5,
-        "6"                              = 6,
-        "7"                              = 7,
-        "8"                              = 8,
-        "9"                              = 9,
-        "Pain as bad as you can imagine" = 10,
-        "Refused"                        = 99
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      peg_enjoyment_12cat, 
-      description  = "PEG_2. What number best describes how, during the past week, pain has interfered with your enjoyment of life?",
-      value_labels = c(
-        "No Pain"                        = 0, 
-        "1"                              = 1, 
-        "2"                              = 2, 
-        "3"                              = 3,
-        "4"                              = 4,
-        "5"                              = 5,
-        "6"                              = 6,
-        "7"                              = 7,
-        "8"                              = 8,
-        "9"                              = 9,
-        "Pain as bad as you can imagine" = 10,
-        "Refused"                        = 99
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      peg_activity_12cat, 
-      description  = "PEG_3. What number best describes how, during the past week, pain has interfered with your general activity?",
-      value_labels = c(
-        "0 - No Pain"                    = 0, 
-        "1"                              = 1, 
-        "2"                              = 2, 
-        "3"                              = 3,
-        "4"                              = 4,
-        "5"                              = 5,
-        "6"                              = 6,
-        "7"                              = 7,
-        "8"                              = 8,
-        "9"                              = 9,
-        "10 - Pain as bad as you can imagine" = 10,
-        "Refused"                             = 99
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      peg_pain_12cat_f, 
-      description  = "PEG_1. What number best describes your pain on average in the past week?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      peg_enjoyment_12cat_f, 
-      description  = "PEG_2. What number best describes how, during the past week, pain has interfered with your enjoyment of life?"
-    ) %>%
+# Create a data frame containing the column names and their descriptions using the df_descriptions function
 
-    cb_add_col_attributes( 
-      peg_activity_12cat_f, 
-      description  = "PEG_3. What number best describes how, during the past week, pain has interfered with your general activity?"
-    ) %>%
+```{r}
+gh_desc <- var_descriptions(general_health)
+```
 
-    cb_add_col_attributes(
-      outcomes_health_general_7cat, 
-      description = "MO_2. In general, would you say your health is...",
-      value_labels = c(
-        "Excellent"  = 1, 
-        "Very good"  = 2, 
-        "Good"       = 3, 
-        "Fair"       = 4, 
-        "Poor"       = 5,
-        "Don't know" = 7,
-        "Refused"    = 9
-        ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_general_7cat_f, 
-      description = "MO_2. In general, would you say your health is..."
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_health_vigorous_5cat, 
-      description = "MO_3. The kinds or amounts of vigorous activities you can do, like lifting heavy objects, running or participating in strenuous sports",
-      value_labels = c(
-        "Yes, limited for more than 3 months" = 1, 
-        "Yes, limited for 3 months or less"   = 2, 
-        "Not limited at all"                  = 3, 
-        "Don’t know"                          = 7,
-        "Refused"                             = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_moderate_5cat, 
-      description = "MO_4. The kinds or amounts of moderate activities you can do, like moving a table, carrying groceries, or bowling",
-      value_labels = c(
-        "Yes, limited for more than 3 months" = 1, 
-        "Yes, limited for 3 months or less"   = 2, 
-        "Not limited at all"                  = 3, 
-        "Don’t know"                          = 7,
-        "Refused"                             = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_uphill_5cat, 
-      description = "MO_5. Walking uphill or climbing a few flights of stairs",
-      value_labels = c(
-        "Yes, limited for more than 3 months" = 1, 
-        "Yes, limited for 3 months or less"   = 2, 
-        "Not limited at all"                  = 3, 
-        "Don’t know"                          = 7,
-        "Refused"                             = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_bend_5cat, 
-      description = "MO_6. Bending, lifting, or stooping",
-      value_labels = c(
-        "Yes, limited for more than 3 months" = 1, 
-        "Yes, limited for 3 months or less"   = 2, 
-        "Not limited at all"                  = 3, 
-        "Don’t know"                          = 7,
-        "Refused"                             = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_block_5cat, 
-      description = "MO_7. Walking one block",
-      value_labels = c(
-        "Yes, limited for more than 3 months" = 1, 
-        "Yes, limited for 3 months or less"   = 2, 
-        "Not limited at all"                  = 3, 
-        "Don’t know"                          = 7,
-        "Refused"                             = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_bathe_5cat, 
-      description = "MO_8. Eating, dressing, bathing or using the toilet",
-      value_labels = c(
-        "Yes, limited for more than 3 months" = 1, 
-        "Yes, limited for 3 months or less"   = 2, 
-        "Not limited at all"                  = 3, 
-        "Don’t know"                          = 7,
-        "Refused"                             = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_vigorous_5cat_f, 
-      description = "MO_3. The kinds or amounts of vigorous activities you can do, like lifting heavy objects, running or participating in strenuous sports"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_moderate_5cat_f, 
-      description = "MO_4. The kinds or amounts of moderate activities you can do, like moving a table, carrying groceries, or bowling"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_uphill_5cat_f, 
-      description = "MO_5. Walking uphill or climbing a few flights of stairs"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_bend_5cat_f, 
-      description = "MO_6. Bending, lifting, or stooping"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_block_5cat_f, 
-      description = "MO_7. Walking one block"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_bathe_5cat_f, 
-      description = "MO_8. Eating, dressing, bathing or using the toilet"
-    ) %>%
-  
-    cb_add_col_attributes(
-      outcomes_4weeks_pain_8cat, 
-      description = "MO_1. How much bodily pain have you had during the past 4 weeks?",
-      value_labels = c(
-        "None"        = 0, 
-        "Very mild"   = 1, 
-        "Mild"        = 2, 
-        "Moderate"    = 3, 
-        "Severe"      = 4,
-        "Very Severe" = 5,
-        "Don't know"  = 7,
-        "Refused"     = 9
-        ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_4weeks_pain_8cat_f, 
-      description = "MO_1. How much bodily pain have you had during the past 4 weeks?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_keep_5cat, 
-      description = "Does your health keep you from working at a job, doing work around the house, or going to school?",
-      value_labels = c(
-        "Yes, for more than 3 months" = 1, 
-        "Yes, for 3 months or less"   = 2, 
-        "No"                          = 3, 
-        "Don’t know"                  = 7,
-        "Refused"                     = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
- 
-    cb_add_col_attributes( 
-      outcomes_health_unable_5cat, 
-      description = "Have you been unable to do certain kinds or amounts of work, housework, or schoolwork because of your health?",
-      value_labels = c(
-        "Yes, for more than 3 months" = 1, 
-        "Yes, for 3 months or less"   = 2, 
-        "No"                          = 3, 
-        "Don’t know"                  = 7,
-        "Refused"                     = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_health_keep_5cat_f, 
-      description = "Does your health keep you from working at a job, doing work around the house, or going to school?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_health_unable_5cat_f, 
-      description = "Have you been unable to do certain kinds or amounts of work, housework, or schoolwork because of your health?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_month_social_7cat, 
-      description = "How much of the time during the past month has your health limited your social activities (like visiting with friends or close relatives)?",
-      value_labels = c(
-        "All of the time"      = 1, 
-        "Most of the time"     = 2, 
-        "Some of the time"     = 3, 
-        "A little of the time" = 4,
-        "None of the time"     = 5,
-        "Don’t know"           = 7,
-        "Refused"              = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_month_nervous_7cat, 
-      description = "How much of the time, during the past month, have you been a very nervous person?",
-      value_labels = c(
-        "All of the time"      = 1, 
-        "Most of the time"     = 2, 
-        "Some of the time"     = 3, 
-        "A little of the time" = 4,
-        "None of the time"     = 5,
-        "Don’t know"           = 7,
-        "Refused"              = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
- 
-    cb_add_col_attributes( 
-      outcomes_month_calm_7cat, 
-      description = "During the past month, how much of the time have you felt calm and peaceful?",
-      value_labels = c(
-        "All of the time"      = 1, 
-        "Most of the time"     = 2, 
-        "Some of the time"     = 3, 
-        "A little of the time" = 4,
-        "None of the time"     = 5,
-        "Don’t know"           = 7,
-        "Refused"              = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_month_blue_7cat, 
-      description = "How much of the time, during the past month, have you felt downhearted and blue?",
-      value_labels = c(
-        "All of the time"      = 1, 
-        "Most of the time"     = 2, 
-        "Some of the time"     = 3, 
-        "A little of the time" = 4,
-        "None of the time"     = 5,
-        "Don’t know"           = 7,
-        "Refused"              = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_month_happy_7cat, 
-      description = "During the past month, how much of the time have you been a happy person?",
-      value_labels = c(
-        "All of the time"      = 1, 
-        "Most of the time"     = 2, 
-        "Some of the time"     = 3, 
-        "A little of the time" = 4,
-        "None of the time"     = 5,
-        "Don’t know"           = 7,
-        "Refused"              = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_month_dumps_7cat, 
-      description = "How often, during the past month, have you felt so down in the dumps that nothing could cheer you up?",
-      value_labels = c(
-        "All of the time"      = 1, 
-        "Most of the time"     = 2, 
-        "Some of the time"     = 3, 
-        "A little of the time" = 4,
-        "None of the time"     = 5,
-        "Don’t know"           = 7,
-        "Refused"              = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_month_social_7cat_f, 
-      description = "How much of the time during the past month has your health limited your social activities (like visiting with friends or close relatives)?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_month_nervous_7cat_f, 
-      description = "How much of the time, during the past month, have you been a very nervous person?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_month_calm_7cat_f, 
-      description = "During the past month, how much of the time have you felt calm and peaceful?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_month_blue_7cat_f, 
-      description = "How much of the time, during the past month, have you felt downhearted and blue?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_month_happy_7cat_f, 
-      description = "During the past month, how much of the time have you been a happy person?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_month_dumps_7cat_f, 
-      description = "How often, during the past month, have you felt so down in the dumps that nothing could cheer you up?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_tf_ill_6cat, 
-      description = "I am somewhat ill",
-      value_labels = c(
-        "Definitely true"  = 1, 
-        "Mostly true"      = 2, 
-        "Don't know"       = 3, 
-        "Mostly false"     = 4,
-        "Definitely false" = 5,
-        "Refused"          = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_tf_anybody_6cat, 
-      description = "I am as healthy as anybody I know",
-      value_labels = c(
-        "Definitely true"  = 1, 
-        "Mostly true"      = 2, 
-        "Don't know"       = 3, 
-        "Mostly false"     = 4,
-        "Definitely false" = 5,
-        "Refused"          = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_tf_health_6cat, 
-      description = "My health is excellent",
-      value_labels = c(
-        "Definitely true"  = 1, 
-        "Mostly true"      = 2, 
-        "Don't know"       = 3, 
-        "Mostly false"     = 4,
-        "Definitely false" = 5,
-        "Refused"          = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_tf_bad_6cat, 
-      description = "I have been feeling bad lately",
-      value_labels = c(
-        "Definitely true"  = 1, 
-        "Mostly true"      = 2, 
-        "Don't know"       = 3, 
-        "Mostly false"     = 4,
-        "Definitely false" = 5,
-        "Refused"          = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_tf_ill_6cat_f, 
-      description = "I am somewhat ill"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      outcomes_tf_anybody_6cat_f, 
-      description = "I am as healthy as anybody I know"
-    ) %>%
- 
-    cb_add_col_attributes( 
-      outcomes_tf_health_6cat_f, 
-      description = "My health is excellent"
-    ) %>%
-
-    cb_add_col_attributes( 
-      outcomes_tf_bad_6cat_f, 
-      description = "I have been feeling bad lately"
-    ) %>%
-
-    cb_add_col_attributes( 
-      depres_satisfied_2cat, 
-      description = "Are you basically satisfied with your life?",
-      value_labels = c(
-        "Yes"  = 0, 
-        "No"   = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_satisfied_2cat_f, 
-      description = "Are you basically satisfied with your life?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      depres_hopeless_2cat, 
-      description = "Do you feel that your situation is hopeless?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-
-    cb_add_col_attributes( 
-      depres_hopeless_2cat_f, 
-      description = "Do you feel that your situation is hopeless?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      depres_better_2cat, 
-      description = "Do you think that most people are better off than you are?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_better_2cat_f, 
-      description = "Do you think that most people are better off than you are?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_activities_2cat, 
-      description = "Have you dropped many of your activities and interests",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_activities_2cat_f, 
-      description = "Have you dropped many of your activities and interests"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_empty_2cat, 
-      description = "Do you feel that your life is empty?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_empty_2cat_f, 
-      description = "Do you feel that your life is empty?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_bored_2cat, 
-      description = "Do you often get bored?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_bored_2cat_f, 
-      description = "Do you often get bored?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_spirits_2cat, 
-      description = "Are you in good spirits most of the time?",
-      value_labels = c(
-        "Yes"  = 0, 
-        "No"   = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_spirits_2cat_f, 
-      description = "Are you in good spirits most of the time?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_afraid_2cat, 
-      description = "Are you afraid that something bad is going to happen to you?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_afraid_2cat_f, 
-      description = "Are you afraid that something bad is going to happen to you?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_happy_2cat, 
-      description = "Do you feel happy most of the time?",
-      value_labels = c(
-        "Yes"  = 0, 
-        "No"   = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_happy_2cat_f, 
-      description = "Do you feel happy most of the time?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_helpless_2cat, 
-      description = "Do you often feel helpless?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_helpless_2cat_f, 
-      description = "Do you often feel helpless?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_home_2cat, 
-      description = "Do you prefer to stay at home, rather than going out and doing things?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_home_2cat_f, 
-      description = "Do you prefer to stay at home, rather than going out and doing things?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_memory_2cat, 
-      description = "Do you feel that you have more problems with your memory than most?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_memory_2cat_f, 
-      description = "Do you feel that you have more problems with your memory than most?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_alive_2cat, 
-      description = "Do you think it is wonderful to be alive now?",
-      value_labels = c(
-        "Yes"  = 0, 
-        "No"   = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_alive_2cat_f, 
-      description = "Do you think it is wonderful to be alive now?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_worthless_2cat, 
-      description = "Do you feel worthless the way you are now?",
-      value_labels = c(
-        "No"  = 0, 
-        "Yes" = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_worthless_2cat_f, 
-      description = "Do you feel worthless the way you are now?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_energy_2cat, 
-      description = "Do you feel full of energy?",
-      value_labels = c(
-        "Yes"  = 0, 
-        "No"   = 1 
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      depres_energy_2cat_f, 
-      description = "Do you feel full of energy?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      ls_lack_companionship_4cat, 
-      description = "First, how often do you feel that you lack companionship?",
-      value_labels = c(
-        "Hardly ever"      = 1, 
-        "Some of the time" = 2,
-        "Often"            = 3,
-        "Refused"          = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-
-    cb_add_col_attributes( 
-      ls_feel_left_out_4cat, 
-      description = "How often do you feel left out?",
-      value_labels = c(
-        "Hardly ever"      = 1, 
-        "Some of the time" = 2,
-        "Often"            = 3,
-        "Refused"          = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      ls_feel_isolated_4cat, 
-      description = "How often do you feel isolated from others?",
-      value_labels = c(
-        "Hardly ever"      = 1, 
-        "Some of the time" = 2,
-        "Often"            = 3,
-        "Refused"          = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      ls_lack_companionship_4cat_f, 
-      description = "First, how often do you feel that you lack companionship?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      ls_feel_left_out_4cat_f, 
-      description = "How often do you feel left out?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      ls_feel_isolated_4cat_f, 
-      description = "How often do you feel isolated from others?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      nesarc_drink_4cat, 
-      description = "In your entire life, have you had at least 1 drink of any kind of alcohol, not counting small tastes or sips?",
-      skip_pattern = "If 'Yes', go to Section 3. All other answers, go to NC_2",
-      value_labels = c(
-        "Yes"        = 1, 
-        "No"         = 2,
-        "Don't know" = 3,
-        "Refused"    = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      nesarc_months_4cat, 
-      description = "During the last 12 months, did you have at least 1 drink of any kind of alcohol?",
-      skip_pattern = "If 'Yes', go to Section 3. All other answers, go to AC_1",
-      value_labels = c(
-        "Yes"        = 1, 
-        "No"         = 2,
-        "Don't know" = 3,
-        "Refused"    = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      nesarc_drink_4cat_f, 
-      description = "In your entire life, have you had at least 1 drink of any kind of alcohol, not counting small tastes or sips?",
-      skip_pattern = "If 'Yes', go to Section 3. All other answers, go to NC_2"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      nesarc_months_4cat_f, 
-      description = "During the last 12 months, did you have at least 1 drink of any kind of alcohol?",
-      skip_pattern = "If 'Yes', go to Section 3. All other answers, go to AC_1"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      auditc_drink_7cat, 
-      description = "How often do you have a drink containing alcohol?",
-      skip_pattern = "If 'Never', go to Section 3. All other answers, go to AC_2",
-      value_labels = c(
-        "Never"                  = 0, 
-        "Monthly or less"        = 1,
-        "2-4 times a month"      = 2,
-        "2-3 times a week"       = 3,
-        "4 or more times a week" = 4,
-        "Don't know"             = 7,
-        "Refused"                = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      auditc_drink_7cat_f, 
-      description = "How often do you have a drink containing alcohol?",
-      skip_pattern = "If 'Never', go to Section 3. All other answers, go to AC_2"
-    ) %>%
-
-    cb_add_col_attributes(
-      auditc_day_7cat, 
-      description = "How many standard drinks containing alcohol do you have on a typical day?",
-      value_labels = c(
-        "1 or 2"     = 1, 
-        "3 or 4"     = 2,
-        "5 or 6"     = 3,
-        "7 to 9"     = 4,
-        "10 or more" = 5,
-        "Don't know" = 7,
-        "Refused"    = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      auditc_day_7cat_f, 
-      description = "How many standard drinks containing alcohol do you have on a typical day?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      auditc_five_7cat, 
-      description = "How often do you have five or more drinks on one occasion?",
-      value_labels = c(
-        "Never"                 = 0, 
-        "Less than monthly"     = 1,
-        "Monthly"               = 2,
-        "Weekly"                = 3,
-        "Daily or almost daily" = 4,
-        "Don't know"            = 7,
-        "Refused"               = 9
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      auditc_five_7cat_f, 
-      description = "How often do you have five or more drinks on one occasion?"
-    )%>%
-
-      cb_add_col_attributes( 
-      x_record_month, 
-      description = "Month record was created"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_year, 
-      description = "Year record was created"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_status, 
-      description = "Status of the record as determined by research team"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_comment, 
-      description = "Comments by interviewer"
-    )
-  
+## Save as rds file
+```{r}
+write_rds(gh_desc, "../codebooks/variable_descriptions/general_health_var_desc.rds")
 ```
 
 # Exclude summary stats for certain variables in word doc
 
 ```{r}
-#Create a vector of variables to exclude summary statistics from
+# Create a vector of variables to exclude summary statistics from
 no_stats <- general_health %>%
   select(
     c(matches("^(x|xc)_"), matches("^(name)"), medstar_id)
   )
 
 no_stats_vars <- colnames(no_stats)
-
 ```
 
 # Pass data frame to the codebook() function
@@ -958,7 +863,8 @@ general_health_codebook <- codebook(
   df = general_health,
   title = "General Health Dataset",
   description = "Data collected during DETECT follow-up interviews regarding the patient's general health and safety",
-  no_summary_stats = no_stats_vars)
+  no_summary_stats = no_stats_vars
+)
 ```
 
 ```{r}

@@ -36,9 +36,9 @@ consent <- consent %>%
   mutate(
     consent_given = case_when(
       x_record_status == "Consent received/Participating" ~ 1,
-      TRUE                                                ~ 0
-      )
+      TRUE ~ 0
     )
+  )
 ```
 
 
@@ -51,5 +51,4 @@ dim(consent) # 1013 17
 
 ```{r}
 write_rds(consent, "../data/cleaned_rds_files/consent_import.rds")
-
 ```
