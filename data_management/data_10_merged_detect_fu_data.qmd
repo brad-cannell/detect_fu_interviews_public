@@ -25,7 +25,6 @@ par <- read_rds("../data/unique_id_creation/participant_unique_id.rds")
 sfr <- read_rds("../data/cleaned_rds_files/self_report_import.rds")
 soc <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.rds")
 con <- read_rds("../data/cleaned_rds_files/consent_import.rds")
-
 ```
 
 # Summarize the Medstar ID commonalities and differences across all the datasets
@@ -35,12 +34,11 @@ con <- read_rds("../data/cleaned_rds_files/consent_import.rds")
 vec_list <- list(aps_id = aps, cls_id = cls, glh_id = glh, lpa_id = lpa, obs_id = obs, par_id = par, sfr_id = sfr, soc_id = soc, con_id = con)
 
 medstar_id_lists <- lapply(vec_list, function(vec) {
- vec_ID <-  unique(vec$medstar_id)
+  vec_ID <- unique(vec$medstar_id)
 })
 
 # Push the vectors to the Global environment
 list2env(medstar_id_lists, envir = .GlobalEnv)
-
 ```
 
 ## Intersect of MedStar IDS across all DETECT FU datasets
@@ -54,30 +52,35 @@ cat("There are", length(intersect_detect), "Medstar IDs that are present in all 
 # Create a function that checks the presence of the values of one vector in another reference vector
 common_id <- function(vec) {
   #  List of vectors to check each vector against
-  vec_ref_list <- list(aps_id = aps_id, cls_id = cls_id, glh_id = glh_id, lpa_id = lpa_id, obs_id = obs_id, 
-                     par_id = par_id, sfr_id = sfr_id, soc_id = soc_id, con_id = con_id)
-  
+  vec_ref_list <- list(
+    aps_id = aps_id, cls_id = cls_id, glh_id = glh_id, lpa_id = lpa_id, obs_id = obs_id,
+    par_id = par_id, sfr_id = sfr_id, soc_id = soc_id, con_id = con_id
+  )
+
   # Function for comparing 2 vectors
   compare_vec <- function(vec, ref_vec) {
-    comparison_column <- full_join(data.frame(key = ref_vec, ref_vec), 
-              data.frame(key = vec, vec), by ="key") %>%
-    select(-key) %>% 
+    comparison_column <- full_join(data.frame(key = ref_vec, ref_vec),
+      data.frame(key = vec, vec),
+      by = "key"
+    ) %>%
+      select(-key) %>%
       mutate(
         in_both = case_when(
           is.na(ref_vec) == T & is.na(vec) == F ~ "Only in this dataset",
           is.na(ref_vec) == F & is.na(vec) == T ~ "Only in dataset being compared to",
-          ref_vec == vec                        ~ "In both"    
+          ref_vec == vec ~ "In both"
         ),
         in_both = factor(in_both,
-                         levels = c("In both", "Only in this dataset", "Only in dataset being compared to"))
+          levels = c("In both", "Only in this dataset", "Only in dataset being compared to")
+        )
       )
     tab <- as.data.frame(table(comparison_column$in_both))
     tab
   }
-  
+
   # Apply the compare_vec function over a list of reference vectors.
   output <- lapply(vec_ref_list, compare_vec, vec = vec) %>% as.data.frame()
-  
+
   return(output)
 }
 ```
@@ -160,7 +163,7 @@ par_merge <- par %>% select(-c(exact_match_id))
 
 
 ```{r}
-# APS Investigations 
+# APS Investigations
 aps_merge <- aps %>% select(-c(x_primary_key, name_full, xc_case_id))
 ```
 
@@ -201,23 +204,17 @@ con_merge <- con %>% select(-c(x_primary_key, name_full))
 
 ```{r}
 # Merge the data and add suffixes to the column names to indicate the data sets of origin
-detect_fu_merge <-lst(par = par_merge, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpa = lpa_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge, con = con_merge) %>%
+detect_fu_merge <- lst(par = par_merge, aps = aps_merge, cls = cls_merge, glh = glh_merge, lpa = lpa_merge, obs = obs_merge, sfr = sfr_merge, soc = soc_merge, con = con_merge) %>%
   imap(
-    function(x, y) x %>% 
-      rename_with(~ paste(., y, sep = '_'), -medstar_id
-                  )
-    ) %>%
-  reduce(full_join, by = 'medstar_id')
+    function(x, y) {
+      x %>%
+        rename_with(~ paste(., y, sep = "_"), -medstar_id)
+    }
+  ) %>%
+  reduce(full_join, by = "medstar_id")
 ```
 
 # Save as RDS file
 ```{r}
 write_rds(detect_fu_merge, "../data/cleaned_rds_files/detect_fu_data_merged.rds")
 ```
-
-
-
-
-
-
-

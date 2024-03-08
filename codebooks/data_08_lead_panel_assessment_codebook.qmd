@@ -24,11 +24,11 @@ lpa <- read_rds("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
 # Set column attributes
 
 ```{r}
-#Set the source to "DETECT LEAD Panel Assessment Data" for all the variables
-lpa_vars <- lpa %>% 
+# Set the source to "DETECT LEAD Panel Assessment Data" for all the variables
+lpa_vars <- lpa %>%
   names()
 
-for(i in lpa_vars) {
+for (i in lpa_vars) {
   attr(lpa[[i]], "source") <- "DETECT LEAD Panel Assessment Data"
 }
 ```
@@ -47,208 +47,169 @@ no_stats_vars <- colnames(no_stats)
 ```{r}
 # Add column attributes to all variables
 lead_panel_assessment <- lpa %>%
-  
-    cb_add_col_attributes( 
-      x_primary_key, 
-      description = "Unique record ID used internally by the database."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_created_by, 
-      description = "User who created the record."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_created_timestamp, 
-      description = "Timestamp when the record was created.",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_modified_by, 
-      description = "User who last modified the record."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_modified_timestamp, 
-      description = "Timestamp when the record was last modified.",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_error_message, 
-      description = "Any database error messages."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_month, 
-      description = "Related month of the record.",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_year, 
-      description = "Related year of the record.",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_status, 
-      description = "The records status."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_record_comment, 
-      description = "Any record comments added by the user."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_assessment_month, 
-      description = "Related assessment month of the record.",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_assessment_year, 
-      description = "Related assessment year of the record.",
-      col_type = "Time"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      medstar_id, 
-      description = "Record ID of the participant."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      name_full, 
-      description = "Full name of the participant."
-    ) %>%
-
-    cb_add_col_attributes( 
-      case_id, 
-      description = "Last 5 characters of the MedstarID."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      panelist_name_10cat_f, 
-      description = "Name of the LEAD panelist user."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      assessment_type_3cat_f, 
-      description = "Type of assessment, such as 'Initial', 'Secondary', etc'"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      physical_abuse_2cat, 
-      description = "Did the LEAD panel user think physical abuse occured?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      sexual_abuse_2cat, 
-      description = "Did the LEAD panel user think sexual abuse occured?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      emotional_psycho_abuse_2cat, 
-      description = "Did the LEAD panel user think emotional or phsychological abuse occured?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      neglect_2cat, 
-      description = "Did the LEAD panel user think neglect occured?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      abandonment_2cat, 
-      description = "Did the LEAD panel user think abandonment occured?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      financial_exploitation_2cat, 
-      description = "Did the LEAD panel user think financial or material exploitation occured?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      self_neglect_2cat, 
-      description = "Did the LEAD panel user think self-neglect occured?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      physical_abuse_2cat_f, 
-      description = "Did the LEAD panel user think physical abuse occured?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      sexual_abuse_2cat_f, 
-      description = "Did the LEAD panel user think sexual abuse occured?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      emotional_psycho_abuse_2cat_f, 
-      description = "Did the LEAD panel user think emotional or phsychological abuse occured?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      neglect_2cat_f, 
-      description = "Did the LEAD panel user think neglect occured?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      abandonment_2cat_f, 
-      description = "Did the LEAD panel user think abandonment occured?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      financial_exploitation_2cat_f, 
-      description = "Did the LEAD panel user think financial or material exploitation occured?"
-    ) %>%
-
-    cb_add_col_attributes( 
-      self_neglect_2cat_f, 
-      description = "Did the LEAD panel user think self-neglect occured?"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      comments, 
-      description = "Any assessment comments added by the LEAD panel user."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      xc_join, 
-      description = "Internal system variable."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      x_username, 
-      description = "Internal system variable."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      panelist_discipline_5cat_f, 
-      description = "Panelist's professional discipline."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      healthcare_worker_2cat_f, 
-      description   = "Does the panelist's discipline fall under the classification of healthcare worker?",
-      value_labesls = c(
-        "Yes" = 1,
-        "No"  = 0
-      ),
-      col_type = "Categorical"
-    ) %>%
-  
-    cb_add_col_attributes( 
-      xc_assessment_screened_2cat_f, 
-      description = "Calculation determining if the participant screened 'positive' or 'negative'."
-    ) %>%
-  
-    cb_add_col_attributes( 
-      xc_assessment_screened_2cat, 
-      description = "Calculation determining if the participant screened 'positive' or 'negative'."
-      )
-
+  cb_add_col_attributes(
+    x_primary_key,
+    description = "Unique record ID used internally by the database."
+  ) %>%
+  cb_add_col_attributes(
+    x_created_by,
+    description = "User who created the record."
+  ) %>%
+  cb_add_col_attributes(
+    x_created_timestamp,
+    description = "Timestamp when the record was created.",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_modified_by,
+    description = "User who last modified the record."
+  ) %>%
+  cb_add_col_attributes(
+    x_modified_timestamp,
+    description = "Timestamp when the record was last modified.",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_error_message,
+    description = "Any database error messages."
+  ) %>%
+  cb_add_col_attributes(
+    x_record_month,
+    description = "Related month of the record.",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_record_year,
+    description = "Related year of the record.",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_record_status,
+    description = "The records status."
+  ) %>%
+  cb_add_col_attributes(
+    x_record_comment,
+    description = "Any record comments added by the user."
+  ) %>%
+  cb_add_col_attributes(
+    x_assessment_month,
+    description = "Related assessment month of the record.",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    x_assessment_year,
+    description = "Related assessment year of the record.",
+    col_type = "Time"
+  ) %>%
+  cb_add_col_attributes(
+    medstar_id,
+    description = "Record ID of the participant."
+  ) %>%
+  cb_add_col_attributes(
+    name_full,
+    description = "Full name of the participant."
+  ) %>%
+  cb_add_col_attributes(
+    case_id,
+    description = "Last 5 characters of the MedstarID."
+  ) %>%
+  cb_add_col_attributes(
+    panelist_name_10cat_f,
+    description = "Name of the LEAD panelist user."
+  ) %>%
+  cb_add_col_attributes(
+    assessment_type_3cat_f,
+    description = "Type of assessment, such as 'Initial', 'Secondary', etc'"
+  ) %>%
+  cb_add_col_attributes(
+    physical_abuse_2cat,
+    description = "Did the LEAD panel user think physical abuse occured?"
+  ) %>%
+  cb_add_col_attributes(
+    sexual_abuse_2cat,
+    description = "Did the LEAD panel user think sexual abuse occured?"
+  ) %>%
+  cb_add_col_attributes(
+    emotional_psycho_abuse_2cat,
+    description = "Did the LEAD panel user think emotional or phsychological abuse occured?"
+  ) %>%
+  cb_add_col_attributes(
+    neglect_2cat,
+    description = "Did the LEAD panel user think neglect occured?"
+  ) %>%
+  cb_add_col_attributes(
+    abandonment_2cat,
+    description = "Did the LEAD panel user think abandonment occured?"
+  ) %>%
+  cb_add_col_attributes(
+    financial_exploitation_2cat,
+    description = "Did the LEAD panel user think financial or material exploitation occured?"
+  ) %>%
+  cb_add_col_attributes(
+    self_neglect_2cat,
+    description = "Did the LEAD panel user think self-neglect occured?"
+  ) %>%
+  cb_add_col_attributes(
+    physical_abuse_2cat_f,
+    description = "Did the LEAD panel user think physical abuse occured?"
+  ) %>%
+  cb_add_col_attributes(
+    sexual_abuse_2cat_f,
+    description = "Did the LEAD panel user think sexual abuse occured?"
+  ) %>%
+  cb_add_col_attributes(
+    emotional_psycho_abuse_2cat_f,
+    description = "Did the LEAD panel user think emotional or phsychological abuse occured?"
+  ) %>%
+  cb_add_col_attributes(
+    neglect_2cat_f,
+    description = "Did the LEAD panel user think neglect occured?"
+  ) %>%
+  cb_add_col_attributes(
+    abandonment_2cat_f,
+    description = "Did the LEAD panel user think abandonment occured?"
+  ) %>%
+  cb_add_col_attributes(
+    financial_exploitation_2cat_f,
+    description = "Did the LEAD panel user think financial or material exploitation occured?"
+  ) %>%
+  cb_add_col_attributes(
+    self_neglect_2cat_f,
+    description = "Did the LEAD panel user think self-neglect occured?"
+  ) %>%
+  cb_add_col_attributes(
+    comments,
+    description = "Any assessment comments added by the LEAD panel user."
+  ) %>%
+  cb_add_col_attributes(
+    xc_join,
+    description = "Internal system variable."
+  ) %>%
+  cb_add_col_attributes(
+    x_username,
+    description = "Internal system variable."
+  ) %>%
+  cb_add_col_attributes(
+    panelist_discipline_5cat_f,
+    description = "Panelist's professional discipline."
+  ) %>%
+  cb_add_col_attributes(
+    healthcare_worker_2cat_f,
+    description = "Does the panelist's discipline fall under the classification of healthcare worker?",
+    value_labesls = c(
+      "Yes" = 1,
+      "No"  = 0
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    xc_assessment_screened_2cat_f,
+    description = "Calculation determining if the participant screened 'positive' or 'negative'."
+  ) %>%
+  cb_add_col_attributes(
+    xc_assessment_screened_2cat,
+    description = "Calculation determining if the participant screened 'positive' or 'negative'."
+  )
 ```
 # Create a data frame containing the column names and their descriptions using the df_descriptions function
 
@@ -269,7 +230,8 @@ lpa_codebook <- codebook(
   df = lead_panel_assessment,
   title = "LEAD Panel Assessment Dataset",
   description = "Data from LEAD Panel Assessment",
-  no_summary_stats = no_stats_vars)
+  no_summary_stats = no_stats_vars
+)
 ```
 
 ```{r}

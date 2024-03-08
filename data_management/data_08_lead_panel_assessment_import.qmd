@@ -37,9 +37,9 @@ Replace instances where panelist name is "Jason Knebl" with the name "Janice Kne
 lpa <- lpa %>%
   mutate(
     panelist_name = case_when(
-      panelist_name == "Jason Knebl"  ~ "Janice Knebl",
-      TRUE                            ~ panelist_name
-    ) 
+      panelist_name == "Jason Knebl" ~ "Janice Knebl",
+      TRUE ~ panelist_name
+    )
   )
 ```
 
@@ -51,89 +51,91 @@ lpa <- lpa %>%
   mutate(
     panelist_name_10cat_f = factor(
       panelist_name,
-      levels = c("Hannah Bell", "Janice Knebl", "Jason Burnett", 
-                 "John Halphen", "Jordan Rolfe", "Kristen Reuter",
-                 "Samantha Fant", "Stephanie Large", 
-                 "Tarrant County District Attorney's Office"
-                )
+      levels = c(
+        "Hannah Bell", "Janice Knebl", "Jason Burnett",
+        "John Halphen", "Jordan Rolfe", "Kristen Reuter",
+        "Samantha Fant", "Stephanie Large",
+        "Tarrant County District Attorney's Office"
       )
     )
+  )
 
-# Assessment type    
+# Assessment type
 lpa <- lpa %>%
   mutate(
     assessment_type_3cat_f = factor(
       assessment_type,
-      levels = c("Initial assessment", "Secondary assessment",
-                 "Post-detect assessment" 
-                )
+      levels = c(
+        "Initial assessment", "Secondary assessment",
+        "Post-detect assessment"
       )
     )
+  )
 
 # Abuse variables
 lpa <- lpa %>%
   mutate(
     across(
-      .cols  = ends_with(c("_abuse", "neglect", "_exploitation", "abandonment")),
-      .fns   = ~ case_when(
-        .x   == "No"  ~ 0,
-        .x   == "Yes" ~ 1
+      .cols = ends_with(c("_abuse", "neglect", "_exploitation", "abandonment")),
+      .fns = ~ case_when(
+        .x == "No" ~ 0,
+        .x == "Yes" ~ 1
       ),
       .names = "{col}_2cat"
     ),
     across(
       .cols = ends_with(c("_abuse_2cat", "neglect_2cat", "exploitation_2cat", "abandonment_2cat")),
-      .fns   = ~ factor(.x, levels = c(0, 1)),
+      .fns = ~ factor(.x, levels = c(0, 1)),
       .names = "{col}_f"
-      )
     )
+  )
 
 lpa <- lpa %>%
   mutate(
     xc_assessment_screened_2cat = case_when(
-      xc_assessment_screened == "Negative"  ~ 0,
-      xc_assessment_screened == "Positive"  ~ 1
+      xc_assessment_screened == "Negative" ~ 0,
+      xc_assessment_screened == "Positive" ~ 1
     ),
     xc_assessment_screened_2cat_f = factor(
       xc_assessment_screened_2cat,
       levels = c(0, 1)
-      )
     )
+  )
 ```
 
 ## Include panelist discipline variables
 Create two new variables _panelist-discipline_ and _healthcare-worker_ that describe the LEAD panelists' professions. This is based on the Panelists names and disciplines file.
 
 ```{r}
-lpa <- lpa %>% 
+lpa <- lpa %>%
   mutate(
     panelist_discipline = case_when(
       panelist_name_10cat_f == "Samantha Fant" |
-      panelist_name_10cat_f == "Jordan Rolfe" |
-      panelist_name_10cat_f == "Hannah Bell"  |
-      panelist_name_10cat_f == "Tarrant County District Attorney's Office"                                            
-                                                   ~ "Assistant district attorney",
-      panelist_name_10cat_f == "Stephanie Large"   ~ "Geriatric nurse practitioner",
-      panelist_name_10cat_f == "Jason Burnett"     ~ "Elder mistreatment researcher",
-      panelist_name_10cat_f == "Kristen Reuter"    ~ "Geriatric social worker",
-      panelist_name_10cat_f == "Janice Knebl" | 
-        panelist_name_10cat_f == "John Halphen"    ~ "Geriatrician"
+        panelist_name_10cat_f == "Jordan Rolfe" |
+        panelist_name_10cat_f == "Hannah Bell" |
+        panelist_name_10cat_f == "Tarrant County District Attorney's Office"
+      ~ "Assistant district attorney",
+      panelist_name_10cat_f == "Stephanie Large" ~ "Geriatric nurse practitioner",
+      panelist_name_10cat_f == "Jason Burnett" ~ "Elder mistreatment researcher",
+      panelist_name_10cat_f == "Kristen Reuter" ~ "Geriatric social worker",
+      panelist_name_10cat_f == "Janice Knebl" |
+        panelist_name_10cat_f == "John Halphen" ~ "Geriatrician"
     ),
     healthcare_worker = case_when(
       panelist_discipline == "Geriatrician" | panelist_discipline == "Geriatric nurse practitioner" ~ 1,
-      TRUE                                                                                          ~ 0
+      TRUE ~ 0
     )
   )
 
 # Co-erce categorical variables into factor variables
-lpa<- lpa %>%
+lpa <- lpa %>%
   mutate(
     panelist_discipline_5cat_f = factor(
       panelist_discipline
     )
   )
 
-lpa<- lpa %>%
+lpa <- lpa %>%
   mutate(
     healthcare_worker_2cat_f = factor(
       healthcare_worker,
@@ -170,41 +172,43 @@ For instance, medstar_id 47311d550da4471297501ae2b3b03b02 has multiple rows with
 
 ```{r}
 # Create a vector of columns that will be used for grouping below.
-group <- c('assessment_type_3cat_f', 'physical_abuse_2cat_f', 'sexual_abuse_2cat_f', 'emotional_psycho_abuse_2cat_f', 'neglect_2cat_f', 
-           'self_neglect_2cat_f', 'financial_exploitation_2cat_f', 'abandonment_2cat_f')
+group <- c(
+  "assessment_type_3cat_f", "physical_abuse_2cat_f", "sexual_abuse_2cat_f", "emotional_psycho_abuse_2cat_f", "neglect_2cat_f",
+  "self_neglect_2cat_f", "financial_exploitation_2cat_f", "abandonment_2cat_f"
+)
 
-# Add a column to the data frame -- multiple_count -- that is equal to the number of rows in the data frame for each combination of medstar ID 
+# Add a column to the data frame -- multiple_count -- that is equal to the number of rows in the data frame for each combination of medstar ID
 # and panelist name.
 lpa <- lpa %>%
-  group_by(medstar_id, panelist_name_10cat_f, assessment_type_3cat_f) %>% 
+  group_by(medstar_id, panelist_name_10cat_f, assessment_type_3cat_f) %>%
   mutate(
     multiple_count = length(panelist_name_10cat_f)
   ) %>%
   ungroup()
 
-# For each MedStar ID, are all the scores assigned by the same panelist identical or different (identifies whether or not there is more than one 
+# For each MedStar ID, are all the scores assigned by the same panelist identical or different (identifies whether or not there is more than one
 # row per group).
-lpa <- lpa %>% 
+lpa <- lpa %>%
   group_by(
     medstar_id, panelist_name_10cat_f, assessment_type_3cat_f, sexual_abuse_2cat_f, emotional_psycho_abuse_2cat_f, neglect_2cat_f,
     self_neglect_2cat_f, financial_exploitation_2cat_f, abandonment_2cat_f
   ) %>%
   mutate(
     same_score = case_when(
-      multiple_count   >1 & n() > 1  ~ TRUE,
-      multiple_count   >1 & n() == 1 ~ FALSE,
-      TRUE                           ~ NA 
+      multiple_count > 1 & n() > 1 ~ TRUE,
+      multiple_count > 1 & n() == 1 ~ FALSE,
+      TRUE ~ NA
     )
   ) %>%
   ungroup()
 
 # Are all, some. or none of the assessment values missing for the specified row?
-lpa <- lpa %>% 
+lpa <- lpa %>%
   mutate(
     all_na = case_when(
-      if_all(all_of(group), ~ is.na(.))  ~ "all",
+      if_all(all_of(group), ~ is.na(.)) ~ "all",
       if_all(all_of(group), ~ !is.na(.)) ~ "none",
-      TRUE                               ~ "some"
+      TRUE ~ "some"
     )
   ) %>%
   ungroup()
@@ -224,51 +228,50 @@ lpa <- lpa |>
     most_recent = ifelse(x_created_timestamp == max(x_created_timestamp), "Yes", "No")
   )
 
-# Should this row be removed or is further review required to determine this 
+# Should this row be removed or is further review required to determine this
 # based on the rules below?
 lpa <- lpa |>
   mutate(
-    remove  = case_when(
+    remove = case_when(
       # Case when the error is present and the scores are not identical. All of the rows being compared have one or more missing
       # scores and at least one of the rows being compared does not have all of the scores missing. Marks such cases
       # for individual review
       multiple_count > 1 & same_score == FALSE & all(all_na != "none") & any(all_na != "all") ~ "Individual review",
-      
-      # Case when the error is present, the scores are not identical and at least one of the rows being compared has some but not all 
+
+      # Case when the error is present, the scores are not identical and at least one of the rows being compared has some but not all
       # scores missing. Any of the other rows being compared could have none or all missing values. Marks such cases for
       # individual reveiw.
-      multiple_count > 1 & same_score == FALSE & any(all_na == "some")                        ~ "Individual review",
-      
+      multiple_count > 1 & same_score == FALSE & any(all_na == "some") ~ "Individual review",
+
       # Case when the error is present, the scores are not identical and all the rows being compared have no missing scores.
-      multiple_count > 1 & same_score == FALSE & all(all_na == "none")                        ~ "Individual review",
-      
+      multiple_count > 1 & same_score == FALSE & all(all_na == "none") ~ "Individual review",
+
       # case when there is no error
-      multiple_count == 1                                                                     ~ "No",
-      
+      multiple_count == 1 ~ "No",
+
       # Marks only the most recent of identical rows where error is present for keeping while the other rows are removed.
-      multiple_count > 1 & same_score == TRUE & most_recent == "Yes"                          ~ "No",
-      
+      multiple_count > 1 & same_score == TRUE & most_recent == "Yes" ~ "No",
+
       # Case when there is an error and the scores being compared are not the same. Marks rows where there are no missing scores
       # for keeping
-      multiple_count > 1 & same_score == FALSE & all_na == "none"                             ~ "No",
-      
+      multiple_count > 1 & same_score == FALSE & all_na == "none" ~ "No",
+
       # Case when error is present but all the rows are identical in terms of assigned scores. Marks rows that are not the most
       # recent for removal
-      multiple_count > 1 & same_score == TRUE & most_recent == "No"                           ~ "Yes",
-      
+      multiple_count > 1 & same_score == TRUE & most_recent == "No" ~ "Yes",
+
       # Case when the error is present and the scores are not identical. Marks rows where all the scores are missing for removal
-      multiple_count > 1 & same_score == FALSE & all_na == "all"                              ~ "Yes"
+      multiple_count > 1 & same_score == FALSE & all_na == "all" ~ "Yes"
     )
-  ) %>% 
+  ) %>%
   ungroup()
 # Remove rows marked by the error_check function for removal.
-lpa <-  lpa %>% filter(!(remove == "Yes")) 
+lpa <- lpa %>% filter(!(remove == "Yes"))
 
 # Remove rows marked by the error_check function for individual review that are not the most recent.
-lpa <-  lpa %>% filter(!(remove == "Individual review" & most_recent == "No") | remove == "No") %>%
+lpa <- lpa %>% filter(!(remove == "Individual review" & most_recent == "No") | remove == "No") %>%
   # Remove filtering columns
   select(-c(multiple_count, same_score, all_na, over_24_hours, most_recent, remove))
-
 ```
 
 ```{r}
@@ -280,5 +283,4 @@ dim(lpa) # 6838 38
 
 ```{r}
 write_rds(lpa, "../data/cleaned_rds_files/lead_panel_assessment_import.rds")
-
 ```
