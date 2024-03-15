@@ -14,22 +14,28 @@ library(dplyr, warn.conflicts = FALSE)
 library(readr)
 library(purrr)
 library(stringr)
-library(janitor)
+library(janitor, warn.conflicts = FALSE)
 ```
 
 
 # Load data
 
-Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki/Using-this-repository. 
+Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki. 
 
 ```{r}
-aps_inv <- read_csv("../data/filemaker_pro_exports/aps_investigations_import.csv")
+aps_inv_path <- here::here("data", "filemaker_pro_exports", "aps_investigations_import.csv")
+```
+
+```{r}
+aps_inv <- read_csv(aps_inv_path)
 ```
 
 ```{r}
 # Data check
 dim(aps_inv) # 951  18
 ```
+
+
 # Data cleaning
 
 We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
@@ -139,8 +145,21 @@ aps_inv <- aps_inv %>%
 dim(aps_inv) # 951  22
 ```
 
+
 # Save as rds file
 
 ```{r}
-write_rds(aps_inv, "../data/cleaned_rds_files/aps_investigations_import.rds")
+aps_inv_path <- here::here("data", "cleaned_rds_files", "aps_investigations_import.rds")
 ```
+
+```{r}
+write_rds(aps_inv, aps_inv_path)
+```
+
+
+# Clean up
+
+```{r}
+rm(list = ls())
+```
+
