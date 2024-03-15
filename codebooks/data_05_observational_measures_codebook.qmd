@@ -120,23 +120,23 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     exploitation_comments,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Additional  comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Additional comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
   ) %>%
   cb_add_col_attributes(
     abandonment_comments,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abandonment Indicators: Additional  comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abandonment Indicators: Additional comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
   ) %>%
   cb_add_col_attributes(
     summary_comments,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale - Environment status of subject: Summary - Additional  comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale - Environment status of subject: Summary - Additional comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
   ) %>%
   cb_add_col_attributes(
     general_assessment_comments,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale - General Assessment: Additional  comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale - General Assessment: Additional comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
   ) %>%
   cb_add_col_attributes(
     abuse_indicators_comments,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale - Possible Abuse Indicators: Additional  comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale - Possible Abuse Indicators: Additional comments. (Question used in older version of the follow-up interview until 9/24/2020.)"
   ) %>%
   cb_add_col_attributes(
     at_phys_why,
@@ -168,7 +168,7 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     clothes_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Clothes. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Clothes. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Clean/neat"  = 0,
       "1"               = 1,
@@ -179,12 +179,84 @@ observational_measures <- obs %>%
     col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
+    unusual_odor_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Unusual odors (e.g. urine, feces) that are unrelated to current medical conditions and/or are more extreme than expected given current medical conditions."
+  ) %>%
+  cb_add_col_attributes(
+    disarray_hoarding_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Inside of home is in extreme disarray/hoarding."
+  ) %>%
+  cb_add_col_attributes(
+    health_safety_concern_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Living environment poses a health or safety concern (e.g., fire hazard, insect or rodent infestation, urine or feces present)."
+  ) %>%
+  cb_add_col_attributes(
+    caregiver_lack_knowledge_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver present, they appear to lack knowledge of the patient/older adult’s medical needs."
+  ) %>%
+  cb_add_col_attributes(
+    caregiver_unengaged_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear unengaged an inattentive in caring for the patient/older adult."
+  ) %>%
+  cb_add_col_attributes(
+    caregiver_frustrated_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear frustrated, tired, angry or burdened by the patient/older adult."
+  ) %>%
+  cb_add_col_attributes(
+    caregiver_anxious_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear overly concerned (e.g., anxious, hovering)."
+  ) %>%
+  cb_add_col_attributes(
+    isolated_home_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is the older adult isolated in the home and/or cut-off from needed social networks or supports?"
+  ) %>%
+  cb_add_col_attributes(
+    depressed_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult appear depressed, anxious, or emotionally distressed for reasons other than their immediate medical condition?"
+  ) %>%
+  cb_add_col_attributes(
+    poor_personal_hygiene_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult have poor personal hygiene (including soiled in urine or feces)?"
+  ) %>%
+  cb_add_col_attributes(
+    inadequately_clothed_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is the older adult inadequately clothed or wearing dirty, torn, or soiled clothing?"
+  ) %>%
+  cb_add_col_attributes(
+    difficulty_medications_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult have difficulties taking their prescribed medications as directed?"
+  ) %>%
+  cb_add_col_attributes(
+    hoarding_medications_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult appear to be hoarding/saving old medications?"
+  ) %>%
+  cb_add_col_attributes(
+    unmet_needs_f,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is/Does the patient/older adult have unmet needs for assistance with eating, toileting, transferring, dressing, or bathing?"
+  ) %>%
+  cb_add_col_attributes(
+    report_elder_abuse_f,
+    description = "Did you report elder abuse/neglect to APS, or, do you plan to based on what you just observed?"
+  ) %>%
+  cb_add_col_attributes(
+    hygiene_f,
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Hygiene. (Question used in older version of the follow-up interview until 08/25/2020.)"
+  ) %>%
+  cb_add_col_attributes(
+    nutrition_f,
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Nutrition. (Question used in older version of the follow-up interview until 08/25/2020.)"
+  ) %>%
+  cb_add_col_attributes(
+    skin_integrity_f,
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Skin integrity. (Question used in older version of the follow-up interview until 08/25/2020.)"
+  ) %>%
+  cb_add_col_attributes(
     clothes_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Clothes. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Clothes. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     hair_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Hair. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Hair. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Clean/combed" = 0,
       "1"                = 1,
@@ -196,11 +268,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     hair_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Hair. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Hair. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     nails_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Nails. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Nails. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Clean/trimmed"        = 0,
       "1"                        = 1,
@@ -212,119 +284,119 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     nails_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Nails. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale General Assessment: Nails. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     bruising_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Bruising. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Bruising. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     lacerations_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Lacerations. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Lacerations. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     fractures_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Fractures. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Fractures. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     stages_healing_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Various stages of healing of any bruises or fractures/ (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Various stages of healing of any bruises or fractures/ (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     sexual_abuse_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Evidence of sexual abuse. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Evidence of sexual abuse. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     abuse_statement_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Statement by older adult related to abuse. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abuse Indicators: Statement by older adult related to abuse. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     contracture_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Contractures. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Contractures. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     decubitus_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Decubitii (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Decubitii (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     dehydration_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Dehydration. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Dehydration. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     diarrhea_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Diarrhea. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Diarrhea. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     depression_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Depression. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Depression. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     impaction_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Impaction. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Impaction. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     malnutrition_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Malnutrition. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Malnutrition. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     urine_burn_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Urine burns. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Urine burns. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     poor_hygiene_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Poor hygiene. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Poor hygiene. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     obvious_disease_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators:  Failure to respond to warning of obvious disease. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators:  Failure to respond to warning of obvious disease. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     inappropriate_medication_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Inappropirate medications (over/under). (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Inappropirate medications (over/under). (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     repetitive_hosp_admission_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Repetitive hospital admissions due to probable failure of health care surveillance. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Repetitive hospital admissions due to probable failure of health care surveillance. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     neglect_statement_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Statement by older adult related to neglect. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Statement by older adult related to neglect. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     money_misuse_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Misuse of money. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Misuse of money. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     evidence_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Evidence. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Evidence. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     goods_for_services_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Reports of demands for goods in exchange for service. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Reports of demands for goods in exchange for service. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     inability_account_money_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Inability to account for money/property. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Inability to account for money/property. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     exploitation_statement_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Statement by older adult related to exploitation. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Exploitation Indicators: Statement by older adult related to exploitation. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     caretaker_withdrawn_care_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abandonment Indicators: Evidence that a caretaker has withdrawn care precipitously without alternate arrangements. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abandonment Indicators: Evidence that a caretaker has withdrawn care precipitously without alternate arrangements. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     left_alone_unsafe_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abandonment Indicators: Evidence that older adult is left alone in an unsafe environment for extended periods of time without adequate support. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abandonment Indicators: Evidence that older adult is left alone in an unsafe environment for extended periods of time without adequate support. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     abandonment_statement_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abandonment Indicators: Statement by older adults regarding abandonment. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Abandonment Indicators: Statement by older adults regarding abandonment. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     exterior_condition_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Exterior condition. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Exterior condition. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Neat/well kept/no trash, debris"       = 0,
       "1"                                         = 1,
@@ -336,7 +408,7 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     exterior_condition_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Exterior condition. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Exterior condition. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     yard_sidewalk_5cat,
@@ -352,11 +424,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     yard_sidewalk_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Yard/Sidewalk. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Yard/Sidewalk. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     roof_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Roof. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Roof. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Intact/no structural damage"          = 0,
       "1"                                        = 1,
@@ -368,11 +440,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     roof_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Roof. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Roof. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     walls_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Walls (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Walls (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Intact/no structural damage"          = 0,
       "1"                                        = 1,
@@ -384,11 +456,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     walls_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Walls (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Walls (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     windows_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Windows. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Windows. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Intact/not broken or missing"     = 0,
       "1"                                    = 1,
@@ -400,11 +472,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     windows_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Windows. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Windows. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     interior_condition_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Interior condition. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Interior condition. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Intact/not broken or missing"     = 0,
       "1"                                    = 1,
@@ -416,11 +488,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     interior_condition_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Interior condition. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Interior condition. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     odor_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Odor. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Odor. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Normal household odor"                                              = 0,
       "1"                                                                      = 1,
@@ -432,11 +504,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     odor_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Odor. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Odor. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     kitchen_cleanliness_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Kitchen. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Kitchen. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Clean, no evidence of unsanitary conditions" = 0,
       "1"                                               = 1,
@@ -448,11 +520,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     kitchen_cleanliness_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Kitchen. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Kitchen. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     bathroom_cleanliness_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Bathroom. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Bathroom. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Clean, no evidence of unsanitary conditions"  = 0,
       "1"                                                = 1,
@@ -464,11 +536,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     bathroom_cleanliness_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Bathroom. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Bathroom. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     bedroom_cleanliness_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Bedroom. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Bedroom. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Clean, no evidence of unsanitary conditions" = 0,
       "1"                                               = 1,
@@ -480,11 +552,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     bedroom_cleanliness_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Bedroom. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Bedroom. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     living_room_cleanliness_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Living room.  (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Living room.  (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Clean, no evidence of unsanitary conditions" = 0,
       "1"                                               = 1,
@@ -496,11 +568,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     living_room_cleanliness_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Living room.  (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Cleanliness - Living room.  (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     clutter_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Clutter. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Clutter. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - Neat/orderly"                                             = 0,
       "1"                                                            = 1,
@@ -512,11 +584,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     clutter_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Clutter. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Clutter. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     structural_problems_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Structural problems. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Structural problems. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - No structural problems"                                                     = 0,
       "1"                                                                              = 1,
@@ -528,11 +600,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     structural_problems_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Structural problems. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Structural problems. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     pets_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Pets. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Pets. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - All animals cared for"    = 0,
       "1 or 2 - Uncared animals"     = 1,
@@ -544,11 +616,11 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     pets_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Pets. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Pets. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     utilities_5cat,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Utilities. (Question used in older version of the follow-up interview until 9/24/2020.)",
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Utilities. (Question used in older version of the follow-up interview until 08/25/2020.)",
     value_labels = c(
       "0 - All utilities work"             = 0,
       "1 - No phone"                       = 1,
@@ -560,23 +632,23 @@ observational_measures <- obs %>%
   ) %>%
   cb_add_col_attributes(
     utilities_5cat_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Utilities. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Utilities. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     summary_evidence_abuse_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Summary - Evidence of abuse. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Summary - Evidence of abuse. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     summary_evidence_neglect_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Summary - Evidence of neglect. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Summary - Evidence of neglect. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     summary_evidence_exploitation_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Summary - Evidence of exploitation. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Summary - Evidence of exploitation. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     summary_evidence_abandonment_f,
-    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Summary - Evidence of abandonment. (Question used in older version of the follow-up interview until 9/24/2020.)"
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Environment status of subject: Summary - Evidence of abandonment. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     at_physical_4cat,

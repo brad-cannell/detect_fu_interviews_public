@@ -105,7 +105,7 @@ participant <- participant %>%
     middle_eastern_north_african           = ifelse(grepl("Middle Eastern or North African", race), 1, 0),
     native_hawaiian_other_pacific_islander = ifelse(grepl("Native Hawaiian or Other Pacific Islander", race), 1, 0),
     white                                  = ifelse(grepl("White", race), 1, 0),
-    other_race                             = ifelse(grepl("Other Race", race), 1, 0),
+    other_race                             = ifelse(grepl("Other Race", race), 1, 0)
   ) %>%
   relocate(c(
     american_indian_alaska_native, asian, black_african_american, hispanic_latino, middle_eastern_north_african,

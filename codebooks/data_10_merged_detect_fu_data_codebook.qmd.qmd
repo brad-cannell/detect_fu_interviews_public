@@ -1700,7 +1700,7 @@ detect_fu_merge <- detect_fu_merge %>%
 ## Observational Measures
 
 ```{r}
-detect_fu_merge <- detect_fu_merge %>%
+detect_fu_merge <- detect_fu_merge %>% 
   cb_add_col_attributes(
     x_created_by_obs,
     description = "Person who created the record."
@@ -1804,6 +1804,78 @@ detect_fu_merge <- detect_fu_merge %>%
   cb_add_col_attributes(
     at_self_why_obs,
     description = "AT_7a. Why do you believe self-neglect has or has not occurred?"
+  ) %>%
+ cb_add_col_attributes(
+    unusual_odor_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Unusual odors (e.g. urine, feces) that are unrelated to current medical conditions and/or are more extreme than expected given current medical conditions."
+  ) %>%
+  cb_add_col_attributes(
+    disarray_hoarding_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Inside of home is in extreme disarray/hoarding."
+  ) %>%
+  cb_add_col_attributes(
+    health_safety_concern_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Living environment poses a health or safety concern (e.g., fire hazard, insect or rodent infestation, urine or feces present)."
+  ) %>%
+cb_add_col_attributes(
+    caregiver_lack_knowledge_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver present, they appear to lack knowledge of the patient/older adult’s medical needs."
+  ) %>%
+cb_add_col_attributes(
+    caregiver_unengaged_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear unengaged an inattentive in caring for the patient/older adult."
+  ) %>%
+cb_add_col_attributes(
+    caregiver_frustrated_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear frustrated, tired, angry or burdened by the patient/older adult."
+  ) %>%
+cb_add_col_attributes(
+    caregiver_anxious_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear overly concerned (e.g., anxious, hovering)."
+  ) %>%
+cb_add_col_attributes(
+    isolated_home_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is the older adult isolated in the home and/or cut-off from needed social networks or supports?"
+  ) %>%
+cb_add_col_attributes(
+    depressed_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult appear depressed, anxious, or emotionally distressed for reasons other than their immediate medical condition?"
+  ) %>%
+cb_add_col_attributes(
+    poor_personal_hygiene_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult have poor personal hygiene (including soiled in urine or feces)?"
+  ) %>%
+cb_add_col_attributes(
+    inadequately_clothed_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is the older adult inadequately clothed or wearing dirty, torn, or soiled clothing?"
+  ) %>%
+cb_add_col_attributes(
+    difficulty_medications_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult have difficulties taking their prescribed medications as directed?"
+  ) %>%
+cb_add_col_attributes(
+    hoarding_medications_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult appear to be hoarding/saving old medications?"
+  ) %>%
+cb_add_col_attributes(
+    unmet_needs_f_obs,
+    description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is/Does the patient/older adult have unmet needs for assistance with eating, toileting, transferring, dressing, or bathing?"
+  ) %>%
+cb_add_col_attributes(
+    report_elder_abuse_f_obs,
+    description = "Did you report elder abuse/neglect to APS, or, do you plan to based on what you just observed?"
+  ) %>%
+  cb_add_col_attributes(
+    hygiene_f_obs,
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Hygiene. (Question used in older version of the follow-up interview until 08/25/2020.)"
+  ) %>%
+  cb_add_col_attributes(
+    nutrition_f_obs,
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Nutrition. (Question used in older version of the follow-up interview until 08/25/2020.)"
+  ) %>%
+  cb_add_col_attributes(
+    skin_integrity_f_obs,
+    description = "Elder Assessment Instrument (EAI) / Self-neglect Severity Scale Possible Neglect Indicators: Skin integrity. (Question used in older version of the follow-up interview until 08/25/2020.)"
   ) %>%
   cb_add_col_attributes(
     clothes_5cat_obs,
