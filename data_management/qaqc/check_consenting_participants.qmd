@@ -3,17 +3,54 @@ title: "Check consent"
 ---
 
 # Purpose
-The consent dataset does not contain all the Medstar IDs seen in the other datasets. The purpose of the code in this file is to double check the Medstar IDs not found in the consent dataset to make sure they shouldn't be included in the count of DETECT follow up interviews completed.
+
+The consent data set does not contain all of the Medstar IDs that are contained in the other data sets downloaded from FileMaker Pro. The purpose of the code in this file is to inventory the Medstar IDs that are not found in the consent data set and make sure they shouldn't be included in the count of DETECT follow up interviews completed.
+
 
 # Load Packages
 
 ```{r}
-library(dplyr)
+library(dplyr, warn.conflicts = FALSE)
 library(readr)
 library(purrr)
 ```
 
-# Load DETECT F/U Data
+# Load data
+
+Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki. 
+
+```{r}
+rds_files <- c(
+  "aps_investigations_import.rds", "consent_import.rds"
+)
+
+df_names <- c("aps", "con")
+
+rds_paths <- purrr::map(
+  rds_files,
+  ~ here::here("data", "cleaned_rds_files", .x)
+)
+
+purrr::walk2(
+  df_names,
+  rds_paths,
+  
+)
+```
+
+
+```{r}
+# Check function to import files
+```
+
+
+```{r}
+aps_inv_path <- here::here("data", "filemaker_pro_exports", "aps_investigations_import.csv")
+```
+
+```{r}
+consent_path <- here::here("data", "filemaker_pro_exports", "consent_import.csv")
+```
 
 ```{r}
 aps <- read_rds("../data/cleaned_rds_files/aps_investigations_import.rds")
