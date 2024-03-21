@@ -20,51 +20,108 @@ library(purrr)
 Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki. 
 
 ```{r}
-rds_files <- c(
-  "aps_investigations_import.rds", "consent_import.rds"
+names_paths <- c(
+  "aps" = "aps_investigations_import.rds",
+  "con" = "consent_import.rds",
+  "cls" = "clutter_scale_import.rds",
+  "glh" = "general_health_import.rds",
+  "lpa" = "lead_panel_assessment_import.rds",
+  "obs" = "observational_measures_import.rds",
+  "par" = "participant_import.rds",
+  "sfr" = "self_report_import.rds",
+  "soc" = "sociodemographic_information_import.rds",
+  "detect_fu_data_merged" = "detect_fu_data_merged.rds"
+)
+```
+
+```{r}
+#| message: false
+
+iwalk(
+  names_paths,
+  # When using iwalk with an anonymous function as we do below, .x refers to 
+  # the element of the vector passed to the .x argument and .y refers to the
+  # index. When we pass a named vector to the .x argument, then the index is
+  # The element's name.
+  ~ {
+    # Get the path for the current data set
+    path <- here::here("data", "cleaned_rds_files", .x)
+    # Get the data
+    df <- readr::read_rds(path)
+    # Print the dimensions of the data for future data checks
+    cat(.y, ":", dim(df), "\n")
+    # Assign the data to the global environment
+    assign(.y, df, envir = globalenv())
+  }
 )
 
-df_names <- c("aps", "con")
+# aps : 951 22 
+# con : 1013 17 
+# cls : 893 29 
+# glh : 955 105 
+# lpa : 6838 38 
+# obs : 935 132 
+# par : 92160 84 
+# sfr : 956 351 
+# soc : 963 52 
+# detect_fu_data_merged : 98200 799 
+```
 
-rds_paths <- purrr::map(
-  rds_files,
-  ~ here::here("data", "cleaned_rds_files", .x)
-)
 
-purrr::walk2(
+# Create a list of data frame names
+
+Create a list of data frame names that we will iterate over below. The list should include all of the data frames in `names_paths` except `detect_fu_data_merged`.
+
+```{r}
+df_names <- names(names_paths)
+df_names <- df_names[df_names != "detect_fu_data_merged"]
+```
+
+```{r}
+# No longer need names_paths
+rm(names_paths)
+```
+
+
+# List all MedStar ids
+
+Create a named list containing the unique MedStar ids that are present in each of the cleaned data frames.
+
+```{r}
+medstar_ids_list <- map(
   df_names,
-  rds_paths,
-  
-)
+  ~ get(.x)[["medstar_id"]] |> unique()
+) |> 
+  set_names(df_names)
 ```
 
+
+# List missing MedStar ids
+
+Create named list containing all of the MedStar ids that exist in each of the follow-up interview data frames, but not in the consent data frame.
 
 ```{r}
-# Check function to import files
-```
-
-
-```{r}
-aps_inv_path <- here::here("data", "filemaker_pro_exports", "aps_investigations_import.csv")
-```
-
-```{r}
-consent_path <- here::here("data", "filemaker_pro_exports", "consent_import.csv")
+medstar_ids_not_in_con <- map(
+  df_names,
+  ~ setdiff(medstar_ids_list[[.x]], medstar_ids_list[["con"]])
+) |> 
+  set_names(df_names)
 ```
 
 ```{r}
-aps <- read_rds("../data/cleaned_rds_files/aps_investigations_import.rds")
-cls <- read_rds("../data/cleaned_rds_files/clutter_scale_import.rds")
-glh <- read_rds("../data/cleaned_rds_files/general_health_import.rds")
-lpa <- read_rds("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
-obs <- read_rds("../data/cleaned_rds_files/observational_measures_import.rds")
-sfr <- read_rds("../data/cleaned_rds_files/self_report_import.rds")
-soc <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.rds")
-con <- read_rds("../data/cleaned_rds_files/consent_import.rds")
-detect_fu_data_merged <- read_rds("../data/cleaned_rds_files/detect_fu_data_merged.rds")
+medstar_ids_not_in_con <- medstar_ids_not_in_con |> 
+  stack() |> 
+  select(df = ind, medstar_id = values)
 ```
 
-# Summarize the Medstar ID commonalities and differences across all the datasets
+
+# 🔴 Left off here. 
+Trying to recreate Ebie's results.
+She didn't include `par` in her comparisons. I should drop it from ours.
+
+
+
+
 
 ```{r}
 # Create vectors, each containing the medstar IDS for each DETECT FU data set.
