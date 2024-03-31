@@ -1888,7 +1888,9 @@ self_report <- sr %>%
       "Refused"                 = 99
     ),
     col_type = "Categorical"
-  ) %>%
+  )
+
+self_report <- self_report %>%
   cb_add_col_attributes(
     sexual_harm_4cat,
     description = "SR_49a. Regardless of how long ago it happened or who made the advances, has anyone ever made you have sex or oral sex by using force or threatening to harm you or someone close to you?",
@@ -2152,7 +2154,7 @@ self_report <- sr %>%
   ) %>%
   cb_add_col_attributes(
     sexual_incident_60_4cat_f,
-    description = " (Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question used in older version of the follow-up interview until 06/09/2020.)"
+    description = "(Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question used in older version of the follow-up interview until 06/09/2020.)"
   ) %>%
   cb_add_col_attributes(
     sexual_incident_reported_4cat_f,
@@ -2223,9 +2225,7 @@ self_report <- sr %>%
   cb_add_col_attributes(
     sexual_person_live_now_4cat_f,
     description = "SR_57b. Does that person (any of those people) live with you now?"
-  )
-
-self_report <- self_report %>%
+  ) %>%
   cb_add_col_attributes(
     sexual_harm_last_time_8cat,
     description = "SR_49d. How long ago was the last time (most recent time) this happened?",
@@ -2539,7 +2539,7 @@ self_report <- self_report %>%
   ) %>%
   cb_add_col_attributes(
     emotional_yelled_times_times,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_yelled_age,
@@ -2547,11 +2547,11 @@ self_report <- self_report %>%
   ) %>%
   cb_add_col_attributes(
     emotional_yelled_age_years,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_embarrassed_times_times,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_embarrassed_age,
@@ -2559,11 +2559,11 @@ self_report <- self_report %>%
   ) %>%
   cb_add_col_attributes(
     emotional_embarrassed_age_years,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview."
   ) %>%
   cb_add_col_attributes(
     emotional_harassed_times_times,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_harassed_age,
@@ -2571,11 +2571,11 @@ self_report <- self_report %>%
   ) %>%
   cb_add_col_attributes(
     emotional_harassed_age_years,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_refused_times_times,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_refused_age,
@@ -2583,127 +2583,169 @@ self_report <- self_report %>%
   ) %>%
   cb_add_col_attributes(
     emotional_refused_age_years,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hit_times_times,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hit_age,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hit_age_years,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_restrain_times_times,
-    description = "Question from an older version of the follow-up intervie"
+    description = "About how many times has this happened to you in your lifetime? (Question from an older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_restrain_age,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_restrain_age_years,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hurt_times_times,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hurt_age,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hurt_age_years,
-    description = "Question from an older version of the follow_up interview"
+    description = "How old were you when this happened (most recently)? (Question from an older version of the follow_up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_harm_times_times,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_harm_age,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_harm_age_years,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_touched_times_times,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_touched_age,
-    description = " How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_touched_age_years,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_forced_times_times,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_forced_age,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_forced_age_years,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_picture_times_times,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_picture_age,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_picture_age_years,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_permission_times_7cat,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)",
+    value_labels = c(
+      "1 or 2 times"                      = 1,
+      "Between 3 and less than 5 times"   = 2,
+      "Between 5 and less than 10 times"  = 3,
+      "Between 10 and less than 20 times" = 4,
+      "20 or more times"                  = 5,
+      "Don’t know"                        = 7,
+      "Refused"                           = 9
+    ),
+    col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_permission_times_times,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_permission_age,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_permission_age_years,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_forged_times_7cat,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)",
+    value_labels = c(
+      "1 or 2 times"                      = 1,
+      "Between 3 and less than 5 times"   = 2,
+      "Between 5 and less than 10 times"  = 3,
+      "Between 10 and less than 20 times" = 4,
+      "20 or more times"                  = 5,
+      "Don’t know"                        = 7,
+      "Refused"                           = 9
+    ),
+    col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_forged_times_times,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_forged_age,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_forged_age_years,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_tricked_times_7cat,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)",
+    value_labels = c(
+      "1 or 2 times"                      = 1,
+      "Between 3 and less than 5 times"   = 2,
+      "Between 5 and less than 10 times"  = 3,
+      "Between 10 and less than 20 times" = 4,
+      "20 or more times"                  = 5,
+      "Don’t know"                        = 7,
+      "Refused"                           = 9
+    ),
+    col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_tricked_times_times,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_tricked_age,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_tricked_age_years,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     fear_afraid_response,
@@ -2748,6 +2790,18 @@ self_report <- self_report %>%
   cb_add_col_attributes(
     xc_lead_panel_summary_count,
     description = "Calculated count of positive abuse instances across SelfReport, ApsInvestigations, and ObservationalMeasures."
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_forged_times_7cat_f,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_permission_times_7cat_f,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_tricked_times_7cat_f,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   )
 ```
 
