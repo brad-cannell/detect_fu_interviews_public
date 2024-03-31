@@ -1700,7 +1700,7 @@ detect_fu_merge <- detect_fu_merge %>%
 ## Observational Measures
 
 ```{r}
-detect_fu_merge <- detect_fu_merge %>% 
+detect_fu_merge <- detect_fu_merge %>%
   cb_add_col_attributes(
     x_created_by_obs,
     description = "Person who created the record."
@@ -1805,7 +1805,7 @@ detect_fu_merge <- detect_fu_merge %>%
     at_self_why_obs,
     description = "AT_7a. Why do you believe self-neglect has or has not occurred?"
   ) %>%
- cb_add_col_attributes(
+  cb_add_col_attributes(
     unusual_odor_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Unusual odors (e.g. urine, feces) that are unrelated to current medical conditions and/or are more extreme than expected given current medical conditions."
   ) %>%
@@ -1817,51 +1817,51 @@ detect_fu_merge <- detect_fu_merge %>%
     health_safety_concern_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Living environment poses a health or safety concern (e.g., fire hazard, insect or rodent infestation, urine or feces present)."
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     caregiver_lack_knowledge_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver present, they appear to lack knowledge of the patient/older adult’s medical needs."
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     caregiver_unengaged_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear unengaged an inattentive in caring for the patient/older adult."
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     caregiver_frustrated_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear frustrated, tired, angry or burdened by the patient/older adult."
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     caregiver_anxious_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: If caregiver(s) present, they appear overly concerned (e.g., anxious, hovering)."
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     isolated_home_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is the older adult isolated in the home and/or cut-off from needed social networks or supports?"
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     depressed_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult appear depressed, anxious, or emotionally distressed for reasons other than their immediate medical condition?"
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     poor_personal_hygiene_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult have poor personal hygiene (including soiled in urine or feces)?"
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     inadequately_clothed_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is the older adult inadequately clothed or wearing dirty, torn, or soiled clothing?"
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     difficulty_medications_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult have difficulties taking their prescribed medications as directed?"
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     hoarding_medications_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Does the older adult appear to be hoarding/saving old medications?"
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     unmet_needs_f_obs,
     description = "Detection of Elder abuse Through Emergency Care Technicians (DETECT) Screening Items: Is/Does the patient/older adult have unmet needs for assistance with eating, toileting, transferring, dressing, or bathing?"
   ) %>%
-cb_add_col_attributes(
+  cb_add_col_attributes(
     report_elder_abuse_f_obs,
     description = "Did you report elder abuse/neglect to APS, or, do you plan to based on what you just observed?"
   ) %>%
@@ -4256,7 +4256,9 @@ detect_fu_merge <- detect_fu_merge %>%
       "Refused"                 = 99
     ),
     col_type = "Categorical"
-  ) %>%
+  )
+
+detect_fu_merge <- detect_fu_merge %>%
   cb_add_col_attributes(
     sexual_harm_4cat_sfr,
     description = "SR_49a. Regardless of how long ago it happened or who made the advances, has anyone ever made you have sex or oral sex by using force or threatening to harm you or someone close to you?",
@@ -4520,7 +4522,7 @@ detect_fu_merge <- detect_fu_merge %>%
   ) %>%
   cb_add_col_attributes(
     sexual_incident_60_4cat_f_sfr,
-    description = " (Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question used in older version of the follow-up interview until 06/09/2020.)"
+    description = "(Did this/Have any of these) incidents (happen/happened) since you were 60 years old? (Question used in older version of the follow-up interview until 06/09/2020.)"
   ) %>%
   cb_add_col_attributes(
     sexual_incident_reported_4cat_f_sfr,
@@ -4905,7 +4907,7 @@ detect_fu_merge <- detect_fu_merge %>%
   ) %>%
   cb_add_col_attributes(
     emotional_yelled_times_times_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_yelled_age_sfr,
@@ -4913,11 +4915,11 @@ detect_fu_merge <- detect_fu_merge %>%
   ) %>%
   cb_add_col_attributes(
     emotional_yelled_age_years_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_embarrassed_times_times_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_embarrassed_age_sfr,
@@ -4925,11 +4927,11 @@ detect_fu_merge <- detect_fu_merge %>%
   ) %>%
   cb_add_col_attributes(
     emotional_embarrassed_age_years_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview."
   ) %>%
   cb_add_col_attributes(
     emotional_harassed_times_times_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_harassed_age_sfr,
@@ -4937,11 +4939,11 @@ detect_fu_merge <- detect_fu_merge %>%
   ) %>%
   cb_add_col_attributes(
     emotional_harassed_age_years_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_refused_times_times_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     emotional_refused_age_sfr,
@@ -4949,127 +4951,169 @@ detect_fu_merge <- detect_fu_merge %>%
   ) %>%
   cb_add_col_attributes(
     emotional_refused_age_years_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question from earlier version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hit_times_times_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hit_age_sfr,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hit_age_years_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_restrain_times_times_sfr,
-    description = "Question from an older version of the follow-up intervie"
+    description = "About how many times has this happened to you in your lifetime? (Question from an older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_restrain_age_sfr,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_restrain_age_years_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hurt_times_times_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hurt_age_sfr,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     physical_hurt_age_years_sfr,
-    description = "Question from an older version of the follow_up interview"
+    description = "How old were you when this happened (most recently)? (Question from an older version of the follow_up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_harm_times_times_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_harm_age_sfr,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_harm_age_years_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_touched_times_times_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_touched_age_sfr,
-    description = " How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_touched_age_years_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_forced_times_times_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_forced_age_sfr,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_forced_age_years_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_picture_times_times_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_picture_age_sfr,
-    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview until.)"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     sexual_picture_age_years_sfr,
-    description = "Question used in older version of the follow-up interview until"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_permission_times_7cat_sfr,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)",
+    value_labels = c(
+      "1 or 2 times"                      = 1,
+      "Between 3 and less than 5 times"   = 2,
+      "Between 5 and less than 10 times"  = 3,
+      "Between 10 and less than 20 times" = 4,
+      "20 or more times"                  = 5,
+      "Don’t know"                        = 7,
+      "Refused"                           = 9
+    ),
+    col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_permission_times_times_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_permission_age_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_permission_age_years_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_forged_times_7cat_sfr,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)",
+    value_labels = c(
+      "1 or 2 times"                      = 1,
+      "Between 3 and less than 5 times"   = 2,
+      "Between 5 and less than 10 times"  = 3,
+      "Between 10 and less than 20 times" = 4,
+      "20 or more times"                  = 5,
+      "Don’t know"                        = 7,
+      "Refused"                           = 9
+    ),
+    col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_forged_times_times_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_forged_age_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_forged_age_years_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_tricked_times_7cat_sfr,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)",
+    value_labels = c(
+      "1 or 2 times"                      = 1,
+      "Between 3 and less than 5 times"   = 2,
+      "Between 5 and less than 10 times"  = 3,
+      "Between 10 and less than 20 times" = 4,
+      "20 or more times"                  = 5,
+      "Don’t know"                        = 7,
+      "Refused"                           = 9
+    ),
+    col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_tricked_times_times_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_tricked_age_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     finance_stranger_tricked_age_years_sfr,
-    description = "Question from earlier version of the follow-up interview"
+    description = "How old were you when this happened (most recently)? (Question used in older version of the follow-up interview.)"
   ) %>%
   cb_add_col_attributes(
     fear_afraid_response_sfr,
@@ -5106,6 +5150,18 @@ detect_fu_merge <- detect_fu_merge %>%
   cb_add_col_attributes(
     xc_lead_panel_summary_count_sfr,
     description = "Calculated count of positive abuse instances across SelfReport, ApsInvestigations, and ObservationalMeasures."
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_forged_times_7cat_f_sfr,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_permission_times_7cat_f_sfr,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
+  ) %>%
+  cb_add_col_attributes(
+    finance_stranger_tricked_times_7cat_f_sfr,
+    description = "About how many times has this happened to you in your lifetime? (Question used in older version of the follow-up interview.)"
   )
 ```
 

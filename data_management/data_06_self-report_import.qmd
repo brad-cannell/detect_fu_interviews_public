@@ -156,6 +156,13 @@ levels_last_time <- c(
   "Between 1 year and less than 3 years ago",
   "3 or more years ago", "Don't know", "Refused"
 )
+
+levels_times <- c(
+  "1 or 2 times", "Between 3 and less than 5 times",
+  "Between 5 and less than 10 times",
+  "Between 10 and less than 20 times", "20 or more times",
+  "Don't know", "Refused"
+)
 ```
 
 
@@ -218,6 +225,26 @@ self_rep <- self_rep %>%
       .cols  = starts_with("finance") & ends_with("last_time"),
       .fns   = ~ factor(.x, levels = levels_last_time),
       .names =  "{col}_8cat_f"
+    ),
+    across(
+      .cols = starts_with("finance") & ends_with("times") &
+        !ends_with("times_times"),
+      .fns = ~ case_when(
+        .x == "1 or 2 times" ~ 1,
+        .x == "Between 3 and less than 5 times" ~ 2,
+        .x == "Between 5 and less than 10 times" ~ 3,
+        .x == "Between 10 and less than 20 times" ~ 4,
+        .x == "20 or more times" ~ 5,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
+      ),
+      .names = "{col}_7cat"
+    ),
+    across(
+      .cols  = starts_with("finance") & ends_with("times") &
+        !ends_with("times_times"),
+      .fns   = ~ factor(.x, levels = levels_times),
+      .names =  "{col}_7cat_f"
     )
   )
 ```
@@ -677,7 +704,7 @@ self_rep <- self_rep %>% select(
   -c(
     (starts_with("emotional") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
     (starts_with("fear") & (!matches("[0-9]cat") & !matches("_response$"))),
-    (starts_with("finance") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times") & !matches("_stranger_forged_times"))),
+    (starts_with("finance") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
     (starts_with("neglect") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
     (starts_with("physical") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
     (starts_with("report") & !matches("[0-9]cat")),
@@ -689,7 +716,7 @@ self_rep <- self_rep %>% select(
 
 ```{r}
 # Data check
-dim(self_rep) # 956 351
+dim(self_rep) # 956 356
 ```
 
 
