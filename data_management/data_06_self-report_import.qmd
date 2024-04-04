@@ -4,26 +4,35 @@ title: "Import Data from FileMaker Pro: Self Report"
 
 # Overview
 
-In this file, we import and do some initial cleaning of the Observational Measures data collected and stored in FileMaker Pro.
+In this file, we import and do some initial cleaning of the EM self-report data collected and stored in FileMaker Pro.
 
 ```{r, message= FALSE}
 # Load all necessary libraries
 library(readr)
-library(purrr)
-library(stringr)
-library(dplyr)
-library(janitor)
+library(dplyr, warn.conflicts = FALSE)
+library(janitor, warn.conflicts = FALSE)
 ```
 
 
 # Load data
 
-Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki. 
 
 ```{r}
-self_rep <- read_csv("../data/filemaker_pro_exports/self_report_import.csv")
+self_rep_path <- here::here("data", "filemaker_pro_exports", "self_report_import.csv")
 ```
-# Clean data
+
+```{r}
+self_rep <- read_csv(self_rep_path)
+```
+
+```{r}
+# Data check
+dim(self_rep) # 956 209
+```
+
+
+# Data cleaning
 
 Here we will convert all variable names to snake case so that everything is uniform.
 
@@ -36,11 +45,19 @@ self_rep <- clean_names(self_rep,
 )
 ```
 
+## Filter rows
+
+There is one row that is missing a MedStar ID and almost all other variables. My best guess is that this was a record Sunil was experimenting with. We will drop the row.
+
 ```{r}
-# Data check
-dim(self_rep) # 956 209
+self_rep <- self_rep |> 
+  filter(!is.na(medstar_id))
 ```
 
+```{r}
+# Data check
+dim(self_rep) # 955 209
+```
 
 ## Create factor variables to match levels in follow-up interview protocol
 
@@ -49,15 +66,18 @@ dim(self_rep) # 956 209
 ```{r}
 # Set levels for factors for different types of questions
 levels_yes_no <- c("Yes", "No", "Don't know", "Refused")
+
 levels_help <- c(
   "Yes, one person", "Yes, more than one person", "No",
   "Don't know", "Refused"
 )
+
 levels_reliable <- c(
   "Not at all reliable", "Somewhat reliable",
   "Very reliable", "Completely reliable", "Don’t know",
   "Refused"
 )
+
 levels_person <- c(
   "A spouse or partner", "An ex spouse or partner",
   "A parent or step-parent", "A brother or sister",
@@ -67,14 +87,120 @@ levels_person <- c(
 )
 ```
 
-
 ### Neglect variables
+
+# 🔴 Experimental code below ---
+
+- I want to use explicit column names with across(). It makes the code easier to reason about.
+- I want to create a function that will take a column as an input, create a factor version that uses the "_f" naming convention, groups the new columns next to each other in the data, then deletes the character version of the column. I think I created something like this for L2C.
+
+```{r}
+# I'm just using this code to help me figure out the name of the columns that the original code was manipulating. Again, all these tidyselectors make it difficult to figure out which columns we are mutating.
+#  This code chunk should be deleted after we get rid of the tidyselectors in the mutate code.
+self_rep |> 
+  select(
+    starts_with("neglect") & !ends_with("help") & !ends_with("reliable") & !ends_with("person")
+  ) |> 
+  names() |> 
+  cat(sep = ', ')
+```
+
+Columns with Yes/No levels
+
+```{r}
+# For testing
+# Eventually move this to an R script.
+mtcars_test <- mtcars |> 
+  # Create character variables, because that's what we are working with in the
+  # DETECT data.
+  mutate(
+    # Two dichotomous variables so we can test the function inside of across()
+    vs = if_else(vs == 0, "No", "Yes"),
+    am = if_else(am == 0, "No", "Yes"),
+    # One variable with more than 2 levels
+    cyl = case_when(
+      cyl == 4 ~ "Four",
+      cyl == 6 ~ "Six",
+      cyl == 8 ~ "Eight"
+    )
+  )
+```
+
+Break this up into multiple functions
+
+```{r}
+char_to_num <- function(.data, .col, .recode) {
+  # Extract names from the named list
+  char_vals = names(.recode)
+  # Recode character values to numeric values
+  for (i in seq_along(char_vals)) {
+    .data[[.col]][.data[[.col]] == char_vals[i]] <- .recode[i]
+  }
+  # Return data
+  .data
+}
+
+# I want this to work on one variable at a time. We will work on multiple
+# variables with across.
+char_to_num(mtcars_test, "vs", c("No" = 0, "Yes" = 1))
+```
+
+```{r}
+recode_factor_relocate <- function(.data, .col, .recode) {
+  # Create character version of column name
+  col_nm <- rlang::enquo(.col) |> rlang::as_name()
+  # Recode character values to numeric values 
+  df_num <- .data |> 
+    char_to_num(col_nm, .recode)
+  # Return data frame
+  df_num
+  
+  # This works. now I need to create a factor version and then relocate the column.
+}
+
+# I want this to work on one variable at a time. We will work on multiple
+# variables with across.
+recode_factor_relocate(mtcars_test, "vs", c("No" = 0, "Yes" = 1))
+```
+
+
+
+```{r}
+# self_rep <- 
+self_rep %>%
+  mutate(
+    across(
+      .cols = c(
+        neglect_go, neglect_food, neglect_house, neglect_clean, neglect_ready, 
+        neglect_bills
+      ),
+      .fns = ~ case_when(
+        .x == "Yes" ~ 1,
+        .x == "No" ~ 2,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
+      ),
+      .names = "{col}_4cat"
+    ),
+    across(
+      .cols = c(
+        neglect_go, neglect_food, neglect_house, neglect_clean, neglect_ready, 
+        neglect_bills
+      ),
+      .fn = ~ factor(.x, levels = levels_yes_no),
+      .names = "{col}_4cat_f"
+    )
+  ) |> 
+  select(starts_with("neglect_go"))
+```
+
+# 🔴 Experimental code above ---
+
 ```{r}
 self_rep <- self_rep %>%
   mutate(
     across(
-      .cols = starts_with("neglect") & !ends_with("help") &
-        !ends_with("reliable") & !ends_with("person"),
+      .cols = ,
       .fns = ~ case_when(
         .x == "Yes" ~ 1,
         .x == "No" ~ 2,
@@ -146,6 +272,7 @@ self_rep <- self_rep %>%
 ### Financial Exploitation Variables
 
 #### Set levels for factors used in these variables
+
 ```{r}
 # Not needed, this variable is not used in this CSV
 levels_last_time <- c(
@@ -158,8 +285,8 @@ levels_last_time <- c(
 )
 ```
 
-
 #### Recode categorical variables to factor variables
+
 ```{r}
 self_rep <- self_rep %>%
   mutate(
@@ -247,7 +374,6 @@ levels_person_v2 <- c(
   "Don't know", "Refused"
 )
 ```
- 
 
 #### Recode categorical variables to factor variables
 
@@ -372,7 +498,6 @@ self_rep <- self_rep %>%
 
 #### Recode categorical variables to factor variables
 
-
 ```{r}
 self_rep <- self_rep %>%
   mutate(
@@ -488,7 +613,6 @@ self_rep <- self_rep %>%
     )
   )
 ```
-
 
 ### Sexual mistreatment variables
 
@@ -634,7 +758,6 @@ self_rep <- self_rep %>%
   )
 ```
 
-
 ### Environment Variables
 
 #### Recode categorical variables to factor variables
@@ -686,15 +809,25 @@ self_rep <- self_rep %>% select(
 )
 ```
 
-
 ```{r}
 # Data check
-dim(self_rep) # 956 351
+dim(self_rep) # 955 351
 ```
 
 
 # Save as rds file
 
 ```{r}
-write_rds(self_rep, "../data/cleaned_rds_files/self_report_import.rds")
+self_rep_path <- here::here("data", "cleaned_rds_files", "self_report_import.rds")
+```
+
+```{r}
+write_rds(self_rep, self_rep_path)
+```
+
+
+# Clean up
+
+```{r}
+rm(list = ls())
 ```
