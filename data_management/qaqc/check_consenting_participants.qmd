@@ -98,7 +98,7 @@ medstar_ids_list <- map(
 
 # List missing MedStar ids
 
-Create named list containing all of the MedStar ids that exist in each of the follow-up interview data frames, but not in the consent data frame.
+Create named list containing all of the MedStar ids that exist in each of the follow-up interview data frames, but do not exist in the consent data frame.
 
 ```{r}
 medstar_ids_not_in_con <- map(
@@ -108,16 +108,42 @@ medstar_ids_not_in_con <- map(
   set_names(df_names)
 ```
 
+Convert the list of MedStar ids to a data frame that is easier to work with. 
+- The first column will contain the name of the data frame that contains the MedStar id.
+- The second column will contain the MedStar id that wasn't found in the consent data frame.
+- We will drop all rows from the participant data frame (`par`). Most of those encounters did not receive a follow-up interview by design.
+
 ```{r}
 medstar_ids_not_in_con <- medstar_ids_not_in_con |> 
   stack() |> 
-  select(df = ind, medstar_id = values)
+  select(df = ind, medstar_id = values) |> 
+  filter(df != "par")
+```
+
+```{r}
+# medstar_ids_not_in_con["par"]
+medstar_ids_not_in_con[!names(medstar_ids_not_in_con) == "par"]
+
 ```
 
 
+
+```{r}
+
+setdiff(unique(medstar_ids_not_in_con$medstar_id), unique(comparisons$ID))
+```
+
+```{r}
+sfr |> 
+  filter(is.na(medstar_id))
+```
+
+
+
 # 🔴 Left off here. 
-Trying to recreate Ebie's results.
-She didn't include `par` in her comparisons. I should drop it from ours.
+- Trying to recreate Ebie's results.
+- She didn't include `par` in her comparisons. I should drop it from ours.
+- There is an NA value in the sfr data frame. I need to go remove that row and then come back to this code.
 
 
 
