@@ -1,0 +1,429 @@
+---
+title: "Preliminary analysis of the self-reported EM section of the follow-up interviews"
+---
+
+# Overview
+
+In this file, we conduct a preliminary analysis of the self-reported EM section of the DETECT follow-up interviews to understand what people self-reported in more detail.
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(dplyr)
+library(flextable)
+library(officer)
+source("../r/extract_df_from_merged_detect.R")
+source("../r/n_percent_ci.R")
+```
+
+
+# Load data
+
+Load the merged detect data frame into the environment and extract the self-report data.
+
+```{r}
+detect_fu_merge  <- readRDS("../data/cleaned_rds_files/detect_fu_data_merged.rds")
+sr <- filter_merged_df(detect_fu_merge, "_sfr")
+```
+
+# Create an aggregate variable of any self-reported abuse
+For each type of abuse, create a binary variable with yes/ no categories for: 
+- Ever abuse
+- Abuse over age 65
+- Abuse in the past year
+
+## Ever abuse
+The category will be "yes" if the value is "yes" for any of the variables related to ever abuse.
+
+```{r}
+# Create empty data frame for aggregate variables
+sr_aggr <- sr %>% select(medstar_id, unique_id_par) %>% data.frame()
+
+# Function for creating aggregate columns
+aggr <- function(abuse_cols, cat_name, f_name){
+  aggr_vars <- sr %>%
+    mutate(
+      # Create a column that has a value of 1 if at least one of the ever physical abuse variables have a value of "yes".
+      cat_name = case_when(
+        if_any(all_of(abuse_cols), ~. == "Yes")  ~ 1,
+        if_all(all_of(abuse_cols), ~. == "No")   ~ 0,
+        TRUE                                     ~ NA
+      ),
+      # Create a factor variable
+      f_name = factor(cat_name, 
+                      levels = c(1, 0),
+                      labels = c("Yes", "No"))
+    ) %>% select(c(medstar_id, cat_name, f_name)) %>%
+    rename(
+      {{cat_name}} := cat_name,
+      {{f_name}} := f_name
+    )
+  # Merge with data frame of aggregate variables
+  sr_aggr <- sr_aggr %>% left_join(., aggr_vars, by = "medstar_id")
+}
+```
+
+### Physical abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+ever_phys_cols <- sr %>% select(physical_hit_4cat_f, physical_hurt_4cat_f, physical_restrain_4cat_f) %>% names()
+
+# Apply function
+sr_aggr <- aggr(ever_phys_cols, ever_phys_2cat, ever_phys_2cat_f)
+```
+
+### Sexual abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+ever_sex_cols <- sr %>% select(sexual_harm_4cat_f, sexual_touched_4cat_f, sexual_forced_4cat_f, sexual_picture_4cat_f) %>% names()
+
+# Apply function
+sr_aggr <- aggr(ever_sex_cols, ever_sex_2cat, ever_sex_2cat_f)
+```
+
+### Emotional abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+ever_emo_cols <- sr %>% select(emotional_yelled_4cat_f, emotional_embarrassed_4cat_f, emotional_harassed_4cat_f,
+                               emotional_refused_4cat_f) %>% 
+  names()
+
+# Apply function
+sr_aggr <- aggr(ever_emo_cols, ever_emo_2cat, ever_emo_2cat_f)
+```
+
+### Financial exploitation
+
+The question for finance_person_permission is not along the lines of "have you ever experienced some form of abuse?" but is "Does that person usually ask for your permission before deciding to spend your money or sell your property?" So a "Yes" for this variable will be equivalent to a "No" and vice versa.
+
+```{r}
+# Create a new variable for finance_person_permission to reflect the inverse relationship to ever abuse.
+sr <- sr %>% 
+  mutate(
+    finance_person_permission_ea_4cat_f = case_when(
+      finance_person_permission_4cat_f == "Yes" ~ "No",
+      finance_person_permission_4cat_f == "No"  ~ "Yes",
+      TRUE                                      ~ finance_person_permission_4cat_f
+    )
+  )
+```
+
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+ever_fin_cols <- sr %>% select(finance_person_permission_ea_4cat_f, finance_person_forged_4cat_f, finance_person_tricked_4cat_f,
+                               finance_person_stolen_4cat_f, finance_stranger_permission_4cat_f, finance_stranger_forged_4cat,
+                               finance_stranger_tricked_4cat_f) %>% 
+  names()
+
+# Apply function
+sr_aggr <- aggr(ever_fin_cols, ever_fin_2cat, ever_fin_2cat_f)
+```
+
+## Abuse over 65
+The category will be "yes" if the value is "yes" for any of the variables related to ever abuse.
+
+### Physical abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+over_65_phys_cols <- sr %>% select(physical_hit_65_4cat_f, physical_hurt_65_4cat_f, physical_restrain_65_4cat_f) %>% names()
+
+# Apply function
+sr_aggr <- aggr(over_65_phys_cols, over_65_phys_2cat, over_65_phys_2cat_f)
+```
+
+### Sexual abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+over_65_sex_cols <- sr %>% select(sexual_harm_65_4cat_f, sexual_touched_65_4cat_f, sexual_forced_65_4cat_f, 
+                                  sexual_picture_65_4cat_f) %>% names()
+
+# Apply function
+sr_aggr <- aggr(over_65_sex_cols, over_65_sex_2cat, over_65_sex_2cat_f)
+```
+
+### Emotional abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+over_65_emo_cols <- sr %>% select(emotional_yelled_65_4cat_f, emotional_embarrassed_65_4cat_f, emotional_harassed_65_4cat_f,
+                               emotional_refused_65_4cat_f) %>% 
+  names()
+
+# Apply function
+sr_aggr <- aggr(over_65_emo_cols, over_65_emo_2cat, over_65_emo_2cat_f)
+```
+
+### Financial exploitation
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+over_65_fin_cols <- sr %>% select(finance_person_permission_65_4cat_f, finance_person_forged_65_4cat_f,
+                                  finance_person_tricked_65_4cat_f, finance_person_stolen_65_4cat_f, 
+                                  finance_stranger_permission_65_4cat_f, finance_stranger_forged_65_4cat_f, 
+                                  finance_stranger_tricked_65_4cat_f) %>% 
+  names()
+
+# Apply function
+sr_aggr <- aggr(over_65_fin_cols, over_65_fin_2cat, over_65_fin_2cat_f)
+```
+
+## Abuse in the past year
+The category will be "yes" if the value is:
+  - Less than 1 month ago
+  - Between 1 month and less than 3 months ago
+  - Between 3 months and less than 6 months ago
+  - Between 6 months and less than 1 year ago
+  
+And "no" if the value is:
+  - Between 1 year and less than 3 years ago
+  - 3 or more years ago
+
+for any of the variables related to ever abuse.
+
+```{r}
+# create past year variables
+sr <- sr %>% 
+  mutate(
+    across(
+      .cols = matches("last_time_[0-9]+cat$"),
+      .fns  = ~ case_when(
+        .x <= 4         ~ "Yes",
+        .x >4 & .x <= 6 ~ "No",
+        TRUE            ~ NA
+      ),
+      .names = "{col}_py"
+    )
+  ) %>%
+  # rename the new columns
+  rename_with(
+    .cols   = ends_with("_py"),
+    .fn     = ~ gsub("_[0-9]+cat_py", "_py", .x)
+  )
+
+```
+
+### Physical abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+py_phys_cols <- sr %>% select(starts_with("physical") & ends_with("_py")) %>% names()
+
+# Apply function
+sr_aggr <- aggr(py_phys_cols, py_phys_2cat, py_phys_2cat_f)
+```
+
+### Sexual abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+py_sex_cols <- sr %>% select(starts_with("sexual") & ends_with("_py")) %>% names()
+
+# Apply function
+sr_aggr <- aggr(py_sex_cols, py_sex_2cat, py_sex_2cat_f)
+```
+
+### Emotional abuse
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+py_emo_cols <- sr %>% select(starts_with("emotional") & ends_with("_py")) %>% 
+  names()
+
+# Apply function
+sr_aggr <- aggr(py_emo_cols, py_emo_2cat, py_emo_2cat_f)
+```
+
+### Financial exploitation
+```{r}
+# Create list of columns that the aggregate variable will be determined by
+py_fin_cols <- sr %>% select(starts_with("finance") & ends_with("_py")) %>% 
+  names()
+
+# Apply function
+sr_aggr <- aggr(py_fin_cols, py_fin_2cat, py_fin_2cat_f)
+```
+
+### Any abuse
+```{r}
+sr_aggr <- sr_aggr %>%
+  mutate(
+    # Create a column that has a value of 1 if at least one of the ever physical abuse variables have a value of "yes".
+    ever_abuse_any_2cat = case_when(
+      if_any((starts_with("ever") & ends_with("2cat")), ~. == 1)  ~ 1,
+      if_all((starts_with("ever") & ends_with("2cat")), ~. == 0)   ~ 0,
+      TRUE                                     ~ NA
+    ),
+    # Create a factor variable
+    ever_abuse_any_2cat_f = factor(ever_abuse_any_2cat, 
+                    levels = c(1, 0),
+                    labels = c("Yes", "No")),
+    # Create a column that has a value of 1 if at least one of the ever physical abuse variables have a value of "yes".
+    over_65_abuse_any_2cat = case_when(
+      if_any((starts_with("over_65") & ends_with("2cat")), ~. == 1)  ~ 1,
+      if_all((starts_with("over_65") & ends_with("2cat")), ~. == 0)   ~ 0,
+      TRUE                                     ~ NA
+    ),
+    # Create a factor variable
+    over_65_abuse_any_2cat_f = factor(over_65_abuse_any_2cat, 
+                    levels = c(1, 0),
+                    labels = c("Yes", "No")),
+    # Create a column that has a value of 1 if at least one of the ever physical abuse variables have a value of "yes".
+    py_abuse_any_2cat = case_when(
+      if_any((starts_with("py") & ends_with("2cat")), ~. == 1)  ~ 1,
+      if_all((starts_with("py") & ends_with("2cat")), ~. == 0)  ~ 0,
+      TRUE                                                      ~ NA
+    ),
+    # Create a factor variable
+    py_abuse_any_2cat_f = factor(py_abuse_any_2cat, 
+                    levels = c(1, 0),
+                    labels = c("Yes", "No")),
+  )
+```
+
+
+# Create summary flextable
+
+## Descriptions
+```{r}
+descriptions <- c(
+ "Ever experienced physical mistreatment.",
+ "Ever experienced sexual mistreatment.",
+ "Ever experienced emotional mistreatment.",
+ "Ever experienced financial exploitation.",
+ "Experienced physical mistreatment at age 65 or older.",
+ "Experienced sexual mistreatment at age 65 or older.",
+ "Experienced emotional mistreatment at age 65 or older.",
+ "Experienced financial exploitation at age 65 or older.",
+ "Experienced physical mistreatment in the past year.",
+ "Experienced sexual mistreatment in the past year.",
+ "Experienced emotional mistreatment in the past year.",
+ "Experienced financial exploitation in the past year.",
+ "Ever experienced any type of abuse.",
+ "Experienced any type of abuse at age 65 or older.",
+ "Experienced any type of abuse in the past year."
+)
+
+var <- aggr_cols
+
+aggr_desc <- data.frame(var, descriptions)
+```
+
+
+
+```{r}
+aggr_cols <- sr_aggr %>% select(ends_with("cat_f")) %>% names()
+
+sum_aggr_list <- aggr_cols |>
+  rlang::set_names(aggr_cols) |> 
+  purrr::map(~ n_percent_ci(sr_aggr, !! rlang::sym(.x), 1))
+```
+
+```{r}
+sum_aggr_table <- purrr::map_dfr(
+  # Bind rows together
+  .x = aggr_cols,
+  .f = ~ dplyr::bind_rows(sum_aggr_list[[.x]])
+)
+
+# Reorder the columns so that `cat` comes after `var`
+sum_aggr_table <- sum_aggr_table |> 
+  dplyr::select(var, cat, everything())
+
+
+# Add description column 
+sum_aggr_table <- sum_aggr_table %>%
+  left_join(., aggr_desc, by = c("var"))
+
+```
+
+```{r}
+#| echo: false
+# Split data frame into list of data frames by variable
+sum_aggr_table_list <- split(sum_aggr_table, sum_aggr_table$var)
+
+```
+
+```{r, include = FALSE}
+# Create flextable
+cat_flextable <- function(var_name, table_list) {
+  # Extract each variable data frame from list 
+  df <- data.frame(table_list[[var_name]])
+  
+  # Set up table header line text including variable name and description
+  title_cap <- as_paragraph(var_name)
+  desc_cap <- df %>% select(descriptions) %>% unique() %>% toString() %>% as_paragraph()
+  format_border <- fp_border(color = "black")
+    
+    # Create flextable
+    flex_tab <- flextable(df, col_keys = c("var", "cat", "n", "formatted_stats")) %>%
+      # Rename columns
+      set_header_labels(
+        var = "Variable", 
+        cat = "Category", 
+        "n" = "N",
+        "formatted_stats" = "Percent of N (95% CI)") %>%
+      
+      # Shade alternating rows
+      bg(i = ~ cat == "No", 
+         bg = ("transparent"), 
+         part = "body") %>%
+      bg(i = ~ cat == "Yes", 
+         bg = ("#f1f1f1"), 
+         part = "body") %>%
+      
+      # Format Header lines
+      add_header_lines(desc_cap) %>%
+      add_header_lines(title_cap) %>%
+      bg(bg = "transparent", part = "header", i = c(1,2)) %>%
+      bold(i = 1, bold = TRUE, part = "header") %>%
+      align(align = "left", part = "header") %>%
+      # Add border lines to header
+      border_remove() %>%
+       surround(i = c(2,3), part = "header", border.bottom = format_border) %>%
+      
+      # Set width and alignment
+      width(width = 4.8, unit = "in") %>%
+      align(align = "left") %>%
+      # add space for website view
+      add_footer_lines("")
+    
+    flex_tab
+}
+```
+
+```{r, results ='asis', echo=FALSE}
+sum_aggr_flex <- lapply(aggr_cols, cat_flextable, table_list = sum_aggr_table_list)
+sum_aggr_flex
+```
+
+# Print Word File
+```{r}
+title_style <- fp_text_lite(font.size = 18, bold = TRUE)
+
+#  Create an empty Word document
+aggr_doc <- read_docx()
+
+aggr_doc <- aggr_doc %>%
+  
+  # Add Heading
+  body_add_fpar(fpar(ftext("Self Report Aggregate Variable Tables", prop = title_style))) %>%
+  body_add_par("")
+  
+
+for(var_name in aggr_cols) {
+ aggr_flex <- cat_flextable(var_name, sum_aggr_table_list)
+  # Set width of tables
+  aggr_flex <- aggr_flex %>% width(j = c(1,2,3,4), width = c(2.3, 1.4, 1.4, 1.7), unit = "in") %>%
+    # Remove space for document view
+    delete_part(part = "footer") %>%
+    # Prevent table breaking up into different pages.
+    paginate(init = TRUE, hdr_ftr = TRUE)
+  
+  # Align tables and add a separating empty line between each table    
+  aggr_doc <- aggr_doc %>%
+    body_add_flextable(aggr_flex, align = "left") %>%
+    body_add_par("")
+}  
+
+  
+
+# print the word document
+print(aggr_doc, target = "./self_report_aggregate.docx")
+```
+
+
