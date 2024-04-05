@@ -1,0 +1,600 @@
+---
+title: "Functions for Recoding, Factoring, and Relocating Columns"
+author: "Brad Cannel"
+date: "2024-04-05"
+---
+
+
+# Overview
+
+I created this code while reviewing `data_06_self_report_import.qmd`. As I'm writing this, it didn't seem like the payoff of changing all of the code was worth the effort. However, I want to save the code -- at least for now -- in case I change my mind or think I will find it useful in some other context. 
+
+This was part of this GitHub issue: https://github.com/orgs/brad-cannell/projects/5?pane=issue&itemId=46561798
+
+
+# Load packages
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(dplyr, warn.conflicts = FALSE)
+library(janitor, warn.conflicts = FALSE)
+```
+
+
+# Motivating example
+
+While reviewing `data_06_self_report_import.qmd`, I noticed that a lot of code was repetitive (making it harder to maintain and more error prone) and bulky (making it hard to read and reason about). Here is an example: 
+
+```{r}
+#| eval: false
+
+# Set levels for factors for different types of questions
+levels_yes_no <- c("Yes", "No", "Don't know", "Refused")
+
+levels_help <- c(
+  "Yes, one person", "Yes, more than one person", "No",
+  "Don't know", "Refused"
+)
+
+levels_reliable <- c(
+  "Not at all reliable", "Somewhat reliable",
+  "Very reliable", "Completely reliable", "Don’t know",
+  "Refused"
+)
+
+levels_person <- c(
+  "A spouse or partner", "An ex spouse or partner",
+  "A parent or step-parent", "A brother or sister",
+  "A son or daughter", "Another relative", "A coworker",
+  "A neighbor", "A friend", "Some other non-relative",
+  "Don't know", "Refused"
+)
+```
+
+### Neglect variables
+
+```{r}
+#| eval: false
+
+self_rep <- self_rep %>%
+  mutate(
+    across(
+      .cols = ,
+      .fns = ~ case_when(
+        .x == "Yes" ~ 1,
+        .x == "No" ~ 2,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
+      ),
+      .names = "{col}_4cat"
+    ),
+    across(
+      .cols = starts_with("neglect") & !ends_with("help") &
+        !ends_with("reliable") & !ends_with("person") & !ends_with("4cat"),
+      .fn = ~ factor(.x, levels = levels_yes_no),
+      .names = "{col}_4cat_f"
+    ),
+    across(
+      .cols = starts_with("neglect") & ends_with("help"),
+      .fns = ~ case_when(
+        .x == "Yes, one person" ~ 1,
+        .x == "Yes, more than one person" ~ 2,
+        .x == "No" ~ 3,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
+      ),
+      .names = "{col}_5cat"
+    ),
+    across(
+      .cols  = starts_with("neglect") & ends_with("help"),
+      .fns   = ~ factor(.x, levels = levels_help),
+      .names = "{col}_5cat_f"
+    ),
+    across(
+      .cols = starts_with("neglect") & ends_with("reliable"),
+      .fns = ~ case_when(
+        .x == "Not at all reliable" ~ 1,
+        .x == "Somewhat reliable" ~ 2,
+        .x == "Very reliable" ~ 3,
+        .x == "Completely reliable" ~ 4,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
+      ),
+      .names = "{col}_6cat"
+    ),
+    across(
+      .cols  = starts_with("neglect") & ends_with("reliable"),
+      .fns   = ~ factor(.x, levels = levels_reliable),
+      .names = "{col}_6cat_f"
+    ),
+    neglect_person_12cat = case_when(
+      neglect_person == "A spouse or partner" ~ 1,
+      neglect_person == "An ex spouse or partner" ~ 2,
+      neglect_person == "A parent or step-parent" ~ 3,
+      neglect_person == "A brother or sister" ~ 4,
+      neglect_person == "A son or daughter" ~ 5,
+      neglect_person == "Another relative" ~ 6,
+      neglect_person == "A coworker" ~ 7,
+      neglect_person == "A neighbor" ~ 8,
+      neglect_person == "A friend" ~ 9,
+      neglect_person == "Some other non-relative" ~ 10,
+      neglect_person == "Don't know" ~ 77,
+      neglect_person == "Refused" ~ 99
+    ),
+    neglect_person_12cat_f = factor(
+      neglect_person,
+      levels = levels_person
+    )
+  )
+```
+
+
+# Solutions
+
+- I want to use explicit column names with across(), as opposed to the combinations of tidyselectors. It makes the code easier to reason about.
+- I want to create a function that will take a column as an input, create a factor version that uses the "_f" naming convention, groups the new columns next to each other in the data, then deletes the character version of the column. I think I created something like this for L2C.
+
+```{r}
+# I'm just using this code to help me figure out the name of the columns that the original code was manipulating. Again, all these tidyselectors make it difficult to figure out which columns we are mutating.
+#  This code chunk should be deleted after we get rid of the tidyselectors in the mutate code.
+self_rep |> 
+  select(
+    starts_with("neglect") & !ends_with("help") & !ends_with("reliable") & !ends_with("person")
+  ) |> 
+  names() |> 
+  cat(sep = ', ')
+```
+
+Columns with Yes/No levels
+
+```{r}
+# For testing
+# Eventually move this to an R script.
+mtcars_test <- mtcars |> 
+  # Create character variables, because that's what we are working with in the
+  # DETECT data.
+  mutate(
+    # Two dichotomous variables so we can test the function inside of across()
+    vs = if_else(vs == 0, "No", "Yes"),
+    am = if_else(am == 0, "No", "Yes"),
+    # One variable with more than 2 levels
+    cyl = case_when(
+      cyl == 4 ~ "Four",
+      cyl == 6 ~ "Six",
+      cyl == 8 ~ "Eight"
+    )
+  )
+```
+
+Break this up into multiple functions
+
+```{r}
+char_to_num <- function(.data, .col, .recode) {
+  # Extract names from the named list
+  char_vals = names(.recode)
+  # Recode character values to numeric values
+  for (i in seq_along(char_vals)) {
+    .data[[.col]][.data[[.col]] == char_vals[i]] <- .recode[i]
+  }
+  .data[[.col]] <- as.numeric(.data[[.col]])
+  # Return data
+  .data
+}
+
+# I want this to work on one variable at a time. We will work on multiple
+# variables with across.
+char_to_num(mtcars_test, "vs", c("No" = 0, "Yes" = 1))
+```
+
+```{r}
+recode_factor_relocate <- function(.data, .col, .recode) {
+  # Create character version of column name
+  col_nm <- rlang::enquo(.col) |> rlang::as_name()
+  # Recode character values to numeric values 
+  df_out <- char_to_num(.data, col_nm, .recode)
+  # Create factor version of the variable
+  col_f <- paste(col_nm, "f", sep = "_")
+  df_out[[col_f]] <- factor(df_out[[col_nm]], .recode, names(.recode))
+  # Relocate the factor version after the numeric version
+  df_out <- dplyr::relocate(df_out, dplyr::all_of(col_f), .after = col_nm)
+  # Return data frame
+  df_out
+}
+
+# I want this to work on one variable at a time. We will work on multiple
+# variables with across.
+recode_factor_relocate(mtcars_test, vs, c("No" = 0, "Yes" = 1))
+```
+
+```{r}
+# Test with a variable that has more than one factor level
+recode_factor_relocate(mtcars_test, cyl, c("Four" = 4, "Six" = 6, "Eight" = 8))
+```
+
+The function above works for one variable at a time. Can I use it with multiple variables and across()?
+
+No, because I can't pass a data frame to the rhs of the equal sign in mutate.
+
+```{r}
+# Testing something simple to see how functions on the rhs of the equal sign work in mutate
+my_f <- function(x) {
+  factor(x)
+}
+mtcars_test |> 
+  mutate(am_f = my_f(am))
+```
+
+Hmmm, that works. So, maybe I can retool the function above. 
+
+Or maybe I can just pass the function I already created to map().
+
+
+```{r}
+# purrr::map(
+#   quos(am, vs),
+#   ~ recode_factor_relocate(mtcars_test, .x, c("No" = 0, "Yes" = 1))
+# )
+```
+
+That didn't work. I might need to retool the function.
+
+```{r}
+char_to_num_2 <- function(.col, .recode) {
+  # Extract names from the named list
+  char_vals = names(.recode)
+  # Recode character values to numeric values
+  for (i in seq_along(char_vals)) {
+    .col[.col == char_vals[i]] <- .recode[i]
+  }
+  .col <- as.numeric(.col)
+  # Return vector
+  .col
+}
+
+# I want this to work on one variable at a time. We will work on multiple
+# variables with across.
+mtcars_test |> 
+  mutate(vs = char_to_num_2(vs, c("No" = 0, "Yes" = 1)))
+```
+
+```{r}
+# Still needs to be retooled
+
+recode_factor_relocate_2 <- function(.col, .recode) {
+  # Create character version of column name
+  col_nm <- rlang::enquo(.col) |> rlang::as_name()
+  # Recode character values to numeric values
+  col_out <- char_to_num_2({{ .col }}, .recode)
+  # # Create factor version of the variable
+  # col_f <- paste(col_nm, "f", sep = "_")
+  # df_out[[col_f]] <- factor(df_out[[col_nm]], .recode, names(.recode))
+  # # Relocate the factor version after the numeric version
+  # df_out <- dplyr::relocate(df_out, dplyr::all_of(col_f), .after = col_nm)
+  # Return col
+  col_out
+}
+
+# I want this to work on one variable at a time. We will work on multiple
+# variables with across.
+mtcars_test |> 
+  mutate(vs = recode_factor_relocate_2(vs, c("No" = 0, "Yes" = 1)))
+```
+
+This also doesn't work because I can't update vs and create vs_f in the same function. I can only act on one column at a time inside mutate.
+
+How can I pass in an entire data frame and act only on certain columns of it? Just use a for loop?
+
+```{r}
+mtcars_test2 <- mtcars_test
+```
+
+```{r}
+for (col in c("vs", "am")) {
+  mtcars_test2 <- recode_factor_relocate(mtcars_test2, !!col, c("No" = 0, "Yes" = 1))
+}
+```
+
+```{r}
+purrr::walk(
+  c("vs", "am"),
+  \(col) mtcars_test2 <<- recode_factor_relocate(mtcars_test2, !!col, c("No" = 0, "Yes" = 1))
+)
+```
+
+Is there a way to use across() though?
+- Maybe do recode, then factor, then relocate?
+
+https://github.com/tidyverse/dplyr/issues/5703
+
+```{r}
+mtcars_test2 <- mtcars_test
+```
+
+```{r}
+mtcars_test2 %>% 
+  mutate({
+    data <- across(c(vs, am))
+    out <- recode_factor_relocate(data, !!col, c("No" = 0, "Yes" = 1))
+    out
+    # out <- purrr::map2_df(data, phq_var_labs, function(.x, .y) {
+    #   v <- case_when(
+    #     .x  < 2 ~ 0,
+    #     .x >= 2 ~ 1
+    #   )
+    #   attr(v, "label")  <- .y
+    #   attr(v, "labels") <- phq_var_labs
+    #   v  
+    # })
+    # names(out) <- glue::glue("{col}_dicot", col = names(out))
+    # out
+  })
+```
+
+Even if I can get the code above to work, it's too long. Not any shorter than using the full across() code below. Unless, I can just pass the function to mutate without a variable name on the lhs.
+
+```{r}
+mtcars_test2 %>% 
+  mutate(
+    across(
+      c(vs, am),
+      ~ {
+        out <- char_to_num_2(.x, c("No" = 0, "Yes" = 1))
+        out
+      }
+    )
+  )
+```
+
+```{r}
+mtcars_test2 %>% 
+  mutate(
+    across(
+      c(vs, am),
+      ~ {
+        .recode <- c("No" = 0, "Yes" = 1)
+        # Create character version of column name
+        col_nm <- deparse(substitute(.x))
+        # Recode character values to numeric values
+        col_out <- char_to_num_2(.x, .recode)
+        # Create factor version of the variable
+        col_f <- paste(col_nm, "f", sep = "_")
+        col_f <- factor(col_out, .recode, names(.recode))
+        # Relocate the factor version after the numeric version
+        # df_out <- dplyr::relocate(df_out, dplyr::all_of(col_f), .after = col_nm)
+        # # Return col
+        col_out
+      }
+    )
+  )
+```
+
+```{r}
+y_n_labs <- c("No" = 0, "Yes" = 1)
+
+mtcars_test2 |> 
+  mutate(across(c(vs, am), ~ char_to_num_2(.x, y_n_labs))) |> 
+  mutate(
+    across(
+      c(vs, am), 
+      # Make this into a function later
+      ~ {
+        # Create character version of column name
+        col_nm <- deparse(substitute(.x))
+        col_f <- factor(.x, y_n_labs, names(y_n_labs))
+      },
+      .names = "{col}_f"
+    )
+  )
+```
+
+```{r}
+y_n_labs <- c("No" = 0, "Yes" = 1)
+
+mtcars_test2 |> 
+  mutate(across(c(vs, am), ~ char_to_num_2(.x, y_n_labs))) |> 
+  mutate(
+    across(
+      c(vs, am), 
+      ~ factor(.x, y_n_labs, names(y_n_labs)),
+      .names = "{col}_f"
+    )
+  ) |> 
+  relocate(vs_f, .after = vs) |> 
+  relocate(am_f, .after = am)
+```
+
+Can I substitute the duplicated c(vs, am)?
+
+```{r}
+y_n_labs <- c("No" = 0, "Yes" = 1)
+vars <- c("vs", "am")
+
+mtcars_test2 |> 
+  mutate(across(all_of(vars), ~ char_to_num_2(.x, y_n_labs))) |> 
+  mutate(
+    across(
+      all_of(vars), 
+      ~ factor(.x, y_n_labs, names(y_n_labs)),
+      .names = "{col}_f"
+    )
+  ) |> 
+  relocate(vs_f, .after = vs) |> 
+  relocate(am_f, .after = am)
+```
+
+Can I functionize it more?
+
+```{r}
+char_to_num_3 <- function(.data, .cols, .recode) {
+  .data |> 
+    mutate(
+      across(
+        all_of(.cols),
+        ~ char_to_num_2(.x, .recode)
+      )
+    )
+}
+
+factors <- function(.data, .cols, .recode) {
+  .data |> 
+    mutate(
+      across(
+        all_of(.cols),
+        ~ factor(.x, .recode, names(.recode)),
+        .names = "{col}_f"
+      )
+    )
+}
+```
+
+
+```{r}
+y_n_labs <- c("No" = 0, "Yes" = 1)
+cols <- c("vs", "am")
+
+mtcars_test2 |> 
+  char_to_num_3(cols, y_n_labs) |> 
+  factors(cols, y_n_labs) |> 
+  relocate(vs_f, .after = vs) |> 
+  relocate(am_f, .after = am)
+```
+
+```{r}
+y_n_labs <- c("No" = 0, "Yes" = 1)
+cols <- c("vs", "am")
+
+mtcars_test3 <- mtcars_test2 |> 
+  char_to_num_3(cols, y_n_labs) |> 
+  factors(cols, y_n_labs)
+
+for (col in cols) {
+  col_f <- paste0(col, "_f")
+  mtcars_test3 <- mtcars_test3 |> 
+    relocate(col_f, .after = col)
+}
+```
+
+I think this might be the best I can do.
+
+Now, let's try it on the real data.
+
+```{r}
+char_to_num_2 <- function(.col, .recode) {
+  # Extract names from the named list
+  char_vals = names(.recode)
+  # Recode character values to numeric values
+  for (i in seq_along(char_vals)) {
+    .col[.col == char_vals[i]] <- .recode[i]
+  }
+  .col <- as.numeric(.col)
+  # Return vector
+  .col
+}
+
+# I want this to work on one variable at a time. We will work on multiple
+# variables with across.
+mtcars_test |> 
+  mutate(vs = char_to_num_2(vs, c("No" = 0, "Yes" = 1)))
+```
+
+```{r}
+# Create the final pair of helper functions
+char_to_num <- function(.col, .recode) {
+  # Extract names from the named list
+  char_vals = names(.recode)
+  # Recode character values to numeric values
+  for (i in seq_along(char_vals)) {
+    .col[.col == char_vals[i]] <- .recode[i]
+  }
+  .col <- as.numeric(.col)
+  # Return vector
+  .col
+}
+
+chars_to_nums <- function(.data, .cols, .recode) {
+  .data |> 
+    mutate(
+      across(
+        all_of(.cols),
+        ~ char_to_num_2(.x, .recode)
+      )
+    )
+}
+
+factors <- function(.data, .cols, .recode) {
+  .data |>
+    mutate(
+      across(
+        all_of(.cols),
+        ~ factor(.x, .recode, names(.recode)),
+        .names = "{col}_f"
+      )
+    )
+}
+
+y_n_labs <- c("No" = 0, "Yes" = 1)
+cols <- c("vs", "am")
+
+mtcars_test3 <- mtcars_test2 |> 
+  chars_to_nums(cols, y_n_labs) |> 
+  factors(cols, y_n_labs)
+
+for (col in cols) {
+  col_f <- paste0(col, "_f")
+  mtcars_test3 <- mtcars_test3 |>
+    relocate(col_f, .after = col)
+}
+```
+
+```{r}
+labs <- c("No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9)
+cols <- c(
+  "neglect_go", "neglect_food", "neglect_house", "neglect_clean", "neglect_ready", 
+  "neglect_bills"
+)
+
+self_rep_2 <- self_rep |> 
+  chars_to_nums(cols, labs) |> 
+  factors(cols, labs)
+
+for (col in cols) {
+  col_f <- paste0(col, "_f")
+  self_rep_2 <- self_rep_2 |>
+    relocate(col_f, .after = col)
+}
+
+select(self_rep_2, starts_with("neglect_"))
+```
+
+
+
+```{r}
+# self_rep <- 
+self_rep %>%
+  mutate(
+    across(
+      .cols = c(
+        neglect_go, neglect_food, neglect_house, neglect_clean, neglect_ready, 
+        neglect_bills
+      ),
+      .fns = ~ case_when(
+        .x == "Yes" ~ 1,
+        .x == "No" ~ 2,
+        .x == "Don't know" ~ 7,
+        .x == "Refused" ~ 9
+      ),
+      .names = "{col}_4cat"
+    ),
+    across(
+      .cols = c(
+        neglect_go, neglect_food, neglect_house, neglect_clean, neglect_ready, 
+        neglect_bills
+      ),
+      .fn = ~ factor(.x, levels = levels_yes_no),
+      .names = "{col}_4cat_f"
+    )
+  ) |> 
+  select(starts_with("neglect_go"))
+```
+

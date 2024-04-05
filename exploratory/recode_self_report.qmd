@@ -1,0 +1,80 @@
+---
+title: "Thinking Through Self-report Coding"
+---
+
+# Overview
+
+In this file, we thinking through the self-report variables.
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(dplyr, warn.conflicts = FALSE)
+library(janitor, warn.conflicts = FALSE)
+```
+
+
+# Load data
+
+Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki. 
+
+```{r}
+self_rep_path <- here::here("data", "cleaned_rds_files", "self_report_import.rds")
+```
+
+```{r}
+self_rep <- read_rds(self_rep_path)
+```
+
+
+# Negelect
+
+Example: Do you need someone to help you get to the places you need to go, for example do you need someone to drive you to the grocery store, a place of worship, the doctor?
+
+```{r}
+self_rep |> 
+  select(starts_with("neglect_go")) |> 
+  mutate(
+    neglect_go_potential = case_when(
+      is.na(neglect_go_4cat) | neglect_go_4cat == 7 | neglect_go_4cat == 9 ~ NA_real_, # Missing
+      neglect_go_4cat_f == "No" ~ 0, # No neglect potential
+      neglect_go_help_5cat_f == "No" ~ 1, # Potential neglect
+      is.na(neglect_go_help_5cat_f) | neglect_go_help_5cat_f == 7 | neglect_go_help_5cat_f == 9 ~ NA_real_, # Missing
+      neglect_go_reliable_6cat_f == "Not at all reliable" ~ 1, # Potential neglect
+      # neglect_go_reliable_6cat_f == "Somewhat reliable" ~ 1, # Potential neglect
+      is.na(neglect_go_reliable_6cat_f) | neglect_go_reliable_6cat_f == 7 | neglect_go_reliable_6cat_f == 9 ~ NA_real_, # Missing
+      TRUE ~ 0 # No neglect potential
+    )
+  ) |> 
+  # filter(neglect_go_help_5cat_f == "No")
+  freqtables::freq_table(neglect_go_potential)
+```
+
+This is how we would recode the neglect_help series of questions. We would do something similar for the other neglect questions. Then, do something like:
+
+IF neglect_go_potential == 1 OR neglect_food_potential == 1 | ..... THEN any_neglect = 1.
+IF neglect_go_potential == 0 AND neglect_food_potential == 0 | ..... THEN any_neglect = 0.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
