@@ -1,0 +1,25 @@
+---
+title: "Preliminary DETECT R01 analysis"
+---
+
+# Overview
+
+In this file, we import and do some initial cleaning of the Observational Measures data collected and stored in FileMaker Pro.
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(table1)
+library(dplyr)
+```
+
+
+# Load data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+sr <- read_rds("../data/cleaned_rds_files/self_report_import.rds")
+lpa <- read_rds("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
+par <- read_rds("../data/cleaned_rds_files/participant_import.rds")
+```
