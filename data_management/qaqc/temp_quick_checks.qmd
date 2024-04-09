@@ -1,0 +1,25 @@
+```{r}
+# 🔴 I'm just using this code to help me figure out the name of the columns that the original code was manipulating. Again, all these tidyselectors make it difficult to figure out which columns we are mutating.
+# This code chunk should be deleted after we get rid of the tidyselectors in the mutate code.
+self_rep |> 
+  select(
+    starts_with("finance") & ends_with("times")
+  ) |> 
+  names() |> 
+  cat(sep = ', ')
+```
+
+```{r}
+# 🔴 I'm just using this code for quick data checks. Don't keep in the qmd file
+self_rep |> 
+  select(starts_with("neglect_go")) |> 
+  filter(!is.na(finance_person_tricked_last_time))
+```
+
+```{r}
+testthat::test_that("Check the number of rows and columns after cleaning the financial columns", {
+  data_check <- dim(self_rep)
+  testthat::expect_equal(data_check, c(955, 257))
+})
+```
+
