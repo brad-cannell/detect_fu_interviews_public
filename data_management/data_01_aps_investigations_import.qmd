@@ -11,7 +11,6 @@ In this file, we import and do some initial cleaning of the APS Investigations d
 
 ```{r}
 library(dplyr, warn.conflicts = FALSE)
-library(readr)
 library(purrr)
 library(stringr)
 library(janitor, warn.conflicts = FALSE)
@@ -27,7 +26,7 @@ aps_inv_path <- here::here("data", "filemaker_pro_exports", "aps_investigations_
 ```
 
 ```{r}
-aps_inv <- read_csv(aps_inv_path)
+aps_inv <- readr::read_csv(aps_inv_path)
 ```
 
 ```{r}
@@ -153,7 +152,7 @@ aps_inv_path <- here::here("data", "cleaned_rds_files", "aps_investigations_impo
 ```
 
 ```{r}
-write_rds(aps_inv, aps_inv_path)
+readr::write_rds(aps_inv, aps_inv_path)
 ```
 
 
