@@ -226,7 +226,7 @@ relocate_factors <- function(.data, .cols) {
 ## Tests ----
 
 ### Results checks
-testthat::test_that("Test that factors results as expected", {
+testthat::test_that("Test that the relocate_factors() results area as expected", {
   y_n_labs <- c("No" = 0, "Yes" = 1)
   cols <- c("vs", "am")
   results <- mtcars_test |>
