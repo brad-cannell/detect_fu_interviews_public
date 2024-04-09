@@ -11,7 +11,6 @@ In this file, we import and do some initial cleaning of the EM self-report data 
 
 ```{r, message= FALSE}
 # Load all necessary libraries
-library(readr)
 library(dplyr, warn.conflicts = FALSE)
 library(janitor, warn.conflicts = FALSE)
 library(stringr)
@@ -22,6 +21,7 @@ library(stringr)
 
 ```{r}
 source(here::here("R", "recoding_factoring_relocating.R"))
+source(here::here("R", "nums_to_na.R"))
 ```
 
 
@@ -34,7 +34,8 @@ self_rep_path <- here::here("data", "filemaker_pro_exports", "self_report_import
 ```
 
 ```{r}
-self_rep <- read_csv(self_rep_path)
+self_rep <- readr::read_csv(self_rep_path)
+rm(self_rep_path)
 ```
 
 ```{r}
@@ -70,78 +71,162 @@ self_rep <- self_rep |>
 dim(self_rep) # 955 209
 ```
 
-## Create factor variables to match levels in follow-up interview protocol
+## Clean categorical variables
 
-NOTE: We considered recoding all "Don't Know" and "Refused" responses to missing in this file, but chose not to. In this file, we will keep the responses consistent with those that were selected during data collection. The "Don't Know" and "Refused" responses can be converted to missing when cleaning the data for specific analyses. That way, the reasons for missing data can still be evaluated.
+- By default, FM Pro exports all categorical variables as character variables.
+- When analyzing data in R, we prefer to work factors and occasionally with numeric values.
+- Below, we:
+  - Convert character values to numeric values
+  - Create a version of each column with "Don't know" and "Refused" converted to NA
+  - Create a factor version of each column (w/o "Don't know" and "Refused")
+  - Arrange the columns as: original column, numeric column w/o "Don't know" and "Refused", 
+    and the factor version of the column.
 
 ### Neglect variables
 
-Columns with Yes/No responses
+### Columns with Yes/No responses
 
 ```{r}
-# Columns of interest
+# Columns of interest for this code chunk
 cols <- c(
   "neglect_go", "neglect_food", "neglect_house", "neglect_clean", "neglect_ready", 
   "neglect_bills"
 )
 
-# labels for factors
-labs_no_yes <- c("No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9)
+# Numeric coding for character values in each column of interest
+value_labels <- c("No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9)
 
-self_rep <- self_rep |>
-  chars_to_nums(cols, labs_no_yes) |> 
-  factors(cols, labs_no_yes) |> 
-  relocate_factors(cols)
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |> 
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  factors(cols_suffix, factor_labs_levs) |> 
+  relocate_factors(cols_suffix)
 ```
 
-Columns with number of people responses
+### Columns with number of people responses
 
 ```{r}
-# Columns of interest
+# Columns of interest for this code chunk
 cols <- c(
   "neglect_go_help", "neglect_food_help", "neglect_house_help", "neglect_clean_help", 
   "neglect_ready_help", "neglect_bills_help"
 )
 
-# labels for factors
-labs_help <- c(
+# Numeric coding for character values in each column of interest
+value_labels <- c(
   "Yes, one person" = 1, "Yes, more than one person" = 2, "No" = 0,
   "Don’t know" = 7, "Refused" = 9
 )
 
-self_rep <- self_rep |> 
-  chars_to_nums(cols, labs_help) |> 
-  factors(cols, labs_help) |> 
-  relocate_factors(cols)
+# NA values
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "3cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  factors(cols_suffix, factor_labs_levs) |> 
+  relocate_factors(cols_suffix)
 ```
 
-Columns with reliability responses
+### Columns with reliability responses
 
 ```{r}
-# Columns of interest
+# Columns of interest for this code chunk
 cols <- c(
   "neglect_go_reliable", "neglect_food_reliable", "neglect_house_reliable", 
   "neglect_clean_reliable", "neglect_ready_reliable", "neglect_bills_reliable"
 )
 
-# labels for factors
-labs_reliable <- c(
+# Numeric coding for character values in each column of interest
+value_labels <- c(
   "Not at all reliable" = 1, "Somewhat reliable" = 2,
   "Very reliable" = 3, "Completely reliable" = 4, "Don’t know" = 7,
   "Refused" = 9
 )
 
-self_rep <- self_rep |> 
-  chars_to_nums(cols, labs_reliable) |> 
-  factors(cols, labs_reliable) |> 
-  relocate_factors(cols)
+# NA values
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  factors(cols_suffix, factor_labs_levs) |> 
+  relocate_factors(cols_suffix)
 ```
+
+### Person column
 
 Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
 
 ```{r}
-#Create dummy variables for race categories 1 = TRUE 0 = FALSE
-self_rep <- self_rep %>%
+# Create dummy variables for race categories 1 = TRUE 0 = FALSE
+self_rep <- self_rep |> 
   mutate(
     neglect_person_spouse         = str_detect(neglect_person, "A spouse or partner"),
     neglect_person_ex_partner     = str_detect(neglect_person, "An ex-spouse or parner"),
@@ -157,130 +242,301 @@ self_rep <- self_rep %>%
     neglect_person_refused        = str_detect(neglect_person, "Refused")
   ) |> 
   # Coerce True and False to 1 and 0
-  mutate(across(neglect_person_spouse:neglect_person_refused, ~ as.numeric(.x)))
+  mutate(across(neglect_person_spouse:neglect_person_refused, ~ as.numeric(.x))) |> 
+  # Relocate the dummy variables after the original variable
+  relocate(neglect_person_spouse:neglect_person_refused, .after = neglect_person)
+```
+
+```{r}
+testthat::test_that("Check the number of rows and columns after cleaning the neglect columns", {
+  data_check <- dim(self_rep)
+  testthat::expect_equal(data_check, c(955, 257))
+})
 ```
 
 ### Financial Exploitation Variables
-
-#### Set levels for factors used in these variables
 
 # 🔴 Delete
 
 Delete the code chunk below when no longer needed.
 
 ```{r}
-# Not needed, this variable is not used in this CSV
-levels_last_time <- c(
-  "Less than 1 month ago",
-  "Between 1 month and less than 3 months ago",
-  "Between 3 months and less than 6 months ago",
-  "Between 6 months and less than 1 year ago",
-  "Between 1 year and less than 3 years ago",
-  "3 or more years ago", "Don't know", "Refused"
-)
-
-levels_times <- c(
-  "1 or 2 times", "Between 3 and less than 5 times",
-  "Between 5 and less than 10 times",
-  "Between 10 and less than 20 times", "20 or more times",
-  "Don't know", "Refused"
-)
+# self_rep <- self_rep %>%
+#   mutate(
+#     across(
+#       .cols = starts_with("finance") & !ends_with("years") &
+#         !ends_with("times") & !ends_with("age") & !ends_with("person") &
+#         !ends_with("last_time"),
+#       .fns = ~ case_when(
+#         .x == "Yes" ~ 1,
+#         .x == "No" ~ 2,
+#         .x == "Don't know" ~ 7,
+#         .x == "Refused" ~ 9
+#       ),
+#       .names = "{col}_4cat"
+#     ),
+#     across(
+#       .cols = starts_with("finance") & !ends_with("years") &
+#         !ends_with("times") & !ends_with("age") & !ends_with("person") &
+#         !ends_with("last_time") & !ends_with("4cat"),
+#       .fns = ~ factor(.x, levels = levels_yes_no),
+#       .names = "{col}_4cat_f"
+#     ),
+#     finance_person_12cat = case_when(
+#       finance_person == "A spouse or partner" ~ 1,
+#       finance_person == "An ex spouse or partner" ~ 2,
+#       finance_person == "A parent or step-parent" ~ 3,
+#       finance_person == "A brother or sister" ~ 4,
+#       finance_person == "A son or daughter" ~ 5,
+#       finance_person == "Another relative" ~ 6,
+#       finance_person == "A coworker" ~ 7,
+#       finance_person == "A neighbor" ~ 8,
+#       finance_person == "A friend" ~ 9,
+#       finance_person == "Some other non-relative" ~ 10,
+#       finance_person == "Don't know" ~ 77,
+#       finance_person == "Refused" ~ 99
+#     ),
+#     finance_person_12cat_f = factor(
+#       finance_person,
+#       levels = levels_person
+#     ),
+#     across(
+#       .cols = starts_with("finance") & ends_with("last_time"),
+#       .fns = ~ case_when(
+#         .x == "Less than 1 month ago" ~ 1,
+#         .x == "Between 1 month and less than 3 months ago" ~ 2,
+#         .x == "Between 3 months and less than 6 months ago" ~ 3,
+#         .x == "Between 6 months and less than 1 year ago" ~ 4,
+#         .x == "Between 1 year and less than 3 years ago" ~ 5,
+#         .x == "3 or more years ago" ~ 6,
+#         .x == "Don't know" ~ 7,
+#         .x == "Refused" ~ 9
+#       ),
+#       .names = "{col}_8cat"
+#     ),
+#     across(
+#       .cols  = starts_with("finance") & ends_with("last_time"),
+#       .fns   = ~ factor(.x, levels = levels_last_time),
+#       .names =  "{col}_8cat_f"
+#     ),
+#     across(
+#       .cols = starts_with("finance") & ends_with("times") &
+#         !ends_with("times_times"),
+#       .fns = ~ case_when(
+#         .x == "1 or 2 times" ~ 1,
+#         .x == "Between 3 and less than 5 times" ~ 2,
+#         .x == "Between 5 and less than 10 times" ~ 3,
+#         .x == "Between 10 and less than 20 times" ~ 4,
+#         .x == "20 or more times" ~ 5,
+#         .x == "Don't know" ~ 7,
+#         .x == "Refused" ~ 9
+#       ),
+#       .names = "{col}_7cat"
+#     ),
+#     across(
+#       .cols  = starts_with("finance") & ends_with("times") &
+#         !ends_with("times_times"),
+#       .fns   = ~ factor(.x, levels = levels_times),
+#       .names =  "{col}_7cat_f"
+#     )
+#   )
 ```
 
-#### Recode categorical variables to factor variables
+### Columns with Yes/No responses
 
 ```{r}
-# 🔴 I'm just using this code to help me figure out the name of the columns that the original code was manipulating. Again, all these tidyselectors make it difficult to figure out which columns we are mutating.
-# This code chunk should be deleted after we get rid of the tidyselectors in the mutate code.
-self_rep |> 
-  select(
-    starts_with("neglect") & ends_with("reliable")
-  ) |> 
-  names() |> 
-  cat(sep = ', ')
+# Columns of interest for this code chunk
+cols <- c(
+  "finance_help", "finance_person_permission", "finance_person_decisions", 
+  "finance_copies", "finance_person_forged", "finance_person_tricked", 
+  "finance_person_stolen", "finance_stranger_permission", 
+  "finance_stranger_forged", "finance_stranger_tricked", 
+  "finance_person_permission_65", "finance_person_forged_65", 
+  "finance_person_tricked_65", "finance_person_stolen_65", 
+  "finance_stranger_permission_65", "finance_stranger_forged_65", 
+  "finance_stranger_tricked_65"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c("No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |> 
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  factors(cols_suffix, factor_labs_levs) |> 
+  relocate_factors(cols_suffix)
 ```
 
+### Person column
+
+Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
 
 ```{r}
+# Create dummy variables for race categories 1 = TRUE 0 = FALSE
 self_rep <- self_rep %>%
   mutate(
-    across(
-      .cols = starts_with("finance") & !ends_with("years") &
-        !ends_with("times") & !ends_with("age") & !ends_with("person") &
-        !ends_with("last_time"),
-      .fns = ~ case_when(
-        .x == "Yes" ~ 1,
-        .x == "No" ~ 2,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_4cat"
-    ),
-    across(
-      .cols = starts_with("finance") & !ends_with("years") &
-        !ends_with("times") & !ends_with("age") & !ends_with("person") &
-        !ends_with("last_time") & !ends_with("4cat"),
-      .fns = ~ factor(.x, levels = levels_yes_no),
-      .names = "{col}_4cat_f"
-    ),
-    finance_person_12cat = case_when(
-      finance_person == "A spouse or partner" ~ 1,
-      finance_person == "An ex spouse or partner" ~ 2,
-      finance_person == "A parent or step-parent" ~ 3,
-      finance_person == "A brother or sister" ~ 4,
-      finance_person == "A son or daughter" ~ 5,
-      finance_person == "Another relative" ~ 6,
-      finance_person == "A coworker" ~ 7,
-      finance_person == "A neighbor" ~ 8,
-      finance_person == "A friend" ~ 9,
-      finance_person == "Some other non-relative" ~ 10,
-      finance_person == "Don't know" ~ 77,
-      finance_person == "Refused" ~ 99
-    ),
-    finance_person_12cat_f = factor(
-      finance_person,
-      levels = levels_person
-    ),
-    across(
-      .cols = starts_with("finance") & ends_with("last_time"),
-      .fns = ~ case_when(
-        .x == "Less than 1 month ago" ~ 1,
-        .x == "Between 1 month and less than 3 months ago" ~ 2,
-        .x == "Between 3 months and less than 6 months ago" ~ 3,
-        .x == "Between 6 months and less than 1 year ago" ~ 4,
-        .x == "Between 1 year and less than 3 years ago" ~ 5,
-        .x == "3 or more years ago" ~ 6,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_8cat"
-    ),
-    across(
-      .cols  = starts_with("finance") & ends_with("last_time"),
-      .fns   = ~ factor(.x, levels = levels_last_time),
-      .names =  "{col}_8cat_f"
-    ),
-    across(
-      .cols = starts_with("finance") & ends_with("times") &
-        !ends_with("times_times"),
-      .fns = ~ case_when(
-        .x == "1 or 2 times" ~ 1,
-        .x == "Between 3 and less than 5 times" ~ 2,
-        .x == "Between 5 and less than 10 times" ~ 3,
-        .x == "Between 10 and less than 20 times" ~ 4,
-        .x == "20 or more times" ~ 5,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_7cat"
-    ),
-    across(
-      .cols  = starts_with("finance") & ends_with("times") &
-        !ends_with("times_times"),
-      .fns   = ~ factor(.x, levels = levels_times),
-      .names =  "{col}_7cat_f"
-    )
-  )
+    finance_person_spouse         = str_detect(finance_person, "A spouse or partner"),
+    finance_person_ex_partner     = str_detect(finance_person, "An ex-spouse or parner"),
+    finance_person_parent         = str_detect(finance_person, "A parent or step-parent"),
+    finance_person_sibling        = str_detect(finance_person, "A brother or sister"),
+    finance_person_child          = str_detect(finance_person, "A son or daughter"),
+    finance_person_other_relative = str_detect(finance_person, "Another relative"),
+    finance_person_coworker       = str_detect(finance_person, "A coworker"),
+    finance_person_neighbor       = str_detect(finance_person, "A neighbor"),
+    finance_person_friend         = str_detect(finance_person, "A friend"),
+    finance_person_non_relative   = str_detect(finance_person, "Some other non-relative"),
+    finance_person_dont_know      = str_detect(finance_person, "Don’t know"),
+    finance_person_refused        = str_detect(finance_person, "Refused")
+  ) |> 
+  # Coerce True and False to 1 and 0
+  mutate(across(finance_person_spouse:finance_person_refused, ~ as.numeric(.x))) |> 
+  # Relocate the dummy variables after the original variable
+  relocate(finance_person_spouse:finance_person_refused, .after = finance_person)
+```
+
+### When was the last time columns
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "finance_person_permission_last_time", "finance_person_forged_last_time", 
+  "finance_person_tricked_last_time", "finance_person_stolen_last_time", 
+  "finance_stranger_permission_last_time", "finance_stranger_forged_last_time", 
+  "finance_stranger_tricked_last_time"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Less than 1 month ago" = 1,
+  "Between 1 month and less than 3 months ago" = 2,
+  "Between 3 months and less than 6 months ago" = 3,
+  "Between 6 months and less than 1 year ago" = 4,
+  "Between 1 year and less than 3 years ago" =5,
+  "3 or more years ago" = 6, 
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "6cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |> 
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  factors(cols_suffix, factor_labs_levs) |> 
+  relocate_factors(cols_suffix)
+```
+
+### Number of times columns
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "finance_stranger_permission_times", "finance_stranger_permission_times_times", 
+  "finance_stranger_forged_times", "finance_stranger_forged_times_times", 
+  "finance_stranger_tricked_times", "finance_stranger_tricked_times_times"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "1 or 2 times" = 1, 
+  "Between 3 and less than 5 times" = 2,
+  "Between 5 and less than 10 times" = 3,
+  "Between 10 and less than 20 times" = 4, 
+  "20 or more times" = 5,
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# There is some weird issue with the encoding for "Don't know". When printed to
+# the screen, it looks the same to humans, but the values are encoded 
+# differently under the hood and R throws an error. To fix, we are overwriting 
+# all "Don't know" values to make them the same.
+for (col in cols) {
+  self_rep[[col]][self_rep[[col]] == "Don’t know"] <- "Don't know"
+}
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+sr <- sr |> 
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  factors(cols_suffix, factor_labs_levs) |> 
+  relocate_factors(cols_suffix)
+```
+
+```{r}
+testthat::test_that("Check the number of rows and columns after cleaning the financial columns", {
+  data_check <- dim(self_rep)
+  testthat::expect_equal(data_check, c(955, 257))
+})
 ```
 
 ### Emotional Mistreatment Variables
@@ -756,7 +1012,7 @@ self_rep_path <- here::here("data", "cleaned_rds_files", "self_report_import.rds
 ```
 
 ```{r}
-write_rds(self_rep, self_rep_path)
+readr::write_rds(self_rep, self_rep_path)
 ```
 
 
