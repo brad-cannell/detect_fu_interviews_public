@@ -26,6 +26,21 @@ detect_fu_merge  <- readRDS("../data/cleaned_rds_files/detect_fu_data_merged.rds
 sr <- filter_merged_df(detect_fu_merge, "_sfr")
 ```
 
+# Recode missing data
+
+Replace "Don't know" and "Refused" values with NA
+```{r}
+sr <- sr %>% mutate(
+  across(
+    .cols = matches("_[0-9]+cat_f"),
+    .fns = ~ case_when(
+      .x == "Refused" | .x == "Don't know" ~ NA,
+      TRUE                                 ~ .x
+    )
+  )
+)
+```
+
 # Create an aggregate variable of any self-reported abuse
 For each type of abuse, create a binary variable with yes/ no categories for: 
 - Ever abuse
@@ -119,13 +134,128 @@ ever_fin_cols <- sr %>% select(finance_person_permission_ea_4cat_f, finance_pers
 sr_aggr <- aggr(ever_fin_cols, ever_fin_2cat, ever_fin_2cat_f)
 ```
 
+### Potential Neglect
+
+Neglect potential will have a value of "Yes" when:
+  - Neglect "have help" variable has a value of "No" when the "need help" value is "Yes"
+  - Neglect variable with suffix "reliable" has value of "Not at all reliable" 
+  - Neglect variable with suffix "reliable" has value of "Somewhat reliable" (this will be looked at later but not included for now)
+  
+And "No" when:
+  - Neglect "need help variable" has value of "No"
+  - Neglect variable with suffix "reliable" has any other value besides "Not at all reliable" and is not missing.
+  
+It will be missing when:
+  - Neglect "need help variable" has a missing value. 
+  - Neglect "need help variable" has a value of "Yes" and any of the other variables have missing values.
+
+```{r}
+# Create a nested list of the names of the variables used to determine potential abuse
+neg_cols <- sr %>% select(starts_with("neglect") & matches("_[0-9]+cat_f") & !matches("neglect_person")) %>% names() %>% sort() %>% cbind() %>% 
+  split(., cut(seq_along(.), 6, labels = FALSE))
+neg_cols
+```
+
+```{r}
+for(i in 1:6){
+  pot_neg <- sr %>% 
+    mutate(
+      "{neg_cols[[i]][[1]]}_pot" := case_when(
+        # Potential neglect
+        sr[neg_cols[[i]][[1]]] == "Yes" & sr[neg_cols[[i]][[2]]] == "No" ~ 1, # Need help but don't have it
+        sr[neg_cols[[i]][[3]]] == "Not at all reliable"                  ~ 1, # Helper is not at all reliable
+        
+        # No potential neglect
+        sr[neg_cols[[i]][[1]]] == "No"                                   ~ 0, # Don't need help
+        sr[neg_cols[[i]][[3]]] != "Not at all reliable" & 
+          !is.na(sr[neg_cols[[i]][[3]]])                                 ~ 0, # Helper is at least somewhat reliable
+        
+        # Missing
+        sr[neg_cols[[i]][[1]]] == NA                                     ~ NA, # Need help value is missing
+        sr[neg_cols[[i]][[1]]] == "Yes" & 
+          (sr[neg_cols[[i]][[2]]] == NA | sr[neg_cols[[i]][[3]]] == NA)  ~ NA  # Need help value is yes but any of the other variables have missing values
+      )
+    ) %>% 
+    rename_with(
+      .cols   = ends_with("_pot"),
+      .fn     = ~ gsub("4cat_f_pot", "pot_2cat", .x)
+    ) %>% select(medstar_id, matches("_pot"))
+  # Merge with data frame of aggregate variables
+  sr_aggr <- sr_aggr %>% left_join(., pot_neg, by = "medstar_id")
+  
+}
+
+sr_aggr <- sr_aggr %>% 
+  mutate(
+    across(
+      .cols = ends_with("pot_2cat"),
+      .fns = ~ factor(.x,
+                    levels = c(1, 0),
+                    labels = c("Yes", "No")
+      ),
+      .names = "{col}_f"
+    )
+  )
+  
+  
+sr_aggr %>% freqtables::freq_table(neglect_go_pot_2cat_f)
+```
+
+#### Any potential negelct
+```{r}
+sr_aggr <- sr_aggr %>%
+  mutate(
+     any_pot_neglect_2cat = case_when(
+      if_any(ends_with("pot_2cat"), ~. == 1)  ~ 1,
+      if_all(ends_with("pot_2cat"), ~. == 0)  ~ 0,
+      TRUE                                    ~ NA
+    ),
+    # Create a factor variable
+    any_pot_neglect_2cat_f = factor(any_pot_neglect_2cat, 
+                    levels = c(1, 0),
+                    labels = c("Yes", "No"))   
+  )
+```
+
+
+## Recode 65 and last time variables
+
+If the value is "No" for any of the variables used in the ever variable determination, the values for the corresponding over 65 variable will be "No" and that of the last time variables will be "Never experienced" and not NA.
+```{r}
+# Create a nested list of the names of the variables used to determine ever, last time and 65 aggregate variables
+
+last_time_65_cols <- sr %>% select(matches("_65_[0-9]+cat_f"), matches("_last_time_[0-9]+cat_f")) %>% names()
+
+col_names <- c(ever_emo_cols, ever_fin_cols, ever_phys_cols, ever_sex_cols, last_time_65_cols) %>% sort() %>% cbind() %>% 
+  split(., cut(seq_along(.), 18, labels = FALSE))
+
+head(col_names)
+```
+
+```{r}
+for(i in 1:18){
+  sr <- sr %>% 
+    mutate(
+      # 65
+      "{col_names[[i]][[2]]}_rc" := case_when(
+        sr[col_names[[i]][[1]]] == "No" ~ "No",
+        TRUE                            ~ sr[[col_names[[i]][[2]]]]
+        ),
+      # last_time
+      "{col_names[[i]][[3]]}_rc" := case_when(
+        sr[col_names[[i]][[1]]] == "No" ~ "Never experienced",
+        TRUE                            ~ sr[[col_names[[i]][[3]]]]
+        )
+    )   
+}
+```
+
 ## Abuse over 65
-The category will be "yes" if the value is "yes" for any of the variables related to ever abuse.
 
 ### Physical abuse
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-over_65_phys_cols <- sr %>% select(physical_hit_65_4cat_f, physical_hurt_65_4cat_f, physical_restrain_65_4cat_f) %>% names()
+over_65_phys_cols <- sr %>% select(starts_with("physical") & matches("65_[0-9]+cat_f_rc$")) %>% names()
 
 # Apply function
 sr_aggr <- aggr(over_65_phys_cols, over_65_phys_2cat, over_65_phys_2cat_f)
@@ -134,8 +264,7 @@ sr_aggr <- aggr(over_65_phys_cols, over_65_phys_2cat, over_65_phys_2cat_f)
 ### Sexual abuse
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-over_65_sex_cols <- sr %>% select(sexual_harm_65_4cat_f, sexual_touched_65_4cat_f, sexual_forced_65_4cat_f, 
-                                  sexual_picture_65_4cat_f) %>% names()
+over_65_sex_cols <- sr %>% select(starts_with("sexual") & matches("65_[0-9]+cat_f_rc$")) %>% names()
 
 # Apply function
 sr_aggr <- aggr(over_65_sex_cols, over_65_sex_2cat, over_65_sex_2cat_f)
@@ -144,9 +273,7 @@ sr_aggr <- aggr(over_65_sex_cols, over_65_sex_2cat, over_65_sex_2cat_f)
 ### Emotional abuse
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-over_65_emo_cols <- sr %>% select(emotional_yelled_65_4cat_f, emotional_embarrassed_65_4cat_f, emotional_harassed_65_4cat_f,
-                               emotional_refused_65_4cat_f) %>% 
-  names()
+over_65_emo_cols <- sr %>% select(starts_with("emotional") & matches("65_[0-9]+cat_f_rc$")) %>% names()
 
 # Apply function
 sr_aggr <- aggr(over_65_emo_cols, over_65_emo_2cat, over_65_emo_2cat_f)
@@ -155,47 +282,44 @@ sr_aggr <- aggr(over_65_emo_cols, over_65_emo_2cat, over_65_emo_2cat_f)
 ### Financial exploitation
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-over_65_fin_cols <- sr %>% select(finance_person_permission_65_4cat_f, finance_person_forged_65_4cat_f,
-                                  finance_person_tricked_65_4cat_f, finance_person_stolen_65_4cat_f, 
-                                  finance_stranger_permission_65_4cat_f, finance_stranger_forged_65_4cat_f, 
-                                  finance_stranger_tricked_65_4cat_f) %>% 
-  names()
+over_65_fin_cols <- sr %>% select(starts_with("finance") & matches("65_[0-9]+cat_f_rc$")) %>% names()
 
 # Apply function
 sr_aggr <- aggr(over_65_fin_cols, over_65_fin_2cat, over_65_fin_2cat_f)
 ```
 
-## Abuse in the past year
+## Abuse in the past month
 The category will be "yes" if the value is:
   - Less than 1 month ago
+  
+And "no" if the value is:
   - Between 1 month and less than 3 months ago
   - Between 3 months and less than 6 months ago
   - Between 6 months and less than 1 year ago
-  
-And "no" if the value is:
   - Between 1 year and less than 3 years ago
   - 3 or more years ago
 
 for any of the variables related to ever abuse.
 
 ```{r}
-# create past year variables
+# create past month variables
 sr <- sr %>% 
   mutate(
     across(
-      .cols = matches("last_time_[0-9]+cat$"),
+      .cols = matches("last_time_[0-9]+cat_f_rc$"),
       .fns  = ~ case_when(
-        .x <= 4         ~ "Yes",
-        .x >4 & .x <= 6 ~ "No",
-        TRUE            ~ NA
+        .x == "Less than 1 month ago"                             ~ "Yes",
+        .x == "Never experienced" | 
+          (.x != "Less than 1 month ago" & !is.na(.x))            ~ "No",
+        TRUE                                                      ~ NA
       ),
-      .names = "{col}_py"
+      .names = "{col}_pm"
     )
   ) %>%
   # rename the new columns
   rename_with(
-    .cols   = ends_with("_py"),
-    .fn     = ~ gsub("_[0-9]+cat_py", "_py", .x)
+    .cols   = ends_with("_pm"),
+    .fn     = ~ gsub("_[0-9]+cat_f_rc_pm", "_pm", .x)
   )
 
 ```
@@ -203,39 +327,39 @@ sr <- sr %>%
 ### Physical abuse
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-py_phys_cols <- sr %>% select(starts_with("physical") & ends_with("_py")) %>% names()
+pm_phys_cols <- sr %>% select(starts_with("physical") & ends_with("_pm")) %>% names()
 
 # Apply function
-sr_aggr <- aggr(py_phys_cols, py_phys_2cat, py_phys_2cat_f)
+sr_aggr <- aggr(pm_phys_cols, pm_phys_2cat, pm_phys_2cat_f)
 ```
 
 ### Sexual abuse
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-py_sex_cols <- sr %>% select(starts_with("sexual") & ends_with("_py")) %>% names()
+pm_sex_cols <- sr %>% select(starts_with("sexual") & ends_with("_pm")) %>% names()
 
 # Apply function
-sr_aggr <- aggr(py_sex_cols, py_sex_2cat, py_sex_2cat_f)
+sr_aggr <- aggr(pm_sex_cols, pm_sex_2cat, pm_sex_2cat_f)
 ```
 
 ### Emotional abuse
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-py_emo_cols <- sr %>% select(starts_with("emotional") & ends_with("_py")) %>% 
+pm_emo_cols <- sr %>% select(starts_with("emotional") & ends_with("_pm")) %>% 
   names()
 
 # Apply function
-sr_aggr <- aggr(py_emo_cols, py_emo_2cat, py_emo_2cat_f)
+sr_aggr <- aggr(pm_emo_cols, pm_emo_2cat, pm_emo_2cat_f)
 ```
 
 ### Financial exploitation
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-py_fin_cols <- sr %>% select(starts_with("finance") & ends_with("_py")) %>% 
+pm_fin_cols <- sr %>% select(starts_with("finance") & ends_with("_pm")) %>% 
   names()
 
 # Apply function
-sr_aggr <- aggr(py_fin_cols, py_fin_2cat, py_fin_2cat_f)
+sr_aggr <- aggr(pm_fin_cols, pm_fin_2cat, pm_fin_2cat_f)
 ```
 
 ### Any abuse
@@ -244,8 +368,8 @@ sr_aggr <- sr_aggr %>%
   mutate(
     # Create a column that has a value of 1 if at least one of the ever physical abuse variables have a value of "yes".
     ever_abuse_any_2cat = case_when(
-      if_any((starts_with("ever") & ends_with("2cat")), ~. == 1)  ~ 1,
-      if_all((starts_with("ever") & ends_with("2cat")), ~. == 0)   ~ 0,
+      if_any((starts_with("ever") & ends_with("2cat")), ~. == 1) ~ 1,
+      if_all((starts_with("ever") & ends_with("2cat")), ~. == 0) ~ 0,
       TRUE                                     ~ NA
     ),
     # Create a factor variable
@@ -255,7 +379,7 @@ sr_aggr <- sr_aggr %>%
     # Create a column that has a value of 1 if at least one of the ever physical abuse variables have a value of "yes".
     over_65_abuse_any_2cat = case_when(
       if_any((starts_with("over_65") & ends_with("2cat")), ~. == 1)  ~ 1,
-      if_all((starts_with("over_65") & ends_with("2cat")), ~. == 0)   ~ 0,
+      if_all((starts_with("over_65") & ends_with("2cat")), ~. == 0)  ~ 0,
       TRUE                                     ~ NA
     ),
     # Create a factor variable
@@ -263,13 +387,13 @@ sr_aggr <- sr_aggr %>%
                     levels = c(1, 0),
                     labels = c("Yes", "No")),
     # Create a column that has a value of 1 if at least one of the ever physical abuse variables have a value of "yes".
-    py_abuse_any_2cat = case_when(
-      if_any((starts_with("py") & ends_with("2cat")), ~. == 1)  ~ 1,
-      if_all((starts_with("py") & ends_with("2cat")), ~. == 0)  ~ 0,
+    pm_abuse_any_2cat = case_when(
+      if_any((starts_with("pm") & ends_with("2cat")), ~. == 1)  ~ 1,
+      if_all((starts_with("pm") & ends_with("2cat")), ~. == 0)  ~ 0,
       TRUE                                                      ~ NA
     ),
     # Create a factor variable
-    py_abuse_any_2cat_f = factor(py_abuse_any_2cat, 
+    pm_abuse_any_2cat_f = factor(pm_abuse_any_2cat, 
                     levels = c(1, 0),
                     labels = c("Yes", "No")),
   )
@@ -280,11 +404,14 @@ sr_aggr <- sr_aggr %>%
 
 ## Descriptions
 ```{r}
+aggr_cols <- sr_aggr %>% select(ends_with("cat_f") & !starts_with("neglect_")) %>% names()
+
 descriptions <- c(
  "Ever experienced physical mistreatment.",
  "Ever experienced sexual mistreatment.",
  "Ever experienced emotional mistreatment.",
  "Ever experienced financial exploitation.",
+ "Potentially experienced any type of neglect",
  "Experienced physical mistreatment at age 65 or older.",
  "Experienced sexual mistreatment at age 65 or older.",
  "Experienced emotional mistreatment at age 65 or older.",
@@ -306,8 +433,6 @@ aggr_desc <- data.frame(var, descriptions)
 
 
 ```{r}
-aggr_cols <- sr_aggr %>% select(ends_with("cat_f")) %>% names()
-
 sum_aggr_list <- aggr_cols |>
   rlang::set_names(aggr_cols) |> 
   purrr::map(~ n_percent_ci(sr_aggr, !! rlang::sym(.x), 1))
