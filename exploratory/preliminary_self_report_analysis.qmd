@@ -111,6 +111,115 @@ sr_aggr <- aggr(ever_emo_cols, ever_emo_2cat, ever_emo_2cat_f)
 
 The question for finance_person_permission is not along the lines of "have you ever experienced some form of abuse?" but is "Does that person usually ask for your permission before deciding to spend your money or sell your property?" So a "Yes" for this variable will be equivalent to a "No" and vice versa.
 
+# 🔴 Brad's code below
+
+```{r}
+sr_test <- sr |> 
+  mutate(
+    fe_permission = case_when(
+      is.na(finance_help_4cat_f) ~ NA_real_,
+      finance_help_4cat_f == "No" ~ 0,
+      finance_person_permission_4cat_f == "Yes" ~ 0,
+      finance_person_permission_4cat_f == "No" ~ 1
+    ),
+    fe_forged = case_when(
+      is.na(finance_help_4cat_f) ~ NA_real_,
+      finance_help_4cat_f == "No" ~ 0,
+      finance_person_forged_4cat_f == "Yes" ~ 1,
+      finance_person_forged_4cat_f == "No" ~ 0
+    ),
+    fe_tricked = case_when(
+      is.na(finance_help_4cat_f) ~ NA_real_,
+      finance_help_4cat_f == "No" ~ 0,
+      finance_person_tricked_4cat_f == "Yes" ~ 1,
+      finance_person_tricked_4cat_f == "No" ~ 0
+    ),
+    fe_stolen = case_when(
+      is.na(finance_help_4cat_f) ~ NA_real_,
+      finance_help_4cat_f == "No" ~ 0,
+      finance_person_stolen_4cat_f == "Yes" ~ 1,
+      finance_person_stolen_4cat_f == "No" ~ 0
+    )
+  ) |> 
+  rowwise() |> 
+  mutate(fe_caregiver_count = sum(c_across(fe_permission:fe_stolen))) |> 
+  ungroup() |> 
+  mutate(fe_caregiver_any = (fe_caregiver_count > 0) |> as.numeric())
+```
+
+```{r}
+sr_test <- sr_test |> 
+  mutate(
+    finance_stranger_permission_4cat = case_when(
+      finance_stranger_permission_4cat == 7 ~ NA_real_,
+      finance_stranger_permission_4cat == 9 ~ NA_real_,
+      finance_stranger_permission_4cat == 2 ~ 0,
+      finance_stranger_permission_4cat == 1 ~ 1,
+    ),
+    finance_stranger_forged_4cat = case_when(
+      finance_stranger_forged_4cat == 7 ~ NA_real_,
+      finance_stranger_forged_4cat == 9 ~ NA_real_,
+      finance_stranger_forged_4cat == 2 ~ 0,
+      finance_stranger_forged_4cat == 1 ~ 1,
+    ),
+    finance_stranger_tricked_4cat = case_when(
+      finance_stranger_tricked_4cat == 7 ~ NA_real_,
+      finance_stranger_tricked_4cat == 9 ~ NA_real_,
+      finance_stranger_tricked_4cat == 2 ~ 0,
+      finance_stranger_tricked_4cat == 1 ~ 1,
+    )
+  ) |> 
+  rowwise() |> 
+  mutate(
+    fe_stranger_count = sum(
+      c_across(
+        c(
+          finance_stranger_permission_4cat, finance_stranger_forged_4cat, 
+          finance_stranger_tricked_4cat
+        )
+      )
+    , na.rm = TRUE)
+  ) |> 
+  ungroup() |> 
+  mutate(
+    fe_stranger_count_test = case_when(
+      fe_stranger_count > 0 ~ fe_stranger_count,
+      is.na(finance_stranger_permission_4cat) ~ NA_real_,
+      is.na(finance_stranger_forged_4cat) ~ NA_real_,
+      is.na(finance_stranger_tricked_4cat) ~ NA_real_,
+      TRUE ~ fe_stranger_count
+    )
+  ) |> 
+  mutate(fe_stranger_any = (fe_stranger_count_test > 0) |> as.numeric())
+```
+
+```{r}
+sr_test <- sr_test |> 
+  mutate(
+    fe_any = case_when(
+      fe_caregiver_any == 1 | fe_stranger_any == 1 ~ 1,
+      fe_caregiver_any == 0 & fe_stranger_any == 0 ~ 0,
+    )
+  )
+```
+
+```{r}
+sr_test |> 
+  freqtables::freq_table(fe_caregiver_any)
+```
+
+```{r}
+sr_test |> 
+  freqtables::freq_table(fe_stranger_any)
+```
+
+```{r}
+sr_test |> 
+  freqtables::freq_table(fe_any)
+```
+
+# 🔴 Brad's code above
+
 ```{r}
 # Create a new variable for finance_person_permission to reflect the inverse relationship to ever abuse.
 sr <- sr %>% 
