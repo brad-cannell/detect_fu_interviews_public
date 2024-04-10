@@ -40,7 +40,13 @@ rm(self_rep_path)
 
 ```{r}
 # Data check
-dim(self_rep) # 956 209
+dims <- c(956, 209)
+if (nrow(self_rep) != dims[1] || ncol(self_rep) != dims[2]) {
+  stop(
+    "Expecting ", dims[1], " rows and ", dims[2], " columns in self_rep. Found ",
+    paste(dim(self_rep), collapse = ", "), " instead. Check into it."
+  )
+}
 ```
 
 
@@ -84,7 +90,7 @@ dim(self_rep) # 955 209
 
 ### Neglect variables
 
-### Columns with Yes/No responses
+#### Columns with Yes/No responses
 
 ```{r}
 # Columns of interest for this code chunk
@@ -123,11 +129,13 @@ self_rep <- self_rep |>
   nums_to_nas(cols, na_values, suffix) |> 
   # Relocate new columns with NA values immediately after the original column
   relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
   factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
   relocate_factors(cols_suffix)
 ```
 
-### Columns with number of people responses
+#### Columns with number of people responses
 
 ```{r}
 # Columns of interest for this code chunk
@@ -169,11 +177,13 @@ self_rep <- self_rep |>
   nums_to_nas(cols, na_values, suffix) |> 
   # Relocate new columns with NA values immediately after the original column
   relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
   factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
   relocate_factors(cols_suffix)
 ```
 
-### Columns with reliability responses
+#### Columns with reliability responses
 
 ```{r}
 # Columns of interest for this code chunk
@@ -216,16 +226,18 @@ self_rep <- self_rep |>
   nums_to_nas(cols, na_values, suffix) |> 
   # Relocate new columns with NA values immediately after the original column
   relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
   factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
   relocate_factors(cols_suffix)
 ```
 
-### Person column
+#### Person column
 
 Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
 
 ```{r}
-# Create dummy variables for race categories 1 = TRUE 0 = FALSE
+# Create dummy variables for person categories 1 = TRUE 0 = FALSE
 self_rep <- self_rep |> 
   mutate(
     neglect_person_spouse         = str_detect(neglect_person, "A spouse or partner"),
@@ -247,102 +259,24 @@ self_rep <- self_rep |>
   relocate(neglect_person_spouse:neglect_person_refused, .after = neglect_person)
 ```
 
+#### Data check
+
+Number of columns after cleaning the neglect section.
+
 ```{r}
-testthat::test_that("Check the number of rows and columns after cleaning the neglect columns", {
-  data_check <- dim(self_rep)
-  testthat::expect_equal(data_check, c(955, 257))
-})
+# Data check
+ncols <- 257
+if (ncol(self_rep) != ncols) {
+  stop(
+    ncols, " columns expected in self_ref after cleaning the neglect variables. ", 
+    ncol(self_rep), " columns found. Check into it."
+  )
+}
 ```
 
 ### Financial Exploitation Variables
 
-# 🔴 Delete
-
-Delete the code chunk below when no longer needed.
-
-```{r}
-# self_rep <- self_rep %>%
-#   mutate(
-#     across(
-#       .cols = starts_with("finance") & !ends_with("years") &
-#         !ends_with("times") & !ends_with("age") & !ends_with("person") &
-#         !ends_with("last_time"),
-#       .fns = ~ case_when(
-#         .x == "Yes" ~ 1,
-#         .x == "No" ~ 2,
-#         .x == "Don't know" ~ 7,
-#         .x == "Refused" ~ 9
-#       ),
-#       .names = "{col}_4cat"
-#     ),
-#     across(
-#       .cols = starts_with("finance") & !ends_with("years") &
-#         !ends_with("times") & !ends_with("age") & !ends_with("person") &
-#         !ends_with("last_time") & !ends_with("4cat"),
-#       .fns = ~ factor(.x, levels = levels_yes_no),
-#       .names = "{col}_4cat_f"
-#     ),
-#     finance_person_12cat = case_when(
-#       finance_person == "A spouse or partner" ~ 1,
-#       finance_person == "An ex spouse or partner" ~ 2,
-#       finance_person == "A parent or step-parent" ~ 3,
-#       finance_person == "A brother or sister" ~ 4,
-#       finance_person == "A son or daughter" ~ 5,
-#       finance_person == "Another relative" ~ 6,
-#       finance_person == "A coworker" ~ 7,
-#       finance_person == "A neighbor" ~ 8,
-#       finance_person == "A friend" ~ 9,
-#       finance_person == "Some other non-relative" ~ 10,
-#       finance_person == "Don't know" ~ 77,
-#       finance_person == "Refused" ~ 99
-#     ),
-#     finance_person_12cat_f = factor(
-#       finance_person,
-#       levels = levels_person
-#     ),
-#     across(
-#       .cols = starts_with("finance") & ends_with("last_time"),
-#       .fns = ~ case_when(
-#         .x == "Less than 1 month ago" ~ 1,
-#         .x == "Between 1 month and less than 3 months ago" ~ 2,
-#         .x == "Between 3 months and less than 6 months ago" ~ 3,
-#         .x == "Between 6 months and less than 1 year ago" ~ 4,
-#         .x == "Between 1 year and less than 3 years ago" ~ 5,
-#         .x == "3 or more years ago" ~ 6,
-#         .x == "Don't know" ~ 7,
-#         .x == "Refused" ~ 9
-#       ),
-#       .names = "{col}_8cat"
-#     ),
-#     across(
-#       .cols  = starts_with("finance") & ends_with("last_time"),
-#       .fns   = ~ factor(.x, levels = levels_last_time),
-#       .names =  "{col}_8cat_f"
-#     ),
-#     across(
-#       .cols = starts_with("finance") & ends_with("times") &
-#         !ends_with("times_times"),
-#       .fns = ~ case_when(
-#         .x == "1 or 2 times" ~ 1,
-#         .x == "Between 3 and less than 5 times" ~ 2,
-#         .x == "Between 5 and less than 10 times" ~ 3,
-#         .x == "Between 10 and less than 20 times" ~ 4,
-#         .x == "20 or more times" ~ 5,
-#         .x == "Don't know" ~ 7,
-#         .x == "Refused" ~ 9
-#       ),
-#       .names = "{col}_7cat"
-#     ),
-#     across(
-#       .cols  = starts_with("finance") & ends_with("times") &
-#         !ends_with("times_times"),
-#       .fns   = ~ factor(.x, levels = levels_times),
-#       .names =  "{col}_7cat_f"
-#     )
-#   )
-```
-
-### Columns with Yes/No responses
+#### Columns with Yes/No responses
 
 ```{r}
 # Columns of interest for this code chunk
@@ -387,16 +321,18 @@ self_rep <- self_rep |>
   nums_to_nas(cols, na_values, suffix) |> 
   # Relocate new columns with NA values immediately after the original column
   relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
   factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
   relocate_factors(cols_suffix)
 ```
 
-### Person column
+#### Person column
 
 Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
 
 ```{r}
-# Create dummy variables for race categories 1 = TRUE 0 = FALSE
+# Create dummy variables for person categories 1 = TRUE 0 = FALSE
 self_rep <- self_rep %>%
   mutate(
     finance_person_spouse         = str_detect(finance_person, "A spouse or partner"),
@@ -418,7 +354,7 @@ self_rep <- self_rep %>%
   relocate(finance_person_spouse:finance_person_refused, .after = finance_person)
 ```
 
-### When was the last time columns
+#### When was the last time columns
 
 ```{r}
 # Columns of interest for this code chunk
@@ -468,18 +404,25 @@ self_rep <- self_rep |>
   nums_to_nas(cols, na_values, suffix) |> 
   # Relocate new columns with NA values immediately after the original column
   relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
   factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
   relocate_factors(cols_suffix)
 ```
 
-### Number of times columns
+#### Number of times columns
+
+There is some weird issue with the encoding for "Don't know" values in the `finance_stranger_permission_times` column. When printed to the screen, the value looks the same to humans, but the values are encoded differently (UTF-8) under the hood and R throws an error. To fix, we are overwriting the value.
+
+```{r}
+self_rep$finance_stranger_permission_times[!is.na(self_rep$finance_stranger_permission_times)] <- "Don't know"
+```
 
 ```{r}
 # Columns of interest for this code chunk
 cols <- c(
-  "finance_stranger_permission_times", "finance_stranger_permission_times_times", 
-  "finance_stranger_forged_times", "finance_stranger_forged_times_times", 
-  "finance_stranger_tricked_times", "finance_stranger_tricked_times_times"
+  "finance_stranger_permission_times", "finance_stranger_forged_times", 
+  "finance_stranger_tricked_times"
 )
 
 # Numeric coding for character values in each column of interest
@@ -507,13 +450,73 @@ factor_labs_levs <- value_labels[!value_labels %in% na_values]
 # changed to NA (Shouldn't need to change this code).
 cols_suffix <- paste(cols, suffix, sep = "_")
 
-# There is some weird issue with the encoding for "Don't know". When printed to
-# the screen, it looks the same to humans, but the values are encoded 
-# differently under the hood and R throws an error. To fix, we are overwriting 
-# all "Don't know" values to make them the same.
-for (col in cols) {
-  self_rep[[col]][self_rep[[col]] == "Don’t know"] <- "Don't know"
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Data check
+
+Number of columns after cleaning the financial exploitation section.
+
+```{r}
+# Data check
+ncols <- 323
+if (ncol(self_rep) != ncols) {
+  stop(
+    ncols, " columns expected in self_ref after cleaning the finance variables. ", 
+    ncol(self_rep), " columns found. Check into it."
+  )
 }
+```
+
+### Emotional Mistreatment Variables
+
+#### Columns with Yes/No responses
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "emotional_yelled", "emotional_embarrassed", "emotional_harassed", 
+  "emotional_refused", "emotional_incident_reported", "emotional_person_live", 
+  "emotional_person_alcohol", "emotional_person_counseling", 
+  "emotional_person_police", "emotional_person_job", "emotional_person_help", 
+  "emotional_person_no_live", 'emotional_incident_60', "emotional_yelled_65", 
+  "emotional_embarrassed_65", "emotional_harassed_65", 'emotional_refused_65', 
+  "emotional_incident_reported_v2", "emotional_person_live_then", 
+  "emotional_person_live_now"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c("No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
 
 # Prepare columns for analysis
 # - Convert character values to numeric values
@@ -521,292 +524,582 @@ for (col in cols) {
 # - Create a factor version of each column (w/o "Don't know" and "Refused")
 # - Arrange the columns as: original column, numeric column w/o "Don't know" and 
 #   "Refused", and the factor version of the column.
-sr <- sr |> 
+self_rep <- self_rep |> 
   # Convert character values to numeric values
   chars_to_nums(cols, value_labels) |> 
   # Create a version of each column with "Don't know" and "Refused" converted to NA
   nums_to_nas(cols, na_values, suffix) |> 
   # Relocate new columns with NA values immediately after the original column
   relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
   factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
   relocate_factors(cols_suffix)
 ```
 
-```{r}
-testthat::test_that("Check the number of rows and columns after cleaning the financial columns", {
-  data_check <- dim(self_rep)
-  testthat::expect_equal(data_check, c(955, 257))
-})
-```
+#### Person column
 
-### Emotional Mistreatment Variables
-
-#### Set levels to be used with these variables
+Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
 
 ```{r}
-levels_times <- c(
-  "1 or 2 times", "Between 3 and less than 5 times",
-  "Between 5 and less than 10 times",
-  "Between 10 and less than 20 times", "20 or more times",
-  "Don't know", "Refused"
-)
-
-levels_friends <- c(
-  "None", "Very few (1-3)", "Some (4-6)", "A lot (7+)",
-  "Don't know", "Refused"
-)
-
-levels_person_v2 <- c(
-  "A stranger", "A spouse or partner", "An ex spouse or partner",
-  "A parent or step-parent", "A brother or sister",
-  "A son or daughter", "Another relative", "A coworker",
-  "A neighbor", "A friend", "Some other non-relative",
-  "Don't know", "Refused"
-)
-```
-
-#### Recode categorical variables to factor variables
-
-```{r}
+# Create dummy variables for person categories 1 = TRUE 0 = FALSE
 self_rep <- self_rep %>%
   mutate(
-    across(
-      .cols = starts_with("emotional") & !ends_with("years") &
-        !ends_with("times") & !ends_with("age") & !ends_with("person") &
-        !ends_with("last_time") & !ends_with("friends") &
-        !ends_with("person_v2"),
-      .fns = ~ case_when(
-        .x == "Yes" ~ 1,
-        .x == "No" ~ 2,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_4cat"
-    ),
-    across(
-      .cols = starts_with("emotional") & !ends_with("years") &
-        !ends_with("times") & !ends_with("age") & !ends_with("person") &
-        !ends_with("last_time") & !ends_with("friends") & !ends_with("4cat") &
-        !ends_with("person_v2"),
-      .fns = ~ factor(.x, levels = levels_yes_no),
-      .names = "{col}_4cat_f"
-    ),
-    emotional_incident_person_12cat = case_when(
-      emotional_incident_person == "A stranger" ~ 1,
-      emotional_incident_person == "A spouse or partner" ~ 2,
-      emotional_incident_person == "An ex spouse or partner" ~ 3,
-      emotional_incident_person == "A parent or step-parent" ~ 4,
-      emotional_incident_person == "A brother or sister" ~ 5,
-      emotional_incident_person == "A son or daughter" ~ 6,
-      emotional_incident_person == "Another relative" ~ 7,
-      emotional_incident_person == "A coworker" ~ 8,
-      emotional_incident_person == "A neighbor" ~ 9,
-      emotional_incident_person == "A friend" ~ 10,
-      emotional_incident_person == "Some other non-relative" ~ 11,
-      emotional_incident_person == "Don't know" ~ 77,
-      emotional_incident_person == "Refused" ~ 99
-    ),
-    emotional_incident_person_12cat_f = factor(
-      emotional_incident_person,
-      levels = levels_person_v2
-    ),
-    across(
-      .cols = starts_with("emotional") & ends_with("last_time"),
-      .fns = ~ case_when(
-        .x == "Less than 1 month ago" ~ 1,
-        .x == "Between 1 month and less than 3 months ago" ~ 2,
-        .x == "Between 3 months and less than 6 months ago" ~ 3,
-        .x == "Between 6 months and less than 1 year ago" ~ 4,
-        .x == "Between 1 year and less than 3 years ago" ~ 5,
-        .x == "3 or more years ago" ~ 6,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_8cat"
-    ),
-    across(
-      .cols  = starts_with("emotional") & ends_with("last_time"),
-      .fns   = ~ factor(.x, levels = levels_last_time),
-      .names =  "{col}_8cat_f"
-    ),
-    across(
-      .cols = starts_with("emotional") & ends_with("times") &
-        !ends_with("times_times"),
-      .fns = ~ case_when(
-        .x == "1 or 2 times" ~ 1,
-        .x == "Between 3 and less than 5 times" ~ 2,
-        .x == "Between 5 and less than 10 times" ~ 3,
-        .x == "Between 10 and less than 20 times" ~ 4,
-        .x == "20 or more times" ~ 5,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_7cat"
-    ),
-    across(
-      .cols = starts_with("emotional") & ends_with("times") &
-        !ends_with("times_times"),
-      .fns = ~ factor(.x, levels = levels_times),
-      .names = "{col}_7cat_f"
-    ),
-    emotional_person_friends_6cat = case_when(
-      emotional_person_friends == "None" ~ 0,
-      emotional_person_friends == "Very few (1-3)" ~ 1,
-      emotional_person_friends == "Some (4-6)" ~ 2,
-      emotional_person_friends == "A lot (7+)" ~ 3,
-      emotional_person_friends == "Don't know" ~ 7,
-      emotional_person_friends == "Refused" ~ 9
-    ),
-    emotional_person_friends_6cat_f = factor(
-      emotional_person_friends,
-      levels = levels_friends
-    ),
-    # Are the levels the same for v2 and v1?
-    emotional_incident_person_v2_12cat = case_when(
-      emotional_incident_person_v2 == "A stranger" ~ 1,
-      emotional_incident_person_v2 == "A spouse or partner" ~ 2,
-      emotional_incident_person_v2 == "An ex spouse or partner" ~ 3,
-      emotional_incident_person_v2 == "A parent or step-parent" ~ 4,
-      emotional_incident_person_v2 == "A brother or sister" ~ 5,
-      emotional_incident_person_v2 == "A son or daughter" ~ 6,
-      emotional_incident_person_v2 == "Another relative" ~ 7,
-      emotional_incident_person_v2 == "A coworker" ~ 8,
-      emotional_incident_person_v2 == "A neighbor" ~ 9,
-      emotional_incident_person_v2 == "A friend" ~ 10,
-      emotional_incident_person_v2 == "Some other non-relative" ~ 11,
-      emotional_incident_person_v2 == "Don't know" ~ 77,
-      emotional_incident_person_v2 == "Refused" ~ 99
-    ),
-    emotional_incident_person_v2_12cat_f = factor(
-      emotional_incident_person_v2,
-      levels = levels_person_v2
-    ),
-  )
+    emotional_person_spouse         = str_detect(emotional_incident_person, "A spouse or partner"),
+    emotional_person_ex_partner     = str_detect(emotional_incident_person, "An ex-spouse or parner"),
+    emotional_person_parent         = str_detect(emotional_incident_person, "A parent or step-parent"),
+    emotional_person_sibling        = str_detect(emotional_incident_person, "A brother or sister"),
+    emotional_person_child          = str_detect(emotional_incident_person, "A son or daughter"),
+    emotional_person_other_relative = str_detect(emotional_incident_person, "Another relative"),
+    emotional_person_coworker       = str_detect(emotional_incident_person, "A coworker"),
+    emotional_person_neighbor       = str_detect(emotional_incident_person, "A neighbor"),
+    emotional_person_friend         = str_detect(emotional_incident_person, "A friend"),
+    emotional_person_non_relative   = str_detect(emotional_incident_person, "Some other non-relative"),
+    emotional_person_dont_know      = str_detect(emotional_incident_person, "Don’t know"),
+    emotional_person_refused        = str_detect(emotional_incident_person, "Refused")
+  ) |> 
+  # Coerce True and False to 1 and 0
+  mutate(across(emotional_person_spouse:emotional_person_refused, ~ as.numeric(.x))) |> 
+  # Relocate the dummy variables after the original variable
+  relocate(emotional_person_spouse:emotional_person_refused, .after = emotional_incident_person)
 ```
- 
+
+#### When was the last time columns
+
+There is some weird issue with the encoding for "Don't know" values in the `emotional_embarrassed_last_time` column. When printed to the screen, the value looks the same to humans, but the values are encoded differently (UTF-8) under the hood and R throws an error. To fix, we are overwriting the value.
+
+```{r}
+# unique(self_rep$emotional_embarrassed_last_time)
+# Encoding(unique(self_rep$emotional_embarrassed_last_time))
+```
+
+```{r}
+self_rep$emotional_embarrassed_last_time[self_rep$emotional_embarrassed_last_time == "Don’t know"] <- "Don't know"
+```
+
+```{r}
+# Encoding(unique(self_rep$emotional_embarrassed_last_time))
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "emotional_yelled_last_time", "emotional_embarrassed_last_time", 
+  "emotional_harassed_last_time", "emotional_refused_last_time"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Less than 1 month ago" = 1,
+  "Between 1 month and less than 3 months ago" = 2,
+  "Between 3 months and less than 6 months ago" = 3,
+  "Between 6 months and less than 1 year ago" = 4,
+  "Between 1 year and less than 3 years ago" =5,
+  "3 or more years ago" = 6, 
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "6cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Number of times columns
+
+There is some weird issue with the encoding for "Don't know" values in all of the columns in this section. When printed to the screen, the value looks the same to humans, but the values are encoded differently (UTF-8) under the hood and R throws an error. To fix, we are overwriting the value.
+
+```{r}
+# unique(self_rep$emotional_refused_times)
+# Encoding(unique(self_rep$emotional_refused_times))
+```
+
+```{r}
+self_rep$emotional_yelled_times[self_rep$emotional_yelled_times == "Don’t know"] <- "Don't know"
+self_rep$emotional_embarrassed_times[self_rep$emotional_embarrassed_times == "Don’t know"] <- "Don't know"
+self_rep$emotional_harassed_times[self_rep$emotional_harassed_times == "Don’t know"] <- "Don't know"
+self_rep$emotional_refused_times[self_rep$emotional_refused_times == "Don’t know"] <- "Don't know"
+```
+
+```{r}
+# Encoding(unique(self_rep$emotional_refused_times))
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "emotional_yelled_times", "emotional_embarrassed_times", 
+  "emotional_harassed_times", "emotional_refused_times"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "1 or 2 times" = 1, 
+  "Between 3 and less than 5 times" = 2,
+  "Between 5 and less than 10 times" = 3,
+  "Between 10 and less than 20 times" = 4, 
+  "20 or more times" = 5,
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Number of friends column
+
+There is some weird issue with the encoding for "Don't know" values in the `emotional_person_friends` column. When printed to the screen, the value looks the same to humans, but the values are encoded differently (UTF-8) under the hood and R throws an error. To fix, we are overwriting the value.
+
+```{r}
+self_rep$emotional_person_friends[self_rep$emotional_person_friends == "Don’t know"] <- "Don't know"
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("emotional_person_friends")
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "None" = 0, 
+  "Very few (1-3)" = 1,
+  "Some (4-6)" = 2,
+  "A lot (7+)" = 3, 
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |> 
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Person column
+
+Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
+
+The categories were a little different for `emotional_incident_person` and `emotional_incident_person_v2`.
+
+```{r}
+# Create dummy variables for person categories 1 = TRUE 0 = FALSE
+self_rep <- self_rep %>%
+  mutate(
+    emotional_person_stranger_v2       = str_detect(emotional_incident_person_v2, "A stranger"),
+    emotional_spouse_v2                = str_detect(emotional_incident_person_v2, "A spouse or partner"),
+    emotional_person_ex_partner_v2     = str_detect(emotional_incident_person_v2, "An ex-spouse or parner"),
+    emotional_person_parent_v2         = str_detect(emotional_incident_person_v2, "A parent or step-parent"),
+    emotional_person_sibling_v2        = str_detect(emotional_incident_person_v2, "A brother or sister"),
+    emotional_person_child_v2          = str_detect(emotional_incident_person_v2, "A son or daughter"),
+    emotional_person_other_relative_v2 = str_detect(emotional_incident_person_v2, "Another relative"),
+    emotional_person_coworker_v2       = str_detect(emotional_incident_person_v2, "A coworker"),
+    emotional_person_neighbor_v2       = str_detect(emotional_incident_person_v2, "A neighbor"),
+    emotional_person_friend_v2         = str_detect(emotional_incident_person_v2, "A friend"),
+    emotional_person_non_relative_v2   = str_detect(emotional_incident_person_v2, "Some other non-relative"),
+    emotional_person_dont_know_v2      = str_detect(emotional_incident_person_v2, "Don’t know"),
+    emotional_person_refused_v2        = str_detect(emotional_incident_person_v2, "Refused")
+  ) |> 
+  # Coerce True and False to 1 and 0
+  mutate(across(emotional_person_stranger_v2:emotional_person_refused_v2, ~ as.numeric(.x))) |> 
+  # Relocate the dummy variables after the original variable
+  relocate(emotional_person_stranger_v2:emotional_person_refused_v2, .after = emotional_incident_person_v2)
+```
+
+#### Data check
+
+Number of columns after cleaning the emotional mistreatment section.
+
+```{r}
+# Data check
+ncols <- 406
+if (ncol(self_rep) != ncols) {
+  stop(
+    ncols, " columns expected in self_ref after cleaning the emotional variables. ", 
+    ncol(self_rep), " columns found. Check into it."
+  )
+}
+```
+
 ### Physical Mistreatment Variables
 
-#### Recode categorical variables to factor variables
+#### Columns with Yes/No responses
 
 ```{r}
+# Columns of interest for this code chunk 
+cols <- c(
+  "physical_hit", "physical_restrain", "physical_hurt", "physical_incident_60", 
+  "physical_incident_reported", "physical_incident_person", 
+  "physical_person_live", "physical_person_alcohol", "physical_person_counseling", 
+  "physical_person_police", "physical_person_job", "physical_person_help", 
+  "physical_person_no_live", "physical_hit_65", "physical_restrain_65", 
+  "physical_hurt_65", "physical_incident_reported_v2", 
+  "physical_person_live_then", "physical_person_live_now"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c("No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### When was the last time columns
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "physical_hit_last_time", "physical_restrain_last_time", 
+  "physical_hurt_last_time"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Less than 1 month ago" = 1,
+  "Between 1 month and less than 3 months ago" = 2,
+  "Between 3 months and less than 6 months ago" = 3,
+  "Between 6 months and less than 1 year ago" = 4,
+  "Between 1 year and less than 3 years ago" =5,
+  "3 or more years ago" = 6, 
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "6cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Number of times columns
+
+There is some weird issue with the encoding for "Don't know" values in all of the columns in this section. When printed to the screen, the value looks the same to humans, but the values are encoded differently (UTF-8) under the hood and R throws an error. To fix, we are overwriting the value.
+
+```{r}
+# unique(self_rep$physical_hurt_times)
+# Encoding(unique(self_rep$physical_hurt_times))
+```
+
+```{r}
+self_rep$physical_hit_times[self_rep$physical_hit_times == "Don’t know"] <- "Don't know"
+self_rep$physical_restrain_times[self_rep$physical_restrain_times == "Don’t know"] <- "Don't know"
+self_rep$physical_hurt_times[self_rep$physical_hurt_times == "Don’t know"] <- "Don't know"
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "physical_hit_times", "physical_restrain_times", "physical_hurt_times"
+)
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "1 or 2 times" = 1, 
+  "Between 3 and less than 5 times" = 2,
+  "Between 5 and less than 10 times" = 3,
+  "Between 10 and less than 20 times" = 4, 
+  "20 or more times" = 5,
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Number of friends column
+
+There is some weird issue with the encoding for "Don't know" values in the `physical_person_friends` column. When printed to the screen, the value looks the same to humans, but the values are encoded differently (UTF-8) under the hood and R throws an error. To fix, we are overwriting the value.
+
+```{r}
+self_rep$physical_person_friends[self_rep$physical_person_friends == "Don’t know"] <- "Don't know"
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("physical_person_friends")
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "None" = 0, 
+  "Very few (1-3)" = 1,
+  "Some (4-6)" = 2,
+  "A lot (7+)" = 3, 
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Person column
+
+Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
+
+```{r}
+# Create dummy variables for person categories 1 = TRUE 0 = FALSE
 self_rep <- self_rep %>%
   mutate(
-    across(
-      .cols = starts_with("physical") & !ends_with("years") &
-        !ends_with("times") & !ends_with("age") &
-        !ends_with("last_time") & !ends_with("friends") &
-        !ends_with("person_v2"),
-      .fns = ~ case_when(
-        .x == "Yes" ~ 1,
-        .x == "No" ~ 2,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_4cat"
-    ),
-    across(
-      .cols = starts_with("physical") & !ends_with("years") &
-        !ends_with("times") & !ends_with("age") &
-        !ends_with("last_time") & !ends_with("friends") & !ends_with("4cat") &
-        !ends_with("person_v2"),
-      .fns = ~ factor(.x, levels = levels_yes_no),
-      .names = "{col}_4cat_f"
-    ),
-    across(
-      .cols = starts_with("physical") & ends_with("last_time"),
-      .fns = ~ case_when(
-        .x == "Less than 1 month ago" ~ 1,
-        .x == "Between 1 month and less than 3 months ago" ~ 2,
-        .x == "Between 3 months and less than 6 months ago" ~ 3,
-        .x == "Between 6 months and less than 1 year ago" ~ 4,
-        .x == "Between 1 year and less than 3 years ago" ~ 5,
-        .x == "3 or more years ago" ~ 6,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_8cat"
-    ),
-    across(
-      .cols  = starts_with("physical") & ends_with("last_time"),
-      .fns   = ~ factor(.x, levels = levels_last_time),
-      .names =  "{col}_8cat_f"
-    ),
-    across(
-      .cols = starts_with("physical") & ends_with("times") &
-        !ends_with("times_times"),
-      .fns = ~ case_when(
-        .x == "1 or 2 times" ~ 1,
-        .x == "Between 3 and less than 5 times" ~ 2,
-        .x == "Between 5 and less than 10 times" ~ 3,
-        .x == "Between 10 and less than 20 times" ~ 4,
-        .x == "20 or more times" ~ 5,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_7cat"
-    ),
-    across(
-      .cols = starts_with("physical") & ends_with("times") &
-        !ends_with("times_times"),
-      .fns = ~ factor(.x, levels = levels_times),
-      .names = "{col}_7cat_f"
-    ),
-    physical_person_friends_6cat = case_when(
-      physical_person_friends == "None" ~ 0,
-      physical_person_friends == "Very few (1-3)" ~ 1,
-      physical_person_friends == "Some (4-6)" ~ 2,
-      physical_person_friends == "A lot (7+)" ~ 3,
-      physical_person_friends == "Don't know" ~ 7,
-      physical_person_friends == "Refused" ~ 9
-    ),
-    physical_person_friends_6cat_f = factor(
-      physical_person_friends,
-      levels = levels_friends
-    ),
-    physical_incident_person_v2_12cat = case_when(
-      physical_incident_person_v2 == "A stranger" ~ 1,
-      physical_incident_person_v2 == "A spouse or partner" ~ 2,
-      physical_incident_person_v2 == "An ex spouse or partner" ~ 3,
-      physical_incident_person_v2 == "A parent or step-parent" ~ 4,
-      physical_incident_person_v2 == "A brother or sister" ~ 5,
-      physical_incident_person_v2 == "A son or daughter" ~ 6,
-      physical_incident_person_v2 == "Another relative" ~ 7,
-      physical_incident_person_v2 == "A coworker" ~ 8,
-      physical_incident_person_v2 == "A neighbor" ~ 9,
-      physical_incident_person_v2 == "A friend" ~ 10,
-      physical_incident_person_v2 == "Some other non-relative" ~ 11,
-      physical_incident_person_v2 == "Don't know" ~ 77,
-      physical_incident_person_v2 == "Refused" ~ 99
-    ),
-    physical_incident_person_v2_12cat_f = factor(
-      physical_incident_person_v2,
-      levels = levels_person_v2
-    ),
-    physical_person_12cat = case_when(
-      physical_person == "A stranger" ~ 1,
-      physical_person == "A spouse or partner" ~ 2,
-      physical_person == "An ex spouse or partner" ~ 3,
-      physical_person == "A parent or step-parent" ~ 4,
-      physical_person == "A brother or sister" ~ 5,
-      physical_person == "A son or daughter" ~ 6,
-      physical_person == "Another relative" ~ 7,
-      physical_person == "A coworker" ~ 8,
-      physical_person == "A neighbor" ~ 9,
-      physical_person == "A friend" ~ 10,
-      physical_person == "Some other non-relative" ~ 11,
-      physical_person == "Don't know" ~ 77,
-      physical_person == "Refused" ~ 99
-    ),
-    physical_person_12cat_f = factor(
-      physical_person,
-      levels = levels_person_v2
-    )
+    physical_person_stranger_v2       = str_detect(physical_incident_person_v2, "A stranger"),
+    physical_spouse_v2                = str_detect(physical_incident_person_v2, "A spouse or partner"),
+    physical_person_ex_partner_v2     = str_detect(physical_incident_person_v2, "An ex-spouse or parner"),
+    physical_person_parent_v2         = str_detect(physical_incident_person_v2, "A parent or step-parent"),
+    physical_person_sibling_v2        = str_detect(physical_incident_person_v2, "A brother or sister"),
+    physical_person_child_v2          = str_detect(physical_incident_person_v2, "A son or daughter"),
+    physical_person_other_relative_v2 = str_detect(physical_incident_person_v2, "Another relative"),
+    physical_person_coworker_v2       = str_detect(physical_incident_person_v2, "A coworker"),
+    physical_person_neighbor_v2       = str_detect(physical_incident_person_v2, "A neighbor"),
+    physical_person_friend_v2         = str_detect(physical_incident_person_v2, "A friend"),
+    physical_person_non_relative_v2   = str_detect(physical_incident_person_v2, "Some other non-relative"),
+    physical_person_dont_know_v2      = str_detect(physical_incident_person_v2, "Don’t know"),
+    physical_person_refused_v2        = str_detect(physical_incident_person_v2, "Refused")
+  ) |> 
+  # Coerce True and False to 1 and 0
+  mutate(across(physical_person_stranger_v2:physical_person_refused_v2, ~ as.numeric(.x))) |> 
+  # Relocate the dummy variables after the original variable
+  relocate(physical_person_stranger_v2:physical_person_refused_v2, .after = physical_incident_person_v2)
+```
+
+```{r}
+# Create dummy variables for person categories 1 = TRUE 0 = FALSE
+self_rep <- self_rep %>%
+  mutate(
+    physical_person_stranger       = str_detect(physical_incident_person, "A stranger"),
+    physical_spouse                = str_detect(physical_incident_person, "A spouse or partner"),
+    physical_person_ex_partner     = str_detect(physical_incident_person, "An ex-spouse or parner"),
+    physical_person_parent         = str_detect(physical_incident_person, "A parent or step-parent"),
+    physical_person_sibling        = str_detect(physical_incident_person, "A brother or sister"),
+    physical_person_child          = str_detect(physical_incident_person, "A son or daughter"),
+    physical_person_other_relative = str_detect(physical_incident_person, "Another relative"),
+    physical_person_coworker       = str_detect(physical_incident_person, "A coworker"),
+    physical_person_neighbor       = str_detect(physical_incident_person, "A neighbor"),
+    physical_person_friend         = str_detect(physical_incident_person, "A friend"),
+    physical_person_non_relative   = str_detect(physical_incident_person, "Some other non-relative"),
+    physical_person_dont_know      = str_detect(physical_incident_person, "Don’t know"),
+    physical_person_refused        = str_detect(physical_incident_person, "Refused")
+  ) |> 
+  # Coerce True and False to 1 and 0
+  mutate(across(physical_person_stranger:physical_person_refused, ~ as.numeric(.x))) |> 
+  # Relocate the dummy variables after the original variable
+  relocate(physical_person_stranger:physical_person_refused, .after = physical_incident_person)
+```
+
+#### Data check
+
+Number of columns after cleaning the physical mistreatment section.
+
+```{r}
+# Data check
+ncols <- 484
+if (ncol(self_rep) != ncols) {
+  stop(
+    ncols, " columns expected in self_ref after cleaning the physical variables. ", 
+    ncol(self_rep), " columns found. Check into it."
   )
+}
 ```
 
 ### Sexual mistreatment variables
 
-#### Recode categorical variables to factor variables
+# 🔴 Ebie's code
 
 ```{r}
 self_rep <- self_rep %>%
