@@ -6,11 +6,22 @@ title: "Import Data from FileMaker Pro: Self Report"
 
 In this file, we import and do some initial cleaning of the EM self-report data collected and stored in FileMaker Pro.
 
+
+# Load packages
+
 ```{r, message= FALSE}
 # Load all necessary libraries
 library(readr)
 library(dplyr, warn.conflicts = FALSE)
 library(janitor, warn.conflicts = FALSE)
+library(stringr)
+```
+
+
+# Load custom functions
+
+```{r}
+source(here::here("R", "recoding_factoring_relocating.R"))
 ```
 
 
@@ -61,110 +72,101 @@ dim(self_rep) # 955 209
 
 ## Create factor variables to match levels in follow-up interview protocol
 
-### Self-report injury, violence, neglect, and exploitation
-
-```{r}
-# Set levels for factors for different types of questions
-levels_yes_no <- c("Yes", "No", "Don't know", "Refused")
-
-levels_help <- c(
-  "Yes, one person", "Yes, more than one person", "No",
-  "Don't know", "Refused"
-)
-
-levels_reliable <- c(
-  "Not at all reliable", "Somewhat reliable",
-  "Very reliable", "Completely reliable", "Don’t know",
-  "Refused"
-)
-
-levels_person <- c(
-  "A spouse or partner", "An ex spouse or partner",
-  "A parent or step-parent", "A brother or sister",
-  "A son or daughter", "Another relative", "A coworker",
-  "A neighbor", "A friend", "Some other non-relative",
-  "Don't know", "Refused"
-)
-```
+NOTE: We considered recoding all "Don't Know" and "Refused" responses to missing in this file, but chose not to. In this file, we will keep the responses consistent with those that were selected during data collection. The "Don't Know" and "Refused" responses can be converted to missing when cleaning the data for specific analyses. That way, the reasons for missing data can still be evaluated.
 
 ### Neglect variables
 
+Columns with Yes/No responses
+
 ```{r}
+# Columns of interest
+cols <- c(
+  "neglect_go", "neglect_food", "neglect_house", "neglect_clean", "neglect_ready", 
+  "neglect_bills"
+)
+
+# labels for factors
+labs_no_yes <- c("No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9)
+
+self_rep <- self_rep |>
+  chars_to_nums(cols, labs_no_yes) |> 
+  factors(cols, labs_no_yes) |> 
+  relocate_factors(cols)
+```
+
+Columns with number of people responses
+
+```{r}
+# Columns of interest
+cols <- c(
+  "neglect_go_help", "neglect_food_help", "neglect_house_help", "neglect_clean_help", 
+  "neglect_ready_help", "neglect_bills_help"
+)
+
+# labels for factors
+labs_help <- c(
+  "Yes, one person" = 1, "Yes, more than one person" = 2, "No" = 0,
+  "Don’t know" = 7, "Refused" = 9
+)
+
+self_rep <- self_rep |> 
+  chars_to_nums(cols, labs_help) |> 
+  factors(cols, labs_help) |> 
+  relocate_factors(cols)
+```
+
+Columns with reliability responses
+
+```{r}
+# Columns of interest
+cols <- c(
+  "neglect_go_reliable", "neglect_food_reliable", "neglect_house_reliable", 
+  "neglect_clean_reliable", "neglect_ready_reliable", "neglect_bills_reliable"
+)
+
+# labels for factors
+labs_reliable <- c(
+  "Not at all reliable" = 1, "Somewhat reliable" = 2,
+  "Very reliable" = 3, "Completely reliable" = 4, "Don’t know" = 7,
+  "Refused" = 9
+)
+
+self_rep <- self_rep |> 
+  chars_to_nums(cols, labs_reliable) |> 
+  factors(cols, labs_reliable) |> 
+  relocate_factors(cols)
+```
+
+Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
+
+```{r}
+#Create dummy variables for race categories 1 = TRUE 0 = FALSE
 self_rep <- self_rep %>%
   mutate(
-    across(
-      .cols = ,
-      .fns = ~ case_when(
-        .x == "Yes" ~ 1,
-        .x == "No" ~ 2,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_4cat"
-    ),
-    across(
-      .cols = starts_with("neglect") & !ends_with("help") &
-        !ends_with("reliable") & !ends_with("person") & !ends_with("4cat"),
-      .fn = ~ factor(.x, levels = levels_yes_no),
-      .names = "{col}_4cat_f"
-    ),
-    across(
-      .cols = starts_with("neglect") & ends_with("help"),
-      .fns = ~ case_when(
-        .x == "Yes, one person" ~ 1,
-        .x == "Yes, more than one person" ~ 2,
-        .x == "No" ~ 3,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_5cat"
-    ),
-    across(
-      .cols  = starts_with("neglect") & ends_with("help"),
-      .fns   = ~ factor(.x, levels = levels_help),
-      .names = "{col}_5cat_f"
-    ),
-    across(
-      .cols = starts_with("neglect") & ends_with("reliable"),
-      .fns = ~ case_when(
-        .x == "Not at all reliable" ~ 1,
-        .x == "Somewhat reliable" ~ 2,
-        .x == "Very reliable" ~ 3,
-        .x == "Completely reliable" ~ 4,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_6cat"
-    ),
-    across(
-      .cols  = starts_with("neglect") & ends_with("reliable"),
-      .fns   = ~ factor(.x, levels = levels_reliable),
-      .names = "{col}_6cat_f"
-    ),
-    neglect_person_12cat = case_when(
-      neglect_person == "A spouse or partner" ~ 1,
-      neglect_person == "An ex spouse or partner" ~ 2,
-      neglect_person == "A parent or step-parent" ~ 3,
-      neglect_person == "A brother or sister" ~ 4,
-      neglect_person == "A son or daughter" ~ 5,
-      neglect_person == "Another relative" ~ 6,
-      neglect_person == "A coworker" ~ 7,
-      neglect_person == "A neighbor" ~ 8,
-      neglect_person == "A friend" ~ 9,
-      neglect_person == "Some other non-relative" ~ 10,
-      neglect_person == "Don't know" ~ 77,
-      neglect_person == "Refused" ~ 99
-    ),
-    neglect_person_12cat_f = factor(
-      neglect_person,
-      levels = levels_person
-    )
-  )
+    neglect_person_spouse         = str_detect(neglect_person, "A spouse or partner"),
+    neglect_person_ex_partner     = str_detect(neglect_person, "An ex-spouse or parner"),
+    neglect_person_parent         = str_detect(neglect_person, "A parent or step-parent"),
+    neglect_person_sibling        = str_detect(neglect_person, "A brother or sister"),
+    neglect_person_child          = str_detect(neglect_person, "A son or daughter"),
+    neglect_person_other_relative = str_detect(neglect_person, "Another relative"),
+    neglect_person_coworker       = str_detect(neglect_person, "A coworker"),
+    neglect_person_neighbor       = str_detect(neglect_person, "A neighbor"),
+    neglect_person_friend         = str_detect(neglect_person, "A friend"),
+    neglect_person_non_relative   = str_detect(neglect_person, "Some other non-relative"),
+    neglect_person_dont_know      = str_detect(neglect_person, "Don’t know"),
+    neglect_person_refused        = str_detect(neglect_person, "Refused")
+  ) |> 
+  # Coerce True and False to 1 and 0
+  mutate(across(neglect_person_spouse:neglect_person_refused, ~ as.numeric(.x)))
 ```
-  
+
 ### Financial Exploitation Variables
 
 #### Set levels for factors used in these variables
+
+# 🔴 Delete
+
+Delete the code chunk below when no longer needed.
 
 ```{r}
 # Not needed, this variable is not used in this CSV
@@ -186,6 +188,18 @@ levels_times <- c(
 ```
 
 #### Recode categorical variables to factor variables
+
+```{r}
+# 🔴 I'm just using this code to help me figure out the name of the columns that the original code was manipulating. Again, all these tidyselectors make it difficult to figure out which columns we are mutating.
+# This code chunk should be deleted after we get rid of the tidyselectors in the mutate code.
+self_rep |> 
+  select(
+    starts_with("neglect") & ends_with("reliable")
+  ) |> 
+  names() |> 
+  cat(sep = ', ')
+```
+
 
 ```{r}
 self_rep <- self_rep %>%
