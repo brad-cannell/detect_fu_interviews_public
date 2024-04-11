@@ -4,14 +4,13 @@ title: "Check consent"
 
 # Purpose
 
-The consent data set does not contain all of the Medstar IDs that are contained in the other data sets downloaded from FileMaker Pro. The purpose of the code in this file is to inventory the Medstar IDs that are not found in the consent data set and make sure they shouldn't be included in the count of DETECT follow up interviews completed.
+The consent data set does not contain all of the MedStar IDs that are contained in the other data sets downloaded from FileMaker Pro. The purpose of the code in this file is to inventory the MedStar IDs that are not found in the consent data set and make sure they shouldn't be included in the count of DETECT follow up interviews completed.
 
 
 # Load Packages
 
 ```{r}
 library(dplyr, warn.conflicts = FALSE)
-library(readr)
 library(purrr)
 ```
 
@@ -55,16 +54,20 @@ iwalk(
   }
 )
 
-# aps : 951 22 
+# aps : 951 26 
 # con : 1013 17 
 # cls : 893 29 
 # glh : 955 105 
 # lpa : 6838 38 
 # obs : 935 132 
 # par : 92160 84 
-# sfr : 956 351 
+# sfr : 955 574 
 # soc : 963 52 
 # detect_fu_data_merged : 98200 799 
+
+# These may change over time if we modify the data. Because we are only checking 
+# MedStar IDs in this file, changes to the number of columns are not likely to 
+# matter much. Changes to the number of rows may or may not be important.
 ```
 
 
@@ -83,9 +86,9 @@ rm(names_paths)
 ```
 
 
-# List all MedStar ids
+# List all MedStar IDs
 
-Create a named list containing the unique MedStar ids that are present in each of the cleaned data frames.
+Create a named list containing the unique MedStar IDs that are present in each of the cleaned data frames.
 
 ```{r}
 medstar_ids_list <- map(
@@ -96,9 +99,9 @@ medstar_ids_list <- map(
 ```
 
 
-# List missing MedStar ids
+# List missing MedStar IDs
 
-Create named list containing all of the MedStar ids that exist in each of the follow-up interview data frames, but do not exist in the consent data frame.
+Create named list containing all of the MedStar IDs that exist in each of the follow-up interview data frames, but do not exist in the consent data frame.
 
 ```{r}
 medstar_ids_not_in_con <- map(
@@ -108,9 +111,9 @@ medstar_ids_not_in_con <- map(
   set_names(df_names)
 ```
 
-Convert the list of MedStar ids to a data frame that is easier to work with. 
-- The first column will contain the name of the data frame that contains the MedStar id.
-- The second column will contain the MedStar id that wasn't found in the consent data frame.
+Convert the list of MedStar IDs to a data frame that is easier to work with. 
+- The first column will contain the name of the data frame that contains the MedStar ID.
+- The second column will contain the MedStar ID that wasn't found in the consent data frame.
 - We will drop all rows from the participant data frame (`par`). Most of those encounters did not receive a follow-up interview by design.
 
 ```{r}
@@ -120,108 +123,73 @@ medstar_ids_not_in_con <- medstar_ids_not_in_con |>
   filter(df != "par")
 ```
 
-```{r}
-# medstar_ids_not_in_con["par"]
-medstar_ids_not_in_con[!names(medstar_ids_not_in_con) == "par"]
 
+# Check for error messages
+
+For each MedStar ID listed in `medstar_ids_not_in_con`, we will check the follow-up data sets for an error message. If one exists, we will append it to `medstar_ids_not_in_con`.
+
+First, create a named list of data frames. Each data frame contains `medstar_id` `x_error_message` only. Below, we will join these error messages to the MedStar IDs in `medstar_ids_not_in_con`.
+
+```{r}
+error_messsages <- map(
+  df_names,
+  ~ get(.x)[, c("medstar_id", "x_error_message")]
+) |> 
+  set_names(df_names)
+```
+
+Convert the list of data frames into a single data frame.
+- We will drop all rows from the participant data frame (`par`). Most of those encounters did not receive a follow-up interview by design.
+
+```{r}
+error_messsages <- bind_rows(error_messsages, .id = "df") |> 
+  filter(df != "par")
+```
+
+Filter `error_messsages` to only include rows with MedStar IDs that are also in `medstar_ids_not_in_con`.
+
+```{r}
+error_messsages <- error_messsages |> 
+  filter(medstar_id %in% medstar_ids_not_in_con$medstar_id)
+```
+
+Filter `error_messsages` to only include rows that don't have a "Participant consent not recorded" error associated with their record in the follow-up instrument data frame.
+
+```{r}
+error_messages <- error_messsages |> 
+  filter(x_error_message != "Participant consent not recorded" | is.na(x_error_message))
 ```
 
 
-
-```{r}
-
-setdiff(unique(medstar_ids_not_in_con$medstar_id), unique(comparisons$ID))
-```
-
-```{r}
-sfr |> 
-  filter(is.na(medstar_id))
-```
-
-
-
-# 🔴 Left off here. 
+# 🔴 Left off here
 - Trying to recreate Ebie's results.
-- She didn't include `par` in her comparisons. I should drop it from ours.
-- There is an NA value in the sfr data frame. I need to go remove that row and then come back to this code.
-
-
-
+- Need to just finish checking for error messages.
+- Her code is returning two rows. My code is returning 4 rows.
 
 
 ```{r}
-# Create vectors, each containing the medstar IDS for each DETECT FU data set.
-vec_list <- list(aps_id = aps, cls_id = cls, glh_id = glh, lpa_id = lpa, obs_id = obs, par_id = par, sfr_id = sfr, soc_id = soc, con_id = con)
-
-medstar_id_lists <- lapply(vec_list, function(vec) {
-  vec_ID <- unique(vec$medstar_id)
-})
-
-# Push the vectors to the Global environment
-list2env(medstar_id_lists, envir = .GlobalEnv)
+# For comparing to Ebie's results
+check_error_message |> filter(medstar_id %in% error_messages$medstar_id)
 ```
 
-```{r}
-#  List of vectors to check consent vector against
-vec_ref_list <- list(
-  aps_id = aps_id, cls_id = cls_id, glh_id = glh_id, lpa_id = lpa_id, obs_id = obs_id,
-  sfr_id = sfr_id, soc_id = soc_id, con_id = con_id
-)
-
-# Function for comparing 2 vectors
-compare_vec <- function(vec, ref_vec) {
-  comparison_column <- full_join(data.frame(key = ref_vec, ref_vec),
-    data.frame(key = vec, vec),
-    by = "key"
-  ) %>%
-    select(-key) %>%
-    mutate(
-      in_both = case_when(
-        is.na(ref_vec) == T & is.na(vec) == F ~ "Only in this dataset",
-        is.na(ref_vec) == F & is.na(vec) == T ~ "Only in dataset being compared to",
-        ref_vec == vec ~ "In both"
-      ),
-      in_both = factor(in_both,
-        levels = c("In both", "Only in this dataset", "Only in dataset being compared to")
-      )
-    )
-  comparison_column
-}
 
 
-# Apply the compare_vec function to the consent vector to produce a list of comparison outputs.
-comparisons <- lapply(vec_ref_list, compare_vec, vec = con_id)
-```
 
-```{r}
-comparisons <- comparisons %>%
-  # Filter all the dataframes for medstar_ids "Only in dataset being compared to"
-  map(., ~ filter(.x, in_both == "Only in dataset being compared to")) %>%
-  # Remove dataframes with empty rows
-  purrr::keep(., ~ nrow(.) > 0) %>%
-  # Bind filtered rows together
-  do.call(rbind, .) %>%
-  # make row names column
-  tibble::rownames_to_column() %>%
-  select(c(rowname, ref_vec)) %>%
-  rename(
-    "dataframe" = "rowname",
-    "ID"        = "ref_vec"
-  ) %>%
-  mutate(
-    dataframe = gsub("_id.*", "", dataframe)
-  )
-```
+
+
+# 🔴 Ebie's code 
+- Trying to recreate Ebie's results.
 
 ```{r}
 # Check participant consent in the other data sets
 check_error_message <- detect_fu_data_merged %>%
-  filter(medstar_id %in% comparisons$ID) %>%
+  filter(medstar_id %in% medstar_ids_not_in_con$medstar_id) %>%
   select(c(medstar_id, contains("x_error_message"))) %>%
-  left_join(comparisons, by = c("medstar_id" = "ID"))
+  left_join(medstar_ids_not_in_con, by = "medstar_id")
 
 check_error_message
 ```
+
 ```{r}
 # Filter MedStar IDs that don't have the error message "Participant consent not recorded" for any of the datasets
 no_error <- check_error_message %>% filter(if_all(contains("x_error_message"), ~ is.na(.) == T))
@@ -241,4 +209,4 @@ check_obs
 Both have incomplete status. 
 
 # Conclusion
-None of the Medstar IDs not found in the consent dataset need to be included in the count of DETECT follow up interviews completed.
+None of the MedStar IDs not found in the consent data set need to be included in the count of DETECT follow up interviews completed.
