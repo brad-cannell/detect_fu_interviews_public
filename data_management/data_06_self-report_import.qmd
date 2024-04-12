@@ -1265,119 +1265,190 @@ self_rep <- self_rep |>
   relocate_factors(cols_suffix)
 ```
 
+#### Number of friends column
+
+There is some weird issue with the encoding for "Don't know" values in the `sexual_person_friends` column. When printed to the screen, the value looks the same to humans, but the values are encoded differently (UTF-8) under the hood and R throws an error. To fix, we are overwriting the value.
+
+```{r}
+self_rep$sexual_person_friends[self_rep$sexual_person_friends == "Don’t know"] <- "Don't know"
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sexual_person_friends")
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "None" = 0, 
+  "Very few (1-3)" = 1,
+  "Some (4-6)" = 2,
+  "A lot (7+)" = 3, 
+  "Don't know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+self_rep <- self_rep |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Person column
+
+Participants were allowed to choose more than one person during the interview. Since some people chose more than one person for these questions, a dummy variable was created. 
+
+```{r}
+# Create dummy variables for person categories 1 = TRUE 0 = FALSE
+self_rep <- self_rep %>%
+  mutate(
+    sexual_person_stranger_v2       = str_detect(sexual_incident_person_v2, "A stranger"),
+    sexual_spouse_v2                = str_detect(sexual_incident_person_v2, "A spouse or partner"),
+    sexual_person_ex_partner_v2     = str_detect(sexual_incident_person_v2, "An ex-spouse or parner"),
+    sexual_person_parent_v2         = str_detect(sexual_incident_person_v2, "A parent or step-parent"),
+    sexual_person_sibling_v2        = str_detect(sexual_incident_person_v2, "A brother or sister"),
+    sexual_person_child_v2          = str_detect(sexual_incident_person_v2, "A son or daughter"),
+    sexual_person_other_relative_v2 = str_detect(sexual_incident_person_v2, "Another relative"),
+    sexual_person_coworker_v2       = str_detect(sexual_incident_person_v2, "A coworker"),
+    sexual_person_neighbor_v2       = str_detect(sexual_incident_person_v2, "A neighbor"),
+    sexual_person_friend_v2         = str_detect(sexual_incident_person_v2, "A friend"),
+    sexual_person_non_relative_v2   = str_detect(sexual_incident_person_v2, "Some other non-relative"),
+    sexual_person_dont_know_v2      = str_detect(sexual_incident_person_v2, "Don’t know"),
+    sexual_person_refused_v2        = str_detect(sexual_incident_person_v2, "Refused")
+  ) |> 
+  # Coerce True and False to 1 and 0
+  mutate(across(sexual_person_stranger_v2:sexual_person_refused_v2, ~ as.numeric(.x))) |> 
+  # Relocate the dummy variables after the original variable
+  relocate(sexual_person_stranger_v2:sexual_person_refused_v2, .after = sexual_incident_person_v2)
+```
+
+```{r}
+# Create dummy variables for person categories 1 = TRUE 0 = FALSE
+self_rep <- self_rep %>%
+  mutate(
+    sexual_person_stranger       = str_detect(sexual_incident_person, "A stranger"),
+    sexual_spouse                = str_detect(sexual_incident_person, "A spouse or partner"),
+    sexual_person_ex_partner     = str_detect(sexual_incident_person, "An ex-spouse or parner"),
+    sexual_person_parent         = str_detect(sexual_incident_person, "A parent or step-parent"),
+    sexual_person_sibling        = str_detect(sexual_incident_person, "A brother or sister"),
+    sexual_person_child          = str_detect(sexual_incident_person, "A son or daughter"),
+    sexual_person_other_relative = str_detect(sexual_incident_person, "Another relative"),
+    sexual_person_coworker       = str_detect(sexual_incident_person, "A coworker"),
+    sexual_person_neighbor       = str_detect(sexual_incident_person, "A neighbor"),
+    sexual_person_friend         = str_detect(sexual_incident_person, "A friend"),
+    sexual_person_non_relative   = str_detect(sexual_incident_person, "Some other non-relative"),
+    sexual_person_dont_know      = str_detect(sexual_incident_person, "Don’t know"),
+    sexual_person_refused        = str_detect(sexual_incident_person, "Refused")
+  ) |> 
+  # Coerce True and False to 1 and 0
+  mutate(across(sexual_person_stranger:sexual_person_refused, ~ as.numeric(.x))) |> 
+  # Relocate the dummy variables after the original variable
+  relocate(sexual_person_stranger:sexual_person_refused, .after = sexual_incident_person)
+```
+
+#### Data check
+
+Number of columns after cleaning the sexual mistreatment section.
+
+```{r}
+# Data check
+ncols <- 570
+if (ncol(self_rep) != ncols) {
+  stop(
+    ncols, " columns expected in self_ref after cleaning the sexual variables. ", 
+    ncol(self_rep), " columns found. Check into it."
+  )
+}
+```
+
+## Clean fears, needs, wants variables
+
+There were four questions in this section of the follow-up interview. All of them allowed open-ended responses.
+
+1. What do you worry most about right now?
+2. What is your greatest fear for your future?
+3. What are you most grateful for right now?
+4. What are you most looking forward to for your future?
+
+For each question, FM Pro exports two columns. 
+
+- The second column for each question (i.e., `fear_afraid_response`, `fear_future_response`, `fear_grateful_response`, `fear_forward_response`, `fear_important_response`) contains the participant's open-ended response as a character string or an `NA` value. The value will be `NA` if the question was skipped, the participant said "Don't know", or the participant "Refused".
+
+- The first column for each question (i.e., `fear_afraid`, `fear_future`, `fear_grateful`, `fear_forward`, and `fear_important`) can only contain 2 possible values values: "Don't know" and "Refused". These columns are not likely to be very useful in practice, but we will keep them in the data for sake of completeness.
+
+There is some weird issue with the encoding for "Don't know" values in all of the columns in this section. When printed to the screen, the value looks the same to humans, but the values are encoded differently (UTF-8) under the hood and R throws an error. To fix, we are overwriting the value.
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "fear_afraid", "fear_future", "fear_grateful", "fear_forward", 
+  "fear_important"
+)
+
+# Fix the encoding for "Don't know"
+self_rep <- self_rep |> 
+  mutate(
+    across(
+      all_of(cols),
+      function(x) {
+        x[x == "Don’t know"] <- "Don't know"
+      }
+    )
+  )
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "fear_afraid_response", "fear_future_response", "fear_grateful_response", 
+  "fear_forward_response", "fear_important_response"
+)
+
+# Fix the encoding for "Don't know"
+self_rep <- self_rep |> 
+  mutate(
+    across(
+      all_of(cols),
+      function(x) {
+        encodings <- Encoding(x)
+        utf_8_idex <- which(encodings == "UTF-8")
+        Encoding(self_rep$fear_afraid_response[utf_8_index]) <- "unknown"
+      }
+    )
+  )
+```
+
+The columns above do not represent categories. Therefore, there is no need to coerce them to factors.
+
+## Clean environment variables
+
 # 🔴 Ebie's code
-
-```{r}
-self_rep <- self_rep %>%
-  mutate(
-   
-    across(
-      .cols = starts_with("sexual") & ends_with("times") &
-        !ends_with("times_times"),
-      .fns = ~ case_when(
-        .x == "1 or 2 times" ~ 1,
-        .x == "Between 3 and less than 5 times" ~ 2,
-        .x == "Between 5 and less than 10 times" ~ 3,
-        .x == "Between 10 and less than 20 times" ~ 4,
-        .x == "20 or more times" ~ 5,
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_7cat"
-    ),
-    across(
-      .cols = starts_with("sexual") & ends_with("times") &
-        !ends_with("times_times"),
-      .fns = ~ factor(.x, levels = levels_times),
-      .names = "{col}_7cat_f"
-    ),
-    
-    
-    
-    sexual_person_friends_6cat = case_when(
-      sexual_person_friends == "None" ~ 0,
-      sexual_person_friends == "Very few (1-3)" ~ 1,
-      sexual_person_friends == "Some (4-6)" ~ 2,
-      sexual_person_friends == "A lot (7+)" ~ 3,
-      sexual_person_friends == "Don't know" ~ 7,
-      sexual_person_friends == "Refused" ~ 9
-    ),
-    sexual_person_friends_6cat_f = factor(
-      sexual_person_friends,
-      levels = levels_friends
-    ),
-    
-    
-    
-    sexual_incident_person_v2_12cat = case_when(
-      sexual_incident_person_v2 == "A stranger" ~ 1,
-      sexual_incident_person_v2 == "A spouse or partner" ~ 2,
-      sexual_incident_person_v2 == "An ex spouse or partner" ~ 3,
-      sexual_incident_person_v2 == "A parent or step-parent" ~ 4,
-      sexual_incident_person_v2 == "A brother or sister" ~ 5,
-      sexual_incident_person_v2 == "A son or daughter" ~ 6,
-      sexual_incident_person_v2 == "Another relative" ~ 7,
-      sexual_incident_person_v2 == "A coworker" ~ 8,
-      sexual_incident_person_v2 == "A neighbor" ~ 9,
-      sexual_incident_person_v2 == "A friend" ~ 10,
-      sexual_incident_person_v2 == "Some other non-relative" ~ 11,
-      sexual_incident_person_v2 == "Don't know" ~ 77,
-      sexual_incident_person_v2 == "Refused" ~ 99
-    ),
-    sexual_incident_person_v2_12cat_f = factor(
-      sexual_incident_person_v2,
-      levels = levels_person_v2
-    ),
-    
-    
-    
-    sexual_person_13cat = case_when(
-      sexual_person == "A stranger" ~ 1,
-      sexual_person == "A spouse or partner" ~ 2,
-      sexual_person == "An ex spouse or partner" ~ 3,
-      sexual_person == "A parent or step-parent" ~ 4,
-      sexual_person == "A brother or sister" ~ 5,
-      sexual_person == "A son or daughter" ~ 6,
-      sexual_person == "Another relative" ~ 7,
-      sexual_person == "A coworker" ~ 8,
-      sexual_person == "A neighbor" ~ 9,
-      sexual_person == "A friend" ~ 10,
-      sexual_person == "Some other non-relative" ~ 11,
-      sexual_person == "Don't know" ~ 77,
-      sexual_person == "Refused" ~ 99
-    ),
-    sexual_person_13cat_f = factor(
-      sexual_person,
-      levels = levels_person_v2
-    )
-  )
-```
-
-### Fears, wants, needs variables
-
-#### Recode categorical variables to factor variables
-
-```{r}
-self_rep <- self_rep %>%
-  mutate(
-    across(
-      .cols = starts_with("fear") & !ends_with("response"),
-      .fns = ~ case_when(
-        .x == "Don't know" ~ 7,
-        .x == "Refused" ~ 9
-      ),
-      .names = "{col}_2cat"
-    ),
-    across(
-      .cols = starts_with("fear") & !ends_with("response") &
-        !ends_with("2cat"),
-      .fns = ~ factor(.x, levels = c("Don't know", "Refused")),
-      .names = "{col}_2cat_f"
-    )
-  )
-```
-
-### Environment Variables
 
 #### Recode categorical variables to factor variables
 
