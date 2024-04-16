@@ -2,9 +2,11 @@
 title: "Check consent"
 ---
 
-# Purpose
+# Overview
 
-The consent data set does not contain all of the MedStar IDs that are contained in the other data sets downloaded from FileMaker Pro. The purpose of the code in this file is to inventory the MedStar IDs that are not found in the consent data set and make sure they shouldn't be included in the count of DETECT follow up interviews completed.
+The consent data set does not contain all of the MedStar IDs that are contained in the other data sets downloaded from FileMaker Pro. The purpose of the code in this file is to inventory the MedStar IDs that are NOT found in the consent data set and make sure they shouldn't be included in the count of DETECT follow up interviews completed.
+
+**IMPORTANT:** In the code below, we found records that needed to be deleted from some of the data sets downloaded from FileMaker Pro. After removing those records, the code below will no longer return the same results. For example, the MedStar ID ending in "...ff587" should not have been included in `aps_investigations_import.rds`, so we went back to `data_01_aps_investigations_import.qmd` and removed it. Now, when we run the code below to look for MedStar IDs that appear in the APS Investigations data, but not the consent data, "...ff587" will no longer appear. Therefore, we are primarily keeping this file around as a record of what we did rather than something we need to continue doing. Having said that, there could be additional rows that need to be removed in the future if people get on FM Pro and start clicking things. That will sometimes cause FM Pro to automatically generate values (e.g., name) in the survey data.
 
 
 # Load Packages
@@ -18,6 +20,8 @@ library(purrr)
 
 Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki. 
 
+- We decided not to import data from the participant data frame (`par`). Most of those encounters did not receive a follow-up interview by design. More importantly, there isn't any data in `par` that required consent from the patient. So, it isn't a problem if the patient has data in `par`, but not in the consent data.
+
 ```{r}
 names_paths <- c(
   "aps" = "aps_investigations_import.rds",
@@ -26,10 +30,8 @@ names_paths <- c(
   "glh" = "general_health_import.rds",
   "lpa" = "lead_panel_assessment_import.rds",
   "obs" = "observational_measures_import.rds",
-  "par" = "participant_import.rds",
   "sfr" = "self_report_import.rds",
-  "soc" = "sociodemographic_information_import.rds",
-  "detect_fu_data_merged" = "detect_fu_data_merged.rds"
+  "soc" = "sociodemographic_information_import.rds"
 )
 ```
 
@@ -60,10 +62,8 @@ iwalk(
 # glh : 955 105 
 # lpa : 6838 38 
 # obs : 935 132 
-# par : 92160 84 
 # sfr : 955 574 
 # soc : 963 52 
-# detect_fu_data_merged : 98200 799 
 
 # These may change over time if we modify the data. Because we are only checking 
 # MedStar IDs in this file, changes to the number of columns are not likely to 
@@ -73,11 +73,8 @@ iwalk(
 
 # Create a list of data frame names
 
-Create a list of data frame names that we will iterate over below. The list should include all of the data frames in `names_paths` except `detect_fu_data_merged`.
-
 ```{r}
 df_names <- names(names_paths)
-df_names <- df_names[df_names != "detect_fu_data_merged"]
 ```
 
 ```{r}
@@ -114,7 +111,6 @@ medstar_ids_not_in_con <- map(
 Convert the list of MedStar IDs to a data frame that is easier to work with. 
 - The first column will contain the name of the data frame that contains the MedStar ID.
 - The second column will contain the MedStar ID that wasn't found in the consent data frame.
-- We will drop all rows from the participant data frame (`par`). Most of those encounters did not receive a follow-up interview by design.
 
 ```{r}
 medstar_ids_not_in_con <- medstar_ids_not_in_con |> 
@@ -123,90 +119,126 @@ medstar_ids_not_in_con <- medstar_ids_not_in_con |>
   filter(df != "par")
 ```
 
+```{r}
+# Data check
+medstar_ids_not_in_con |> 
+  summarise(
+    Rows = n(),
+    `Unique MedStar IDs` = unique(.data$medstar_id) |> length()
+  )
+```
 
-# Check for error messages
+So, there are 20 instances of a MedStar ID existing in one of the follow-up survey data sets, but not in the consent data. There are 13 unique MedStar IDs, meaning that some MedStar IDs appear in more than one of the follow-up survey data sets.
 
-For each MedStar ID listed in `medstar_ids_not_in_con`, we will check the follow-up data sets for an error message. If one exists, we will append it to `medstar_ids_not_in_con`.
 
-First, create a named list of data frames. Each data frame contains `medstar_id` `x_error_message` only. Below, we will join these error messages to the MedStar IDs in `medstar_ids_not_in_con`.
+# Check for data without consent
+
+So, the MedStar IDs in `medstar_ids_not_in_con` are MedStar IDs that have a row in at least one of the follow-up survey data sets, but do not appear in the consent form data. If they didn't give consent to participate in the follow-up interviews, then there shouldn't be any data recorded in the follow-up survey data. We will check to make sure that is the case below.
 
 ```{r}
-error_messsages <- map(
+check_data_wo_consent <- map(
   df_names,
-  ~ get(.x)[, c("medstar_id", "x_error_message")]
+  function(x) {
+    # Get each data frame from the global environment
+    df <- get(x)
+    # Include only the MedStar IDs in medstar_ids_not_in_con
+    df <- df[df$medstar_id %in% unique(medstar_ids_not_in_con$medstar_id), ]
+    # Remove variables that start with "x". They are created by FM Pro, not 
+    # the interviewer.
+    df <- select(df, !starts_with("x"))
+    # Return df
+    df
+  }
 ) |> 
   set_names(df_names)
 ```
 
-Convert the list of data frames into a single data frame.
-- We will drop all rows from the participant data frame (`par`). Most of those encounters did not receive a follow-up interview by design.
+Convert the list of data frames into a single data frame. This will make it easier to work with.
 
 ```{r}
-error_messsages <- bind_rows(error_messsages, .id = "df") |> 
-  filter(df != "par")
+check_data_wo_consent <- bind_rows(check_data_wo_consent, .id = "df")
 ```
 
-Filter `error_messsages` to only include rows with MedStar IDs that are also in `medstar_ids_not_in_con`.
+Remove columns that have an `NA` value in every row. That's what they are supposed to have (if there was no consent given and a follow-up interview wasn't done), so there is no need to check them.
+
+Reducing the search space will make it easier to review the rows with non-missing values next.
 
 ```{r}
-error_messsages <- error_messsages |> 
-  filter(medstar_id %in% medstar_ids_not_in_con$medstar_id)
+check_data_wo_consent <- check_data_wo_consent |> 
+  select(where(~!all(is.na(.x))))
 ```
 
-Filter `error_messsages` to only include rows that don't have a "Participant consent not recorded" error associated with their record in the follow-up instrument data frame.
+Count how many values in the data frame are something other than `NA`.
+- dplyr won't let us include columns of different types in our code to count the number of non-NA values in each row. so, we will first create dummy columns that will equal FALSE if the value for each column is `NA` and TRUE otherwise. Then, we will count the TRUEs in the dummy columns.
 
 ```{r}
-error_messages <- error_messsages |> 
-  filter(x_error_message != "Participant consent not recorded" | is.na(x_error_message))
+check_data_wo_consent <- check_data_wo_consent |> 
+  mutate(
+    across(
+      everything(),
+      ~ !is.na(.x),
+      .names = "{col}_not_na"
+    )
+  ) |> 
+  rowwise() |> 
+  mutate(
+    non_na_count = sum(c_across(ends_with("_not_na")))
+  ) |> 
+  # Ungroup to remove the effect of rowwise()
+  ungroup() |> 
+  # We don't need the dummy columns anymore
+  select(!ends_with("_not_na"))
 ```
 
-
-# 🔴 Left off here
-- Trying to recreate Ebie's results.
-- Need to just finish checking for error messages.
-- Her code is returning two rows. My code is returning 4 rows.
-
+We expect the values of `df`, `medstar_id` and `full_name` to have a value in them. They are autopopulated by FM Pro and containing a value does not necessarily indicate that a follow-up interview was done without consent. Therefore, we will filter for rows where the value of `non_na_count` is greater than 3.
 
 ```{r}
-# For comparing to Ebie's results
-check_error_message |> filter(medstar_id %in% error_messages$medstar_id)
-```
-
-
-
-
-
-
-# 🔴 Ebie's code 
-- Trying to recreate Ebie's results.
-
-```{r}
-# Check participant consent in the other data sets
-check_error_message <- detect_fu_data_merged %>%
-  filter(medstar_id %in% medstar_ids_not_in_con$medstar_id) %>%
-  select(c(medstar_id, contains("x_error_message"))) %>%
-  left_join(medstar_ids_not_in_con, by = "medstar_id")
-
-check_error_message
+check_data_wo_consent <- check_data_wo_consent |> 
+  filter(non_na_count > 3)
 ```
 
 ```{r}
-# Filter MedStar IDs that don't have the error message "Participant consent not recorded" for any of the datasets
-no_error <- check_error_message %>% filter(if_all(contains("x_error_message"), ~ is.na(.) == T))
-no_error
+# Data check
+check_data_wo_consent |> 
+  summarise(
+    Rows = n(),
+    `Unique MedStar IDs` = unique(.data$medstar_id) |> length()
+  )
 ```
 
-Two of the 13 MedStar IDs don't have the error message "Participant consent not recorded" for any of the datasets.
-Both medstar_ids are in the observational measures data set.
+There are 10 MedStar IDs that have data in a follow-up survey data set, but do not have a record in the consent data. We will check these manually in FM Pro.
 
-```{r}
-# check the status of these medStar IDs in the observational measures dataset
-check_obs <- detect_fu_data_merged %>%
-  filter(medstar_id %in% no_error$medstar_id) %>%
-  select(x_record_status_obs)
-check_obs
-```
-Both have incomplete status. 
+1.  ...ff587: No consent given. There was no follow-up interview scheduled. There was one item checked in the APS Investigations survey instrument. Possibly by mistake. It looks like someone just clicked through several of the follow-up interview survey screens. We will delete this record from `aps_investigations_import.rds`.
+
+2.  ...debe8: No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. However, there was a value for `name_last` in the Clutter Rating Scale survey instrument. This is autopopulated by FM Pro if the interviewer even opens the Clutter Rating Scale survey instrument. It looks like someone just clicked it by mistake. We will delete this record from `data_03_clutter_scale_import.qmd`.
+
+3.  ...6bbcf: No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. However, "Don't know" and "unknown" are showing up as as values in the fears, needs, and wants questions from the self-report of injury, violence, neglect, and exploitation follow-up interview survey instrument. I think this is just an artifact of how those variables are being cleaned in `data_06_self-report_import.qmd`. We will delete this record from `data_06_self-report_import.qmd`.
+
+4.  ...b427b: No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. However, "Don't know" and "unknown" are showing up as as values in the fears, needs, and wants questions from the self-report of injury, violence, neglect, and exploitation follow-up interview survey instrument. I think this is just an artifact of how those variables are being cleaned in `data_06_self-report_import.qmd`. We will delete this record from `data_06_self-report_import.qmd`. Additionally, it looks like someone clicked on the APS Investigations survey instrument, which created a row in `aps_investigations_import.rds`. We will also delete that record.
+
+5.  ...92912: No consent given. There was no follow-up interview scheduled. There are values for some of the race variables in `sociodemographic_information_import.rds` as an artifact of how the variables were created. There aren't any values in FM Pro. We will delete this record from `data_07_sociodemographic_information_import.qmd`.
+
+6.  ...83082: No consent given. There was no follow-up interview scheduled. There are values for some of the race variables in `sociodemographic_information_import.rds` as an artifact of how the variables were created. There aren't any values selected in FM Pro for race. There is a gender value selected in FM Pro, but it looks like it was selected by accident. We will delete this record from `data_07_sociodemographic_information_import.qmd`.
+
+7.  ...281fa: No consent given. There was no follow-up interview scheduled. There are values for some of the race variables in `sociodemographic_information_import.rds` as an artifact of how the variables were created. There aren't any values in FM Pro. We will delete this record from `data_07_sociodemographic_information_import.qmd`.
+
+8.  ...9b0f2: No consent given. There was no follow-up interview scheduled. There are values for some of the race variables in `sociodemographic_information_import.rds` as an artifact of how the variables were created. There aren't any values in FM Pro. We will delete this record from `data_07_sociodemographic_information_import.qmd`.
+
+9.  ...3a6e2: There was no follow-up interview scheduled. There are values for some of the race variables in `sociodemographic_information_import.rds` as an artifact of how the variables were created. There aren't any values in FM Pro. We will delete this record from `data_07_sociodemographic_information_import.qmd`.
+
+10. ...4419d: There was no follow-up interview scheduled. There are values for some of the race variables in `sociodemographic_information_import.rds` as an artifact of how the variables were created. There aren't any values in FM Pro. We will delete this record from `data_07_sociodemographic_information_import.qmd`.
+
 
 # Conclusion
-None of the MedStar IDs not found in the consent data set need to be included in the count of DETECT follow up interviews completed.
+
+After removing the records above, there shouldn't be any rows in any of the follow-up survey data sets for people who did NOT give consent to participate. Having said that, there could be additional rows that need to be removed in the future if people get on FM Pro and start clicking things. That will sometimes cause FM Pro to automatically generate values (e.g., name) in the survey data.
+
+Additionally, all of the MedStar IDs found in the consent data set need to be included in the count of DETECT follow-up interviews completed.
+
+
+# Clean up
+
+```{r}
+rm(list = ls())
+```
+

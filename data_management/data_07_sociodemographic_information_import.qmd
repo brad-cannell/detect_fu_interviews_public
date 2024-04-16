@@ -34,6 +34,25 @@ sociodemographic_information <- clean_names(sociodemographic_information)
 dim(sociodemographic_information) # 963  28
 ```
 
+## Remove rows
+
+For MedStar IDs ...92912, ...83082, ...281fa, ...9b0f2, ...3a6e2, and ...4419d, no consent was given. There was no follow-up interview scheduled. There aren't any values in FM Pro. We will delete these records. For more details, see `check_consenting_participants.qmd`.
+
+```{r}
+sociodemographic_information <- sociodemographic_information |>
+  filter(!stringr::str_detect(medstar_id, "92912")) |>
+  filter(!stringr::str_detect(medstar_id, "83082")) |>
+  filter(!stringr::str_detect(medstar_id, "281fa")) |>
+  filter(!stringr::str_detect(medstar_id, "9b0f2")) |>
+  filter(!stringr::str_detect(medstar_id, "3a6e2")) |>
+  filter(!stringr::str_detect(medstar_id, "4419d"))
+```
+
+```{r}
+# Data check
+dim(sociodemographic_information) # 957  28
+```
+
 ## Coerce categorical variables to factor variables
 
 ### Sociodemographic Information

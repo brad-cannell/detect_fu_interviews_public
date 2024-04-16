@@ -61,6 +61,22 @@ if (nrow(aps_inv) != dims[1] || ncol(aps_inv) != dims[2]) {
 aps_inv <- clean_names(aps_inv)
 ```
 
+## Remove rows
+
+For MedStar ID ...ff587, No consent was given. There was no follow-up interview scheduled. There was one item checked in the APS Investigations survey instrument. Possibly by mistake. It looks like someone just clicked through several of the follow-up interview survey screens. We will delete this record.
+
+For MedStar ID ...b427b, No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. It looks like someone clicked on the APS Investigations survey instrument, which created a row in `aps_investigations_import.rds`. We will delete that record.
+
+```{r}
+aps_inv <- aps_inv |> 
+  filter(!stringr::str_detect(medstar_id, "ff587")) |> 
+  filter(!stringr::str_detect(medstar_id, "b427b"))
+```
+
+```{r}
+dim(aps_inv) # 949  18
+```
+
 ## Clean categorical variables
 
 - By default, FM Pro exports all categorical variables as character variables.

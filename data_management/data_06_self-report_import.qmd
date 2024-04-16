@@ -81,6 +81,21 @@ self_rep <- self_rep |>
 dim(self_rep) # 955 209
 ```
 
+For MedStar ID ...6bbcf, No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. However, "Don't know" and "unknown" are showing up as as values in the fears, needs, and wants questions from the self-report of injury, violence, neglect, and exploitation follow-up interview survey instrument. I think this is just an artifact of how those variables are being cleaned. We will delete this record.
+
+For MedStar ID ...b427b, No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. However, "Don't know" and "unknown" are showing up as as values in the fears, needs, and wants questions from the self-report of injury, violence, neglect, and exploitation follow-up interview survey instrument. I think this is just an artifact of how those variables are being cleaned. We will delete this record.
+
+```{r}
+self_rep <- self_rep |>
+  filter(!stringr::str_detect(medstar_id, "6bbcf")) |> 
+  filter(!stringr::str_detect(medstar_id, "b427b"))
+```
+
+```{r}
+# Data check
+dim(self_rep) # 953 209
+```
+
 ## Clean categorical variables
 
 - By default, FM Pro exports all categorical variables as character variables.
