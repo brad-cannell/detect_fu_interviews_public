@@ -40,6 +40,15 @@ We will create categorical variables with numerical values that match the codebo
 clutter_scale <- clean_names(clutter_scale)
 ```
 
+## Remove rows
+
+For MedStar ID ...debe8, No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. However, there was a value for `name_last` in the Clutter Rating Scale survey instrument. This is autopopulated by FM Pro if the interviewer even opens the Clutter Rating Scale survey instrument. It looks like someone just clicked it by mistake. We will delete this record.
+
+```{r}
+clutter_scale <- clutter_scale |>
+  filter(!stringr::str_detect(medstar_id, "debe8"))
+```
+
 ## Create recoded variables and factor variables to match levels in follow-up interview protocol
 
 ```{r}

@@ -38,6 +38,10 @@ self_rep <- readr::read_csv(self_rep_path)
 rm(self_rep_path)
 ```
 
+## Data check
+
+The initial number of rows and columns.
+
 ```{r}
 # Data check
 dims <- c(956, 209)
@@ -75,6 +79,21 @@ self_rep <- self_rep |>
 ```{r}
 # Data check
 dim(self_rep) # 955 209
+```
+
+For MedStar ID ...6bbcf, No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. However, "Don't know" and "unknown" are showing up as as values in the fears, needs, and wants questions from the self-report of injury, violence, neglect, and exploitation follow-up interview survey instrument. I think this is just an artifact of how those variables are being cleaned. We will delete this record.
+
+For MedStar ID ...b427b, No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. However, "Don't know" and "unknown" are showing up as as values in the fears, needs, and wants questions from the self-report of injury, violence, neglect, and exploitation follow-up interview survey instrument. I think this is just an artifact of how those variables are being cleaned. We will delete this record.
+
+```{r}
+self_rep <- self_rep |>
+  filter(!stringr::str_detect(medstar_id, "6bbcf")) |> 
+  filter(!stringr::str_detect(medstar_id, "b427b"))
+```
+
+```{r}
+# Data check
+dim(self_rep) # 953 209
 ```
 
 ## Clean categorical variables
@@ -1437,71 +1456,86 @@ self_rep <- self_rep |>
       all_of(cols),
       function(x) {
         encodings <- Encoding(x)
-        utf_8_idex <- which(encodings == "UTF-8")
+        utf_8_index <- which(encodings == "UTF-8")
         Encoding(self_rep$fear_afraid_response[utf_8_index]) <- "unknown"
       }
     )
   )
 ```
 
-The columns above do not represent categories. Therefore, there is no need to coerce them to factors.
+- The columns above do not represent categories. Therefore, there is no need to coerce them to factors.
+- The section above does not change the number of rows or columns, so there is no need for another data check here.
 
 ## Clean environment variables
 
-# 🔴 Ebie's code
-
-#### Recode categorical variables to factor variables
-
 ```{r}
-self_rep <- self_rep %>%
+self_rep <- self_rep |>
   mutate(
-    report_private_5cat = case_when(
+    # Convert character values to numeric values
+    report_private = case_when(
       report_private == "Yes, for the entire time" ~ 1,
       report_private == "Yes, for part of the time" ~ 2,
       report_private == "No, but they were still close enough to hear" ~ 3,
       report_private == "No" ~ 4,
       report_private == "Don't know" ~ 7
     ),
-    report_private_5cat_f = factor(
-      report_private,
-      levels = c(
-        "Yes, for the entire time", "Yes, for part of the time",
-        "No, but they were still close enough to hear", "No",
-        "Don't know"
-      )
-    ),
-    report_influence_4cat = case_when(
+    report_influence = case_when(
       report_influence == "Yes" ~ 1,
-      report_influence == "No" ~ 2,
+      report_influence == "No" ~ 0,
       report_influence == "Don't know" ~ 7,
       report_influence == "Refused" ~ 9
     ),
-    report_influence_4cat_f = factor(
-      report_influence,
-      levels = levels_yes_no
+    
+    # Create a version of each column with "Don't know" and "Refused" converted to NA
+    report_private_4cat = case_when(
+      report_private == 7 ~ NA_real_,
+      TRUE ~ report_private
+    ),
+    report_influence_2cat = case_when(
+      report_influence == 7 ~ NA_real_,
+      TRUE ~ report_influence
     )
-  )
+  ) |> 
+  
+  # Relocate new columns with NA values immediately after the original column
+  relocate(report_private_4cat, .after = report_private) |> 
+  relocate(report_influence_2cat, .after = report_influence) |> 
+  
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  mutate(
+    report_private_4cat_f = factor(
+      report_private_4cat,
+      1:4,
+      c(
+        "Yes, for the entire time", "Yes, for part of the time",
+        "No, but they were still close enough to hear", "No"
+      )
+    ),
+    report_influence_2cat_f = factor(
+      report_influence_2cat,
+      0:1,
+      c("No", "Yes")
+    )
+  ) |> 
+  
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate(report_private_4cat_f, .after = report_private_4cat) |> 
+  relocate(report_influence_2cat_f, .after = report_influence_2cat)
 ```
 
-## Remove raw character variables that have recoded forms
+### Data check
 
-```{r}
-self_rep <- self_rep %>% select(
-  -c(
-    (starts_with("emotional") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
-    (starts_with("fear") & (!matches("[0-9]cat") & !matches("_response$"))),
-    (starts_with("finance") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
-    (starts_with("neglect") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
-    (starts_with("physical") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times"))),
-    (starts_with("report") & !matches("[0-9]cat")),
-    (starts_with("sexual") & (!matches("[0-9]cat") & !matches("_age") & !matches("_times_times")))
-  )
-)
-```
+Number of columns after cleaning the environment variables section.
 
 ```{r}
 # Data check
-dim(self_rep) # 955 351
+ncols <- 574
+if (ncol(self_rep) != ncols) {
+  stop(
+    ncols, " columns expected in self_ref after cleaning the environment variables. ", 
+    ncol(self_rep), " columns found. Check into it."
+  )
+}
 ```
 
 

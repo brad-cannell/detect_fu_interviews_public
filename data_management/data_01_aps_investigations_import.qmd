@@ -17,6 +17,14 @@ library(janitor, warn.conflicts = FALSE)
 ```
 
 
+# Load custom functions
+
+```{r}
+source(here::here("R", "recoding_factoring_relocating.R"))
+source(here::here("R", "nums_to_na.R"))
+```
+
+
 # Load data
 
 Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki. 
@@ -29,15 +37,23 @@ aps_inv_path <- here::here("data", "filemaker_pro_exports", "aps_investigations_
 aps_inv <- readr::read_csv(aps_inv_path)
 ```
 
+## Data check
+
+The initial number of rows and columns.
+
 ```{r}
 # Data check
-dim(aps_inv) # 951  18
+dims <- c(951, 18)
+if (nrow(aps_inv) != dims[1] || ncol(aps_inv) != dims[2]) {
+  stop(
+    "Expecting ", dims[1], " rows and ", dims[2], " columns in aps_inv. Found ",
+    paste(dim(aps_inv), collapse = ", "), " instead. Check into it."
+  )
+}
 ```
 
 
 # Data cleaning
-
-We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ## Convert all variable names to snake case
 
@@ -45,103 +61,177 @@ We will create categorical variables with numerical values that match the codebo
 aps_inv <- clean_names(aps_inv)
 ```
 
-## Create recoded variables to match levels in follow-up interview protocol
+## Remove rows
+
+For MedStar ID ...ff587, No consent was given. There was no follow-up interview scheduled. There was one item checked in the APS Investigations survey instrument. Possibly by mistake. It looks like someone just clicked through several of the follow-up interview survey screens. We will delete this record.
+
+For MedStar ID ...b427b, No consent given. There was no follow-up interview scheduled. There weren't any items checked in any of the follow-up interview survey instruments. It looks like someone clicked on the APS Investigations survey instrument, which created a row in `aps_investigations_import.rds`. We will delete that record.
 
 ```{r}
-# Create recoded variables for aps_report
-aps_inv <- aps_inv %>%
-  mutate(
-    aps_report_4cat = case_when(
-      aps_report == "Yes" ~ 1,
-      aps_report == "No" ~ 2,
-      aps_report == "Don't know" ~ 7,
-      aps_report == "Refused" ~ 9
-    ),
-    aps_report_4cat_f = factor(
-      aps_report,
-      levels = c("Yes", "No", "Don't know", "Refused")
-    )
-  )
+aps_inv <- aps_inv |> 
+  filter(!stringr::str_detect(medstar_id, "ff587")) |> 
+  filter(!stringr::str_detect(medstar_id, "b427b"))
 ```
 
 ```{r}
-# Create recoded variables for aps_times
-aps_inv <- aps_inv %>%
-  mutate(
-    aps_times_5cat = case_when(
-      aps_times == "0" ~ 0,
-      aps_times == "1" ~ 1,
-      aps_times == "2+" ~ 2,
-      aps_times == "Don't know" ~ 7,
-      aps_times == "Refused" ~ 9
-    ),
-    aps_times_5cat_f = factor(
-      aps_times,
-      levels = c("0", "1", "2+", "Don't know", "Refused")
-    )
-  )
+dim(aps_inv) # 949  18
 ```
+
+## Clean categorical variables
+
+- By default, FM Pro exports all categorical variables as character variables.
+- When analyzing data in R, we prefer to work factors and occasionally with numeric values.
+- Below, we:
+  - Convert character values to numeric values
+  - Create a version of each column with "Don't know" and "Refused" converted to NA
+  - Create a factor version of each column (w/o "Don't know" and "Refused")
+  - Arrange the columns as: original column, numeric column w/o "Don't know" and "Refused", 
+    and the factor version of the column.
+    
+#### Columns with Yes/No responses
+    
+```{r}
+# Columns of interest for this code chunk 
+cols <- c("aps_report")
+
+# Numeric coding for character values in each column of interest
+value_labels <- c("No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+aps_inv <- aps_inv |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
+```
+
+#### Columns with number of times responses
 
 ```{r}
-# Create recoded variables for aps_first
-aps_inv <- aps_inv %>%
-  mutate(
-    aps_first_8cat = case_when(
-      aps_first == "10 or more years ago" ~ 1,
-      aps_first == "5-10 years ago" ~ 2,
-      aps_first == "1-5 years ago" ~ 3,
-      aps_first == "In the past year but more than a month ago" ~ 4,
-      aps_first == "In the past month" ~ 5,
-      aps_first == "In the past week" ~ 6,
-      aps_first == "Don't know" ~ 7,
-      aps_first == "Refused" ~ 9
-    ),
-    aps_first_8cat_f = factor(
-      aps_first,
-      levels = c(
-        "10 or more years ago", "5-10 years ago", "1-5 years ago",
-        "In the past year but more than a month ago", "In the past month",
-        "In the past week", "Don't know", "Refused"
-      )
-    )
-  )
+# Columns of interest for this code chunk 
+cols <- c("aps_times")
+
+# Numeric coding for character values in each column of interest
+value_labels <- c("0" = 0, "1" = 1, "2+" = 2, "Don't know" = 7, "Refused" = 9)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "3cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+aps_inv <- aps_inv |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
 ```
+
+#### How long ago columns
 
 ```{r}
-# Create recoded variables for aps_recent
-aps_inv <- aps_inv %>%
-  mutate(
-    aps_recent_8cat = case_when(
-      aps_recent == "In the past week" ~ 1,
-      aps_recent == "In the past month" ~ 2,
-      aps_recent == "In the past year but more than a month ago" ~ 3,
-      aps_recent == "1-5 years ago" ~ 4,
-      aps_recent == "5-10 years ago" ~ 5,
-      aps_recent == "10 or more years ago" ~ 6,
-      aps_recent == "Don’t know" ~ 7,
-      aps_recent == "Refused" ~ 9
-    ),
-    aps_recent_8cat_f = factor(
-      aps_recent,
-      levels = c(
-        "In the past week", "In the past month",
-        "In the past year but more than a month ago", "1-5 years ago",
-        "5-10 years ago", "10 or more years ago", "Don’t know", "Refused"
-      )
-    )
-  )
+# Columns of interest for this code chunk 
+cols <- c("aps_first", "aps_recent")
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "In the past week" = 1, "In the past month" = 2,
+  "In the past year but more than a month ago" = 3, "1-5 years ago" = 4,
+  "5-10 years ago" = 5, "10 or more years ago" = 6, "Don’t know" = 7, 
+  "Refused" = 9
+)
+
+# Numeric values to convert to NA in each column of interest
+na_values <- c(7, 9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "6cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+aps_inv <- aps_inv |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)
 ```
 
-## Remove raw variables that have recoded forms
+### Data check
 
-```{r}
-aps_inv <- aps_inv %>%
-  select(-c(aps_report, aps_times, aps_first, aps_recent))
-```
+Number of columns after cleaning the categorical variables.
 
 ```{r}
 # Data check
-dim(aps_inv) # 951  22
+ncols <- 26
+if (ncol(aps_inv) != ncols) {
+  stop(
+    ncols, " columns expected in aps_inv after cleaning the categorical variables. ", 
+    ncol(aps_inv), " columns found. Check into it."
+  )
+}
 ```
 
 
