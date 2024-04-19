@@ -34,8 +34,8 @@ sr <- sr %>% mutate(
   across(
     .cols = matches("_[0-9]+cat_f"),
     .fns = ~ case_when(
-      .x == "Refused" | .x == "Don't know" ~ NA,
-      TRUE                                 ~ .x
+      .x == "Refused" | .x == "Don’t know" | .x == "Don't know" ~ NA,
+      TRUE                                                      ~ .x
     )
   )
 )

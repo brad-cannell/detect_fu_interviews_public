@@ -4,22 +4,480 @@ title: "Preliminary DETECT R01 analysis"
 
 # Overview
 
-In this file, we import and do some initial cleaning of the Observational Measures data collected and stored in FileMaker Pro.
+In this file, we analyse the DETECT R01 main outcomes.
 
 ```{r, message= FALSE}
 # Load all necessary libraries
 library(readr)
 library(table1)
-library(dplyr)
+library(flextable)
+library(tidyverse)
+library(officer)
+library(expss) # add variable labels
+
+# Create confusion matrix for each abuse type 
+source("../r/lead_determination_vs_detect_tool_confusion_matrix_by_abuse_type.R")
+
+# Create confusion matrix for each DETECT tool item 
+source("../r/lead_determination_vs_detect_tool_item_confusion_matrix.R")
+
+# Extract each df from the merged df
+source("../r/extract_df_from_merged_detect.R")
+
+# Function for analyzing LEAD Panel Assessment data
+source("../R/lead_positive_votes_analysis.R")
 ```
 
 
 # Load data
+```{r}
+# Import the merged data frame.
+detect_fu_merge  <- readRDS("../data/cleaned_rds_files/detect_fu_data_merged.rds")
+```
 
-Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+# Overall confusion matrix using LEAD as the gold standard
 
 ```{r}
-sr <- read_rds("../data/cleaned_rds_files/self_report_import.rds")
-lpa <- read_rds("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
-par <- read_rds("../data/cleaned_rds_files/participant_import.rds")
+#| echo: false
+# Extract lead Panel data from merged data frame
+lpa <- filter_merged_df(detect_fu_merge, "_lpa")
+
+# Extract participant data frame from merged dataframe
+par <- filter_merged_df(detect_fu_merge, "_par") 
+
+# Extract detect tool variables from participant data frame and recode variables to convert all responses besides "Yes" and "No" to NA.
+detect_tool <- par %>% select(c(medstar_id, ends_with("_5cat_f"))) %>%
+  mutate(
+    across(
+      .cols = ends_with("_5cat_f"),
+      .fns = ~ case_when(
+        .x == "Yes" ~ "Yes",
+        .x == "No"  ~ "No",
+        TRUE        ~ NA
+      )
+    ),
+    across(
+      .cols = ends_with("_5cat_f"),
+      .fns = ~ factor(.x, levels = c("Yes", "No"))
+    )
+  )
 ```
+
+```{r}
+#| echo: false
+# Generate positive vote summary columns for each Medstar ID
+lead_sum <- pos_votes(lpa)
+
+# Separate rows in final determination data frame from the rest
+final_det <- lead_sum %>% filter(final_determination == 1)
+lead_pos_votes <- lead_sum %>% filter(final_determination == 0)
+```
+
+The DETECT tool determination was counted as positive if the value of any of the detect tool variables was 'Yes' while the LEAD Panel Assessment was counted as positive if the final determination value was 'Yes' for any of the abuse types.
+
+```{r}
+conf_mat <- compare_det(final_det, detect_tool, abuse_any)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+```{r}
+# Check data frame used to create confusion matrix
+conf_mat_df <- conf_mat[[3]]
+```
+
+
+# Create confusion matrices for each abuse type using LEAD as the gold standard.
+
+## Physical Abuse
+
+```{r}
+conf_mat <- compare_det(final_det, detect_tool, physical_abuse_det)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Sexual abuse
+
+```{r}
+conf_mat <- compare_det(final_det, detect_tool, sexual_abuse_det)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Emotional - Psychological Abuse
+
+```{r}
+conf_mat <- compare_det(final_det, detect_tool, emotional_psycho_abuse_det)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Neglect
+
+```{r}
+conf_mat <- compare_det(final_det, detect_tool, neglect_det)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Self Neglect
+
+```{r}
+conf_mat <- compare_det(final_det, detect_tool, self_neglect_det)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Financial Exploitation
+
+```{r}
+conf_mat <- compare_det(final_det, detect_tool, financial_exploitation_det)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+
+## Abandonment
+
+```{r}
+conf_mat <- compare_det(final_det, detect_tool, abandonment_det)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+# Create confusion matrices using LEAD as the gold standard and each DETECT screening item as the exposure.
+## Unusual odor 
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_unusual_odor_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+```{r}
+# Check df used to create confusion matrix
+df <- conf_mat[[3]]
+```
+
+## Unmet needs
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_unmet_needs_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Difficulty medications
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_difficulty_medications_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Hoarding medications
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_hoarding_medications_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Disarray hoarding
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_disarray_hoarding_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Health safety concern
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_health_safety_concern_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Caregiver lack knowledge
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_caregiver_lack_knowledge_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Caregiver unengaged
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_caregiver_unengaged_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Caregiver frustrated
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_caregiver_frustrated_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Caregiver anxious
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_caregiver_anxious_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Isolated home
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_isolated_home_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Depressed
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_depressed_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Poor personal hygeine
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_poor_personal_hygiene_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+## Inadequately clothed
+
+```{r}
+conf_mat <- compare_det_item(final_det, detect_tool, x_inadequately_clothed_5cat_f)
+```
+
+```{r}
+conf_mat[[1]]
+```
+
+```{r}
+conf_mat[[2]]
+```
+
+# Create Table 1
+
+```{r}
+# Extract sociodemographic data from merged data frame (include only rows with non-missing data for abuse determination)
+soc <- filter_merged_df(detect_fu_merge, "_soc") %>% filter(medstar_id %in% conf_mat_df$medstar_id)
+```
+
+```{r}
+table1_vars <- soc %>% 
+  mutate(
+    # Create new categorical age variable with 4 age groups
+    age_4cat_f = case_when(
+      sode_age_years >= 65 & sode_age_years < 75 ~ "65-74",
+      sode_age_years >= 75 & sode_age_years < 85 ~ "75-84",
+      sode_age_years >= 85 & sode_age_years < 95 ~ "85-94",
+      sode_age_years >= 95                       ~ "95+"
+    ),
+    age_4cat_f = factor(age_4cat_f, 
+                        levels = c("65-74", "75-84", "85-94", "95+")
+                        ),
+    # Create new household size variable with 9 levels
+    sode_people_9cat_f = factor(sode_people)
+  )
+
+# merge sex variable from participant dataset
+table1_vars <- par %>% select(medstar_id, sex_3cat_f) %>% right_join(table1_vars, by = "medstar_id") 
+```
+
+
+```{r}
+# Replace "Don't know" and "Refused" values with NA
+table1_vars <- table1_vars %>% mutate(
+  across(
+    .cols = matches("_[0-9]+cat_f"),
+    .fns = ~ case_when(
+      .x == "Refused" | .x == "Don’t know" | .x == "Don't know" ~ NA,
+      TRUE                                                      ~ .x
+    )
+  )
+) %>% droplevels()
+
+```
+
+```{r}
+# add variable labels
+table1_vars <- apply_labels(table1_vars,
+  age_4cat_f = "Age", 
+  sex_3cat_f = "Sex",
+  sode_race_eth_6cat_f = "Race/ ethnicity",
+  sogi_orientation_8cat_f = "Sexual orientation",
+  sode_marital_8cat_f = "Marital status", 
+  sode_people_9cat_f = "Household size", 
+  sode_employed_11cat_f = "Employment status",
+  sode_income_9cat_f = "Household income",
+  sode_military_4cat_f = "Military service", 
+  sode_unwanted_4cat_f = "Unwanted sexual attention", 
+  sode_sexual_4cat_f = "Sexual coersion"
+  
+)
+
+```
+
+```{r}
+# Select variables to include in Table 1
+
+table1_vars %>% select(matches("_[0-9]+cat_f")) %>% select(-c(sode_age_4cat_f, hsi_contact_4cat_f, sode_race_8cat_f, sode_hispanic_4cat_f)) %>% names()
+```
+
+```{r}
+# Create caption/ title
+cap <- "Table 1: Table of study population characteristics"
+
+
+tabele1_tab <- table1(~ age_4cat_f + sex_3cat_f + sode_race_eth_6cat_f + sogi_orientation_8cat_f + sode_marital_8cat_f + sode_people_9cat_f + sode_employed_11cat_f +
+                        sode_income_9cat_f + sode_military_4cat_f + sode_unwanted_4cat_f + sode_sexual_4cat_f,
+  data = table1_vars,
+  caption = cap
+)
+tabele1_tab <- t1flex(tabele1_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+tabele1_tab
+```
+
+
+
+
+
