@@ -87,15 +87,15 @@ Replace "Don't know" and "Refused" values with NA
 Ebie, this isn't necessary if you use the new variables I created in `data_06_self_report_import.qmd`. I haven't uploaded them to SharePoint yet, but if you just rerun `data_06_self_report_import.qmd`, you will have the updated data on your computer.
 
 ```{r}
-# sr <- sr %>% mutate(
-#   across(
-#     .cols = matches("_[0-9]+cat_f"),
-#     .fns = ~ case_when(
-#       .x == "Refused" | .x == "Don't know" ~ NA,
-#       TRUE                                 ~ .x
-#     )
-#   )
-# )
+sr <- sr %>% mutate(
+  across(
+    .cols = matches("_[0-9]+cat_f"),
+    .fns = ~ case_when(
+      .x == "Refused" | .x == "Don't know" ~ NA,
+      TRUE                                 ~ .x
+    )
+  )
+)
 ```
 
 
