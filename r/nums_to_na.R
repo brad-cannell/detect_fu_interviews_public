@@ -4,21 +4,14 @@
 # 2024-04-09
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Data for testing ----
-mtcars_test <- mtcars
-# Add 7's and 9's to the mtcars data
-mtcars_test$vs[1] <- 7
-mtcars_test$vs[3] <- 9
-mtcars_test$am[2] <- 7
-mtcars_test$am[4] <- 9
-mtcars_test$cyl[1] <- 99
-# Add some attributes. We want to make sure the aren't' dropped.
-attr(mtcars_test$vs, "description") <- "The vs column from mtcars"
-attr(mtcars_test$vs, "value_labels") <- c("No" = 0, "Yes" = 1, "Don't Know" = 7, "Refused" = 9)
-attr(mtcars_test$am, "description") <- "The am column from mtcars"
-attr(mtcars_test$am, "value_labels") <- c("No" = 0, "Yes" = 1, "Don't Know" = 7, "Refused" = 9)
-attr(mtcars_test$cyl, "description") <- "The cyl column from mtcars"
-attr(mtcars_test$cyl, "value_labels") <- c("Four cyl" = 4, "Six cyl" = 6, "Eight cyl" = 8, "Unknown" = 99)
+# After making modifications, test for problems using:
+# testthat::test_file(here::here("tests", "testthat", "test-nums_to_na.R"))
+
+# Style Notes: 
+# - Leave 5 blank lines between functions to make the code easier to read.
+
+
+
 
 
 #' Function To Help Convert Selected Numeric Values To NA
@@ -44,51 +37,8 @@ num_to_na <- function(.col, .na_values) {
   .col
 }
 
-## Tests ----
 
-results <- mtcars_test |>
-  # One column
-  dplyr::mutate(cyl = num_to_na(cyl, 99)) |> 
-  # Multiple columns with across
-  dplyr::mutate(
-    dplyr::across(
-      c(vs, am),
-      ~ num_to_na(.x, c(7, 9))
-    )
-  )
 
-### Attributes checks
-testthat::test_that("Test to make sure that data frame attributes are retained.", {
-  # Test the description attribute
-  testthat::expect_equal(
-    attr(results$cyl, "description"),
-    "The cyl column from mtcars"
-  )
-  
-  # Test the value_labels attribute
-  testthat::expect_equal(
-    attr(results$cyl, "value_labels"),
-    c("Four cyl" = 4, "Six cyl" = 6, "Eight cyl" = 8, "Unknown" = 99)
-  )
-})
-
-### Results checks
-testthat::test_that("Test that num_to_na() results are as expected", {
-  # Test vs values
-  testthat::expect_equal(
-    results$vs[1:4], 
-    c(NA, 0, NA, 1)
-  )
-  
-  # Test am values
-  testthat::expect_equal(
-    results$am[1:4], 
-    c(1, NA, 1, NA)
-  )
-})
-
-### Clean up ----
-rm(results)
 
 
 #' Function To Help Convert Selected Numeric Values To NA Across Multiple Columns
@@ -119,32 +69,8 @@ nums_to_nas <- function(.data, .cols, .na_values, .suffix) {
     )
 }
 
-## Tests ----
 
-testthat::test_that("Test that nums_to_nas() results are as expected", {
-  # Columns to manipulate
-  cols <- c("vs", "am")
-  # Suffix for the version of each column with "Don't Know" and "Refused" changed
-  # to NA.
-  suffix <- "2cat"
-  # NA values
-  na_values <- c(7, 9)
-  # Manipulate the data
-  results <- mtcars_test |>
-    nums_to_nas(cols, na_values, suffix)
-  
-  # Test vs values
-  testthat::expect_equal(
-    results$vs_2cat[1:4], 
-    c(NA, 0, NA, 1)
-  )
-  
-  # Test am values
-  testthat::expect_equal(
-    results$am_2cat[1:4], 
-    c(1, NA, 1, NA)
-  )
-})
+
 
 
 #' Relocate New Column With NA Values Immediately After The Original Column
@@ -169,28 +95,3 @@ relocate_na_cols <- function(.data, .cols, .suffix) {
   # Return data frame
   .data
 }
-
-## Tests ----
-
-testthat::test_that("Test that relocate_na_cols() results are as expected", {
-  # Columns to manipulate
-  cols <- c("vs", "am")
-  # Suffix for the version of each column with "Don't Know" and "Refused" changed
-  # to NA.
-  suffix <- "2cat"
-  # NA values
-  na_values <- c(7, 9)
-  # Manipulate the data
-  results <- mtcars_test |>
-    nums_to_nas(cols, na_values, suffix) |> 
-    relocate_na_cols(cols, suffix)
-
-  # Test vs location
-  testthat::expect_equal(which(colnames(results) == "vs"), 8L)
-  # Test vs_f values
-  testthat::expect_equal(which(colnames(results) == "vs_2cat"), 9L)
-})
-
-
-# Clean up ----
-rm(mtcars_test)

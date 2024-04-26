@@ -6,22 +6,15 @@
 # 2024-04-05
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Data for testing ----
-# Eventually move this to an R script.
-mtcars_test <- mtcars |>
-  # Create character columns, because that's what we are working with in the
-  # DETECT data.
-  dplyr::mutate(
-    # Two dichotomous columns so we can test the function inside of across()
-    vs = dplyr::if_else(vs == 0, "No", "Yes"),
-    am = dplyr::if_else(am == 0, "No", "Yes"),
-    # One variable with more than 2 levels
-    cyl = dplyr::case_when(
-      cyl == 4 ~ "Four",
-      cyl == 6 ~ "Six",
-      cyl == 8 ~ "Eight"
-    )
-  )
+
+# After making modifications, test for problems using:
+# testthat::test_file(here::here("tests", "testthat", "test-recoding_factoring_relocating.R"))
+
+# Style Notes: 
+# - Leave 5 blank lines between functions to make the code easier to read.
+
+
+
 
 
 #' Recode A Character Column To Numeric Column
@@ -55,33 +48,6 @@ char_to_num <- function(.col, .recode) {
   .col
 }
 
-## Tests ----
-
-### Results checks
-testthat::test_that("Test that char_to_num results as expected", {
-  labs_n_y <- c("No" = 0, "Yes" = 1)
-  result <- mtcars_test |> 
-    dplyr::mutate(vs = char_to_num(vs, labs_n_y))
-  
-  testthat::expect_equal(
-    result$vs, 
-    c(
-      0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 
-      0, 1, 0, 1, 0, 0, 0, 1
-    )
-  )
-})
-
-### Error checks
-testthat::test_that("Test to make sure that .recode contains the same values as the .col", {
-  # Value in .col, but not .recode
-  labs_n_y <- c("No" = 0, "Check" = 1)
-  testthat::expect_error(
-    mtcars_test |> dplyr::mutate(vs = char_to_num(vs, labs_n_y)),
-    "Values in .col, but not .recode: Yes"
-  )
-})
-
 
 
 
@@ -109,34 +75,6 @@ chars_to_nums <- function(.data, .cols, .recode) {
       )
     )
 }
-
-## Tests ----
-
-### Results checks
-testthat::test_that("Test that chars_to_nums results as expected", {
-  labs_n_y <- c("No" = 0, "Yes" = 1)
-  cols <- c("vs", "am")
-  result <- mtcars_test |> 
-    chars_to_nums(cols, labs_n_y)
-  
-  # Test vs values
-  testthat::expect_equal(
-    result$vs, 
-    c(
-      0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 
-      0, 1, 0, 1, 0, 0, 0, 1
-    )
-  )
-  
-  # Test am values
-  testthat::expect_equal(
-    result$am, 
-    c(
-      1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 
-      0, 1, 1, 1, 1, 1, 1, 1
-    )
-  )
-})
 
 
 
@@ -167,36 +105,6 @@ factors <- function(.data, .cols, .recode) {
     )
 }
 
-## Tests ----
-
-### Results checks
-testthat::test_that("Test that factors results as expected", {
-  labs_n_y <- c("No" = 0, "Yes" = 1)
-  cols <- c("vs", "am")
-  result <- mtcars_test |> 
-    chars_to_nums(cols, labs_n_y) |> 
-    factors(cols, labs_n_y)
-  
-  # Test vs values
-  testthat::expect_equal(
-    result$vs, 
-    c(
-      0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 
-      0, 1, 0, 1, 0, 0, 0, 1
-    )
-  )
-  
-  # Test vs_f values
-  testthat::expect_equal(
-    result$vs_f, 
-    factor(c(
-      "No", "No", "Yes", "Yes", "No", "Yes", "No", "Yes", "Yes", "Yes", "Yes", 
-      "No", "No", "No", "No", "No", "No", "Yes", "Yes", "Yes", "Yes", 'No', 
-      "No", "No", "No", "Yes", "No", "Yes", "No", "No", "No", "Yes"
-    ))
-  )
-})
-
 
 
 
@@ -219,23 +127,3 @@ relocate_factors <- function(.data, .cols) {
   # Return data frame
   .data
 }
-
-## Tests ----
-
-### Results checks
-testthat::test_that("Test that the relocate_factors() results area as expected", {
-  y_n_labs <- c("No" = 0, "Yes" = 1)
-  cols <- c("vs", "am")
-  results <- mtcars_test |>
-    chars_to_nums(cols, y_n_labs) |>
-    factors(cols, y_n_labs) |>
-    relocate_factors(cols)
-  
-  # Test vs location
-  testthat::expect_equal(which(colnames(results) == "vs"), 8L)
-  # Test vs_f values
-  testthat::expect_equal(which(colnames(results) == "vs_f"), 9L)
-})
-
-# Clean up ----
-rm(mtcars_test)
