@@ -1,0 +1,704 @@
+---
+title: "UCLA data cleaning and analysis_1"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+getwd()
+```
+
+```{r}
+setwd("C:\\Users\\DELL\\OneDrive - UTHealth Houston\\Desktop\\CANNELL'S LAB\\detect_fu_interviews_public\\exploratory\\cleaned_rds_files")
+```
+
+```{r}
+library(flextable)
+library(table1)
+library(dplyr)
+library(tibble)
+library(misty)
+library(mice)
+library(officer)
+library(tidyverse)
+```
+
+# Load Cleaned data
+
+# Load the general health and participant datasets
+
+```{r}
+general_health <- readRDS("general_health_import.rds")
+
+participant <- readRDS("participant_import.rds")
+
+soc_dem <- readRDS("sociodemographic_information_import.rds")
+
+self_report <- readRDS("self_report_import.rds")
+
+aps <- readRDS("aps_investigations_import.rds")
+```
+
+## UCLA Loneliness Scale (Missing data summary)
+
+Create table that summarizes missing data using the md.pattern function
+
+```{r}
+ls_m <- general_health %>%
+  select(
+    starts_with("ls") & ends_with("4cat_f")
+  ) %>%
+  md.pattern(., plot = F, rotate.names = T)
+
+ls_m <- ls_m %>%
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  rename(
+    No_of_rows = rowname,
+    ls_lack_companionship = ls_lack_companionship_4cat_f,
+    ls_feel_left_out = ls_feel_left_out_4cat_f,
+    ls_feel_isolated = ls_feel_isolated_4cat_f,
+    No_missing_per_row = V4
+  ) %>%
+  flextable()
+
+ls_m <- add_footer_row(ls_m,
+  values = c("A matrix with ncol(x)+1 columns, in which each row corresponds to a missing data pattern (1 = observed, 0 = missing). Rows and columns are sorted in increasing amounts of missing information. The last column and row contain row and column counts, respectively."),
+  colwidths = c(5), top = TRUE
+)
+
+ls_m <- align(ls_m, align = "left", part = "all")
+
+ls_m <- bold(ls_m, bold = TRUE, i = 5, part = "body")
+ls_m <- bold(ls_m, bold = TRUE, j = 1, part = "body")
+ls_m <- bold(ls_m, bold = TRUE, j = 5, part = "body")
+ls_m <- set_caption(ls_m, "Missing Data Patterns")
+ls_m <- width(ls_m, width = 1)
+
+ls_m
+```
+
+```{r, fig.width = 12}
+
+```
+
+### summary of the count of unique people who completed the UCLA loneliness scale
+
+preparation of the data
+
+Merge into a single dataset all the necessary variables from the general health and participant datasets and separate some certain missing variables for the unique value summary excluding missing rows.
+
+```{r}
+part_id <- participant %>%
+  select(medstar_id, name_first, name_middle_initial, name_last, dob, sex_3cat_f, x_address_original)
+
+# merge name columns into new full name column
+part_id <- part_id %>%
+  unite("name_full", "name_first":"name_last", sep = " ", na.rm = TRUE, remove = F) %>%
+  relocate(name_full, .after = name_last)
+
+ls <- general_health %>%
+  select(
+    medstar_id, x_record_month, x_record_year,
+    starts_with("ls") & ends_with("4cat_f")
+  ) %>%
+  drop_na(c("ls_lack_companionship_4cat_f", "ls_feel_left_out_4cat_f", "ls_feel_isolated_4cat_f"))
+
+gen_part <- left_join(ls, part_id)
+gen_part <- gen_part %>% separate(x_address_original, into = c("house_number", "street_name"), sep = "^\\S*\\K\\s+")
+```
+
+```{r}
+part_id <- participant %>%
+  select(medstar_id, name_first, name_middle_initial, name_last, dob, sex_3cat_f, x_address_original)
+
+# merge name columns into new full name column
+part_id <- part_id %>%
+  unite("name_full", "name_first":"name_last", sep = " ", na.rm = TRUE, remove = F) %>%
+  relocate(name_full, .after = name_last)
+
+ls <- general_health %>%
+  select(
+    medstar_id, x_record_month, x_record_year,
+    starts_with("ls") & ends_with("4cat_f")
+  ) %>%
+  drop_na(c("ls_lack_companionship_4cat_f", "ls_feel_left_out_4cat_f", "ls_feel_isolated_4cat_f"))
+
+gen_part <- left_join(ls, part_id)
+gen_part <- gen_part %>% separate(x_address_original, into = c("house_number", "street_name"), sep = "^\\S*\\K\\s+")
+```
+
+### Create table of unique i.ds
+
+Table showing the count of the unique names and their corresponding number that occurs once or more excluding rows that have missing data
+
+```{r}
+# Count of the unique people who completed the loneliness scale
+
+unique_people <- gen_part %>%
+  select(name_first, name_last, dob, sex_3cat_f, house_number) %>%
+  group_by_all() %>%
+  summarise(count = n()) %>%
+  unique()
+
+# Unique people whose names are found in only one row with complete ls scale data
+
+ucs <- unique_people %>% filter(count == 1)
+
+# Unique people whose names were found in more than one row who completed ls scale data with the number of occurrences
+
+nucs <- unique_people %>% filter(count > 1)
+
+# Filtered dataset that includes only people that had moe than one occurrence
+
+nucs_df <- filter(gen_part, name_full %in% nucs$Name)
+
+# Table summarizing counts of unique names and number of names that occur once or more than once excluding rows with missing loneliness scale data
+
+sum_table <- data.frame(
+  Value = c("Unique people", "Occur multiple times", "Occur only once", "Total number of rows"),
+  Count = c(nrow(unique_people), nrow(nucs), nrow(ucs), nrow(gen_part))
+) %>%
+  flextable()
+# Set caption
+
+sum_table <- set_caption(sum_table, "Unique and Non-unique Name Counts")
+sum_table <- width(sum_table, width = 2)
+
+sum_table
+
+
+```
+
+## Descriptive tables
+
+preparation of the data
+
+Create a data subset that includes the loneliness scale data and excludes missing and 'refused' responses
+
+```{r}
+#| echo: false
+#| eval: true
+lsd <- general_health %>%
+  select(
+    medstar_id,
+    starts_with("ls") & ends_with(c("4cat_f", "4cat"))
+  ) %>%
+  na.omit() %>%
+  filter(
+    if_all(
+      everything(), ~ !grepl(paste("Refused", collapse = "|"), .)
+    )
+  ) %>%
+  droplevels()
+
+
+```
+
+### Descriptive table for categorical data of UCLA Loneliness Scale
+
+# Create labels
+
+```{r}
+label(lsd$ls_lack_companionship_4cat_f) <- "feel a lack of companionship"
+label(lsd$ls_feel_left_out_4cat_f) <- "feel left out"
+label(lsd$ls_feel_isolated_4cat_f) <- "feel isolated"
+label(lsd$ls_lack_companionship_4cat) <- "feel a lack of companionship"
+label(lsd$ls_feel_left_out_4cat) <- "feel left out"
+label(lsd$ls_feel_isolated_4cat) <- "feel isolated"
+
+
+cap_c <- "Basic Stats for UCLA Loneliness Scale"
+
+
+ls_c <- table1(~ ls_lack_companionship_4cat_f + ls_feel_left_out_4cat_f + ls_feel_isolated_4cat_f, data = lsd, caption = cap_c)
+ls_c <- t1flex(ls_c, tablefn = c("qflextable", "flextable", "regulartable"))
+ls_c <- width(ls_c, width = 3)
+
+ls_c
+```
+
+### Descriptive table for scores of the UCLA Loneliness Scale
+
+Individual scores calculation for the UCLA scale
+
+```{r}
+
+cap_s <- "Basic Stats for UCLA Loneliness Scale Numeric Scores (Individual)"
+
+
+ls_s <- table1(~ ls_lack_companionship_4cat + ls_feel_left_out_4cat + ls_feel_isolated_4cat, data = lsd, caption = cap_s)
+ls_s <- t1flex(ls_s, tablefn = c("qflextable", "flextable", "regulartable"))
+
+ls_s <- width(ls_s, width = 3)
+
+ls_s
+```
+
+### Descriptive table for total scores (Calculating the UCLA scale total score with SD)
+
+```{r}
+# Create column with total scores
+lsd <- lsd %>% mutate(total_score = rowSums(.[2:4]))
+
+# Create label for the column of total scores
+label(lsd$total_score) <- "total score"
+
+# Create descriptive table
+cap_t <- "Basic Stats for UCLA Loneliness Scale Numeric Scores (Total)"
+
+ls_t <- table1(~total_score, data = lsd, caption = cap_t)
+ls_t <- t1flex(ls_t, tablefn = c("qflextable", "flextable", "regulartable"))
+ls_t <- width(ls_t, width = 3)
+
+ls_t
+```
+
+# Sociodemographic Information
+
+## data preparation
+
+Create a data frame which includes requested socio-demographic information for all rows that do not have any missing values or 'Refused' or 'Don't know responses for loneliness scale data.
+
+```{r}
+# Select socio-demographic information variables
+sdf <- soc_dem %>%
+  select(c(8, 10:12, 17:42))
+
+# Combine ls and sociodemographic data
+soc_dem_ls <- left_join(lsd, sdf)
+
+# Exclude 'Refused' and 'Don't know' responses for all variables
+pat <- c("Don't know", "Refused")
+soc_dem_ls_n <- soc_dem_ls %>%
+  filter(
+    if_all(
+      everything(), ~ !grepl(paste(pat, collapse = "|"), .)
+    )
+  ) %>%
+  droplevels() %>%
+  mutate(
+    sode_age_years = as.numeric(sode_age_years), sode_people = as.numeric(sode_people)
+  )
+```
+
+### Descriptive tables for categorical data and numerically coded data
+
+Categorical data
+
+```{r}
+# Create descriptive table and title it
+cap_soc <- "Basic Stats for Sociodemographic Information (Frequency)"
+
+
+sdls_tab <- table1(~ sode_people_3cat_f  + sode_marital_8cat_f + sode_age_4cat_f + sode_hispanic_4cat_f + sode_school_9cat_f + sode_employed_11cat_f + sode_income_9cat_f + sode_military_4cat_f + sode_unwanted_4cat_f + sode_sexual_4cat_f + sogi_identity_5cat_f + sogi_orientation_8cat_f + hsi_contact_4cat_f,
+  data = soc_dem_ls,
+  caption = cap_soc
+)
+sdls_tab <- t1flex(sdls_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+sdls_tab <- width(sdls_tab, width = 3)
+sdls_tab
+
+```
+
+Numerically coded data
+
+```{r}
+cap_soc_n <- "Basic Stats for Sociodemographic Information (Central tendency)"
+
+
+sdls_tab_n <- table1(~ sode_age_years + sode_age_4cat + sode_people + sode_marital_8cat_f + sode_hispanic_4cat + sode_school_9cat + sode_employed_11cat + sode_income_9cat + sode_military_4cat + sode_unwanted_4cat + sode_sexual_4cat + sogi_identity_5cat + sogi_orientation_8cat + hsi_contact_4cat,
+  data = soc_dem_ls_n,
+  caption = cap_soc_n
+)
+sdls_tab_n <- t1flex(sdls_tab_n, tablefn = c("qflextable", "flextable", "regulartable"))
+sdls_tab_n <- width(sdls_tab_n, width = 3)
+
+sdls_tab_n
+```
+
+### General Health
+
+Data Preparation
+
+Take out columns with variables that are not needed and exclude rows that have any missing values or 'Refused' or 'Don't know' responses for loneliness scale data. Also create total scale score for PEG and depression variables.
+
+```{r}
+# Filter out columns with unneeded variables and exclude rows that have any missing values or 'Refused' or 'Don't know responses for loneliness scale data.
+gh_ls <- general_health %>%
+  select(-c(starts_with("outcomes_tf") | starts_with("nesarc"))) %>%
+  drop_na(c("ls_lack_companionship_4cat_f", "ls_feel_left_out_4cat_f", "ls_feel_isolated_4cat_f")) %>%
+  filter(
+    if_all(
+      c("ls_lack_companionship_4cat_f", "ls_feel_left_out_4cat_f", "ls_feel_isolated_4cat_f"),
+      ~ !grepl(paste("Refused", collapse = "|"), .)
+    )
+  ) %>%
+  droplevels()
+
+# Create columns representing total scores for PEG and depression variables.
+gh_ls <- gh_ls %>% mutate(
+  PEG_total = rowSums(.[14:16]),
+  depres_total = rowSums(
+    select(., (starts_with("depres") & ends_with("cat")))
+  )
+)
+
+# Exclude 'Refused' and 'Don't know' responses for all variables
+pat <- c("Don't know", "Refused")
+gh_ls_n <- gh_ls %>%
+  filter(
+    if_all(
+      everything(), ~ !grepl(paste(pat, collapse = "|"), .)
+    )
+  ) %>%
+  droplevels()
+
+```
+
+## Create descriptive table for the general health data
+
+### Categorical data
+
+```{r}
+cap_g <- "Basic Stats for General Health Data (Categories)"
+
+gh_ls_tab <- table1(~ outcomes_health_vigorous_5cat_f + outcomes_health_moderate_5cat_f + outcomes_health_uphill_5cat_f + outcomes_health_bend_5cat_f + outcomes_health_block_5cat_f + outcomes_health_bathe_5cat_f + outcomes_4weeks_pain_8cat_f + outcomes_month_social_7cat_f + outcomes_month_nervous_7cat_f + outcomes_month_calm_7cat_f + outcomes_month_blue_7cat_f + outcomes_month_happy_7cat_f + outcomes_month_dumps_7cat_f + auditc_drink_7cat_f + auditc_day_7cat_f + auditc_five_7cat_f,
+  data = gh_ls,
+  caption = cap_g
+)
+
+gh_ls_tab <- t1flex(gh_ls_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+gh_ls_tab <- width(gh_ls_tab, width = 3)
+
+gh_ls_tab
+
+```
+
+## Numerically coded data for general health data
+
+```{r}
+cap_g_n <- "Basic Stats for General Health Data"
+
+gh_ls_n_tab <- table1(~ PEG_total + depres_total + outcomes_health_vigorous_5cat + outcomes_health_moderate_5cat + outcomes_health_uphill_5cat + outcomes_health_bend_5cat + outcomes_health_block_5cat + outcomes_health_bathe_5cat + outcomes_4weeks_pain_8cat + outcomes_month_social_7cat + outcomes_month_nervous_7cat + outcomes_month_calm_7cat + outcomes_month_blue_7cat + outcomes_month_happy_7cat + outcomes_month_dumps_7cat + auditc_drink_7cat + auditc_day_7cat + auditc_five_7cat,
+  data = gh_ls_n,
+  caption = cap_g_n
+)
+
+gh_ls_n_tab <- t1flex(gh_ls_n_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+gh_ls_n_tab <- width(gh_ls_n_tab, width = 3)
+
+gh_ls_n_tab
+```
+
+### Self Report Data
+
+organize the data
+
+Take out columns with variables that are not necessary and exclude rows that have any missing values or 'Refused' or 'Don't know' responses for loneliness scale data.
+
+```{r}
+# Select relevant variables from the self report dataset
+sr_ls <- self_report %>%
+  select(
+    neglect_go_4cat, neglect_food_4cat, neglect_house_4cat, neglect_clean_4cat, neglect_ready_4cat,
+    neglect_bills_4cat, neglect_go_help_5cat, neglect_food_help_5cat, neglect_house_help_5cat,
+    neglect_clean_help_5cat, neglect_ready_help_5cat, neglect_bills_help_5cat, neglect_go_reliable_6cat,
+    neglect_food_reliable_6cat, neglect_house_reliable_6cat, neglect_clean_reliable_6cat,
+    neglect_ready_reliable_6cat, neglect_bills_reliable_6cat, neglect_person_12cat, finance_help_4cat,
+    finance_person_permission_4cat, finance_person_decisions_4cat, finance_copies_4cat,
+    finance_person_forged_4cat, finance_person_tricked_4cat, finance_person_stolen_4cat,
+    finance_stranger_permission_4cat, finance_stranger_forged_4cat, finance_stranger_tricked_4cat,
+    finance_person_permission_65_4cat, finance_person_forged_65_4cat, finance_person_tricked_65_4cat,
+    finance_person_stolen_65_4cat, finance_stranger_permission_65_4cat, finance_stranger_forged_65_4cat,
+    finance_stranger_tricked_65_4cat, finance_person_12cat, finance_person_permission_last_time_8cat,
+    finance_person_forged_last_time_8cat, finance_person_tricked_last_time_8cat,
+    finance_person_stolen_last_time_8cat, finance_stranger_permission_last_time_8cat,
+    finance_stranger_forged_last_time_8cat, finance_stranger_tricked_last_time_8cat,
+    emotional_yelled_4cat, emotional_embarrassed_4cat, emotional_harassed_4cat, emotional_refused_4cat,
+    emotional_incident_reported_4cat, emotional_person_help_4cat, emotional_person_no_live_4cat,
+    emotional_yelled_65_4cat, emotional_embarrassed_65_4cat, emotional_harassed_65_4cat,
+    emotional_refused_65_4cat, emotional_incident_reported_v2_4cat, emotional_person_live_then_4cat,
+    emotional_person_live_now_4cat, emotional_incident_person_12cat, emotional_yelled_last_time_8cat,
+    emotional_embarrassed_last_time_8cat, emotional_harassed_last_time_8cat,
+    emotional_refused_last_time_8cat, emotional_yelled_times_7cat, emotional_embarrassed_times_7cat,
+    emotional_harassed_times_7cat, emotional_refused_times_7cat, physical_hit_4cat,
+    physical_restrain_4cat, physical_hurt_4cat, physical_incident_reported_4cat,
+    physical_incident_person_4cat, physical_person_4cat, physical_person_help_4cat,
+    physical_person_no_live_4cat, physical_hit_65_4cat, physical_restrain_65_4cat, physical_hurt_65_4cat,
+    physical_incident_reported_v2_4cat, physical_person_live_then_4cat, physical_person_live_now_4cat,
+    emotional_incident_person_v2_12cat, physical_hit_last_time_8cat, physical_restrain_last_time_8cat,
+    physical_hurt_last_time_8cat, physical_hit_times_7cat, physical_restrain_times_7cat,
+    physical_hurt_times_7cat, physical_incident_person_v2_12cat, physical_person_12cat,
+    sexual_harm_4cat, sexual_touched_4cat, sexual_forced_4cat, sexual_picture_4cat,
+    sexual_incident_reported_4cat, sexual_incident_person_4cat, sexual_person_live_4cat,
+    sexual_person_help_4cat, sexual_person_no_live_4cat, sexual_harm_65_4cat, sexual_touched_65_4cat,
+    sexual_forced_65_4cat, sexual_picture_65_4cat, sexual_incident_reported_v2_4cat,
+    sexual_person_live_then_4cat, sexual_person_live_now_4cat, sexual_harm_last_time_8cat,
+    sexual_touched_last_time_8cat, sexual_forced_last_time_8cat, sexual_picture_last_time_8cat,
+    sexual_harm_times_7cat, sexual_touched_times_7cat, sexual_forced_times_7cat,
+    sexual_picture_times_7cat, sexual_incident_person_v2_12cat, neglect_go_4cat_f, neglect_food_4cat_f,
+    neglect_house_4cat_f, neglect_clean_4cat_f, neglect_ready_4cat_f, neglect_bills_4cat_f,
+    neglect_go_help_5cat_f, neglect_food_help_5cat_f, neglect_house_help_5cat_f,
+    neglect_clean_help_5cat_f, neglect_ready_help_5cat_f, neglect_bills_help_5cat_f,
+    neglect_go_reliable_6cat_f, neglect_food_reliable_6cat_f, neglect_house_reliable_6cat_f,
+    neglect_clean_reliable_6cat_f, neglect_ready_reliable_6cat_f, neglect_bills_reliable_6cat_f,
+    neglect_person_12cat_f, finance_help_4cat_f, finance_person_permission_4cat_f,
+    finance_person_decisions_4cat_f, finance_copies_4cat_f, finance_person_forged_4cat_f,
+    finance_person_tricked_4cat_f, finance_person_stolen_4cat_f, finance_stranger_permission_4cat_f,
+    finance_stranger_forged_4cat_f, finance_stranger_tricked_4cat_f, finance_person_permission_65_4cat_f,
+    finance_person_forged_65_4cat_f, finance_person_tricked_65_4cat_f, finance_person_stolen_65_4cat_f,
+    finance_stranger_permission_65_4cat_f, finance_stranger_forged_65_4cat_f,
+    finance_stranger_tricked_65_4cat_f, finance_person_12cat_f,
+    finance_person_permission_last_time_8cat_f, finance_person_forged_last_time_8cat_f,
+    finance_person_tricked_last_time_8cat_f, finance_person_stolen_last_time_8cat_f,
+    finance_stranger_permission_last_time_8cat_f, finance_stranger_forged_last_time_8cat_f,
+    finance_stranger_tricked_last_time_8cat_f, emotional_yelled_4cat_f, emotional_embarrassed_4cat_f,
+    emotional_harassed_4cat_f, emotional_refused_4cat_f, emotional_incident_reported_4cat_f,
+    emotional_person_help_4cat_f, emotional_person_no_live_4cat_f, emotional_yelled_65_4cat_f,
+    emotional_embarrassed_65_4cat_f, emotional_harassed_65_4cat_f, emotional_refused_65_4cat_f,
+    emotional_incident_reported_v2_4cat_f, emotional_person_live_then_4cat_f,
+    emotional_person_live_now_4cat_f, emotional_incident_person_12cat_f,
+    emotional_yelled_last_time_8cat_f, emotional_embarrassed_last_time_8cat_f,
+    emotional_harassed_last_time_8cat_f, emotional_refused_last_time_8cat_f,
+    emotional_yelled_times_7cat_f, emotional_embarrassed_times_7cat_f, emotional_harassed_times_7cat_f,
+    emotional_refused_times_7cat_f, emotional_incident_person_v2_12cat_f, physical_hit_4cat_f,
+    physical_restrain_4cat_f, physical_hurt_4cat_f, physical_incident_reported_4cat_f,
+    physical_incident_person_4cat_f, physical_person_4cat_f, physical_person_help_4cat_f,
+    physical_person_no_live_4cat_f, physical_hit_65_4cat_f, physical_restrain_65_4cat_f,
+    physical_hurt_65_4cat_f, physical_incident_reported_v2_4cat_f, physical_person_live_then_4cat_f,
+    physical_person_live_now_4cat_f, physical_hit_last_time_8cat_f, physical_restrain_last_time_8cat_f,
+    physical_hurt_last_time_8cat_f, physical_hit_times_7cat_f, physical_restrain_times_7cat_f,
+    physical_hurt_times_7cat_f, physical_incident_person_v2_12cat_f, physical_person_12cat_f,
+    sexual_harm_4cat_f, sexual_touched_4cat_f, sexual_forced_4cat_f, sexual_picture_4cat_f,
+    sexual_incident_reported_4cat_f, sexual_incident_person_4cat_f, sexual_person_live_4cat_f,
+    sexual_person_help_4cat_f, sexual_person_no_live_4cat_f, sexual_harm_65_4cat_f,
+    sexual_touched_65_4cat_f, sexual_forced_65_4cat_f, sexual_picture_65_4cat_f,
+    sexual_incident_reported_v2_4cat_f, sexual_person_live_then_4cat_f, sexual_person_live_now_4cat_f,
+    sexual_harm_last_time_8cat_f, sexual_touched_last_time_8cat_f, sexual_forced_last_time_8cat_f,
+    sexual_picture_last_time_8cat_f, sexual_harm_times_7cat_f, sexual_touched_times_7cat_f,
+    sexual_forced_times_7cat_f, sexual_picture_times_7cat_f, sexual_incident_person_v2_12cat_f,
+    medstar_id
+  )
+# Merge filtered UCLA ls data with self report data
+sr_ls <- left_join(lsd, sr_ls)
+
+# Exclude 'Refused' and 'Don't know' responses for all variables
+sr_ls_n <- sr_ls %>%
+  filter(
+    if_all(
+      everything(), ~ !grepl(paste(pat, collapse = "|"), .)
+    )
+  ) %>%
+  droplevels()
+
+```
+
+## Create descriptive table for the Self Report Data
+
+### Categorical Data
+
+```{r}
+cap_sr <- "Basic Stats for Self Report Data (Categories)"
+
+sr_ls_tab <- table1(~ neglect_go_4cat_f + neglect_food_4cat_f + neglect_house_4cat_f + neglect_clean_4cat_f + neglect_ready_4cat_f + neglect_bills_4cat_f + neglect_go_help_5cat_f + neglect_food_help_5cat_f + neglect_house_help_5cat_f + neglect_clean_help_5cat_f + neglect_ready_help_5cat_f + neglect_bills_help_5cat_f + neglect_go_reliable_6cat_f + neglect_food_reliable_6cat_f + neglect_house_reliable_6cat_f + neglect_clean_reliable_6cat_f + neglect_ready_reliable_6cat_f + neglect_bills_reliable_6cat_f + neglect_person_12cat_f + finance_help_4cat_f + finance_person_permission_4cat_f + finance_person_decisions_4cat_f + finance_copies_4cat_f + finance_person_forged_4cat_f + finance_person_tricked_4cat_f + finance_person_stolen_4cat_f + finance_stranger_permission_4cat_f + finance_stranger_forged_4cat_f + finance_stranger_tricked_4cat_f + finance_person_permission_65_4cat_f + finance_person_forged_65_4cat_f + finance_person_tricked_65_4cat_f + finance_person_stolen_65_4cat_f + finance_stranger_permission_65_4cat_f + finance_stranger_forged_65_4cat_f + finance_stranger_tricked_65_4cat_f + finance_person_12cat_f + finance_person_permission_last_time_8cat_f + finance_person_forged_last_time_8cat_f + finance_person_tricked_last_time_8cat_f + finance_person_stolen_last_time_8cat_f + finance_stranger_permission_last_time_8cat_f + finance_stranger_forged_last_time_8cat_f + finance_stranger_tricked_last_time_8cat_f + emotional_yelled_4cat_f + emotional_embarrassed_4cat_f + emotional_harassed_4cat_f + emotional_refused_4cat_f + emotional_incident_reported_4cat_f + emotional_person_help_4cat_f + emotional_person_no_live_4cat_f + emotional_yelled_65_4cat_f + emotional_embarrassed_65_4cat_f + emotional_harassed_65_4cat_f + emotional_refused_65_4cat_f + emotional_incident_reported_v2_4cat_f + emotional_person_live_then_4cat_f + emotional_person_live_now_4cat_f + emotional_incident_person_12cat_f + emotional_yelled_last_time_8cat_f + emotional_embarrassed_last_time_8cat_f + emotional_harassed_last_time_8cat_f + emotional_refused_last_time_8cat_f + emotional_yelled_times_7cat_f + emotional_embarrassed_times_7cat_f + emotional_harassed_times_7cat_f + emotional_refused_times_7cat_f + emotional_incident_person_v2_12cat_f + physical_hit_4cat_f + physical_restrain_4cat_f + physical_hurt_4cat_f + physical_incident_reported_4cat_f + physical_incident_person_4cat_f + physical_person_4cat_f + physical_person_help_4cat_f + physical_person_no_live_4cat_f + physical_hit_65_4cat_f + physical_restrain_65_4cat_f + physical_hurt_65_4cat_f + physical_incident_reported_v2_4cat_f + physical_person_live_then_4cat_f + physical_person_live_now_4cat_f + physical_hit_last_time_8cat_f + physical_restrain_last_time_8cat_f + physical_hurt_last_time_8cat_f + physical_hit_times_7cat_f + physical_restrain_times_7cat_f + physical_hurt_times_7cat_f + physical_incident_person_v2_12cat_f + physical_person_12cat_f + sexual_harm_4cat_f + sexual_touched_4cat_f + sexual_forced_4cat_f + sexual_picture_4cat_f + sexual_incident_reported_4cat_f + sexual_incident_person_4cat_f + sexual_person_live_4cat_f + sexual_person_help_4cat_f + sexual_person_no_live_4cat_f + sexual_harm_65_4cat_f + sexual_touched_65_4cat_f + sexual_forced_65_4cat_f + sexual_picture_65_4cat_f + sexual_incident_reported_v2_4cat_f + sexual_person_live_then_4cat_f + sexual_person_live_now_4cat_f + sexual_harm_last_time_8cat_f + sexual_touched_last_time_8cat_f + sexual_forced_last_time_8cat_f + sexual_picture_last_time_8cat_f + sexual_harm_times_7cat_f + sexual_touched_times_7cat_f + sexual_forced_times_7cat_f + sexual_picture_times_7cat_f + sexual_incident_person_v2_12cat_f,
+  data = sr_ls,
+  caption = cap_sr
+)
+
+sr_ls_tab <- t1flex(sr_ls_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+sr_ls_tab <- width(sr_ls_tab, width = 3)
+
+sr_ls_tab
+
+
+```
+
+## Numerically coded data for self report data
+
+```{r}
+cap_sr_n <- "Basic Stats for Self Report Data"
+
+sr_ls_n_tab <- table1(~ neglect_go_4cat + neglect_food_4cat + neglect_house_4cat + neglect_clean_4cat + neglect_ready_4cat + neglect_bills_4cat + neglect_go_help_5cat + neglect_food_help_5cat + neglect_house_help_5cat + neglect_clean_help_5cat + neglect_ready_help_5cat + neglect_bills_help_5cat + neglect_go_reliable_6cat + neglect_food_reliable_6cat + neglect_house_reliable_6cat + neglect_clean_reliable_6cat + neglect_ready_reliable_6cat + neglect_bills_reliable_6cat + neglect_person_12cat + finance_help_4cat + finance_person_permission_4cat + finance_person_decisions_4cat + finance_copies_4cat + finance_person_forged_4cat + finance_person_tricked_4cat + finance_person_stolen_4cat + finance_stranger_permission_4cat + finance_stranger_forged_4cat + finance_stranger_tricked_4cat + finance_person_permission_65_4cat + finance_person_forged_65_4cat + finance_person_tricked_65_4cat + finance_person_stolen_65_4cat + finance_stranger_permission_65_4cat + finance_stranger_forged_65_4cat + finance_stranger_tricked_65_4cat + finance_person_12cat + finance_person_permission_last_time_8cat + finance_person_forged_last_time_8cat + finance_person_tricked_last_time_8cat + finance_person_stolen_last_time_8cat + finance_stranger_permission_last_time_8cat + finance_stranger_forged_last_time_8cat + finance_stranger_tricked_last_time_8cat + emotional_yelled_4cat + emotional_embarrassed_4cat + emotional_harassed_4cat + emotional_refused_4cat + emotional_incident_reported_4cat + emotional_person_help_4cat + emotional_person_no_live_4cat + emotional_yelled_65_4cat + emotional_embarrassed_65_4cat + emotional_harassed_65_4cat + emotional_refused_65_4cat + emotional_incident_reported_v2_4cat + emotional_person_live_then_4cat + emotional_person_live_now_4cat + emotional_incident_person_12cat + emotional_yelled_last_time_8cat + emotional_embarrassed_last_time_8cat + emotional_harassed_last_time_8cat + emotional_refused_last_time_8cat + emotional_yelled_times_7cat + emotional_embarrassed_times_7cat + emotional_harassed_times_7cat + emotional_refused_times_7cat + physical_hit_4cat + physical_restrain_4cat + physical_hurt_4cat + physical_incident_reported_4cat + physical_incident_person_4cat + physical_person_4cat + physical_person_help_4cat + physical_person_no_live_4cat + physical_hit_65_4cat + physical_restrain_65_4cat + physical_hurt_65_4cat + physical_incident_reported_v2_4cat + physical_person_live_then_4cat + physical_person_live_now_4cat + emotional_incident_person_v2_12cat + physical_hit_last_time_8cat + physical_restrain_last_time_8cat + physical_hurt_last_time_8cat + physical_hit_times_7cat + physical_restrain_times_7cat + physical_hurt_times_7cat + physical_incident_person_v2_12cat + physical_person_12cat + sexual_harm_4cat + sexual_touched_4cat + sexual_forced_4cat + sexual_picture_4cat + sexual_incident_reported_4cat + sexual_incident_person_4cat + sexual_person_live_4cat + sexual_person_help_4cat + sexual_person_no_live_4cat + sexual_harm_65_4cat + sexual_touched_65_4cat + sexual_forced_65_4cat + sexual_picture_65_4cat + sexual_incident_reported_v2_4cat + sexual_person_live_then_4cat + sexual_person_live_now_4cat + sexual_harm_last_time_8cat + sexual_touched_last_time_8cat + sexual_forced_last_time_8cat + sexual_picture_last_time_8cat + sexual_harm_times_7cat + sexual_touched_times_7cat + sexual_forced_times_7cat + sexual_picture_times_7cat + sexual_incident_person_v2_12cat,
+  data = sr_ls_n,
+  caption = cap_sr_n
+)
+
+sr_ls_n_tab <- t1flex(sr_ls_n_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+sr_ls_n_tab <- width(sr_ls_n_tab, width = 3)
+
+sr_ls_n_tab
+
+```
+
+# APS Investigations
+
+## organize the data
+
+Take out columns with variables that are not necessary and exclude rows that have any missing values or 'Refused' or 'Don't know' responses for loneliness scale data.
+
+```{r}
+# Select all relevant variables
+aps_ls <- aps %>%
+  select(c(8, 15:22))
+
+# Merge filtered UCLA "ls" data with "self report" data
+aps_ls <- left_join(lsd, aps_ls)
+
+# Exclude 'Refused' and 'Don't know' responses for all variables
+aps_ls_n <- aps_ls %>%
+  filter(
+    if_all(
+      everything(), ~ !grepl(paste(pat, collapse = "|"), .)
+    )
+  ) %>%
+  droplevels()
+
+```
+
+## Descriptive table for APS data
+
+### Categorical Data
+
+```{r}
+cap_aps <- "Basic Stats for Self Report Data (Categories)"
+
+aps_ls_tab <- table1(~ aps_report_4cat_f + aps_times_5cat_f + aps_first_8cat_f + aps_recent_8cat_f,
+  data = aps_ls,
+  caption = cap_aps
+)
+
+aps_ls_tab <- t1flex(aps_ls_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+aps_ls_tab <- width(aps_ls_tab, width = 3)
+
+aps_ls_tab
+```
+
+### Numerically coded data for APS data
+
+```{r}
+cap_aps_n <- "Basic Stats for Self Report Data"
+
+aps_ls_n_tab <- table1(~ aps_report_4cat + aps_times_5cat + aps_first_8cat + aps_recent_8cat,
+  data = aps_ls_n,
+  caption = cap_aps_n
+)
+
+aps_ls_n_tab <- t1flex(aps_ls_n_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+aps_ls_n_tab <- width(aps_ls_n_tab, width = 3)
+
+aps_ls_n_tab
+```
+
+# creation of a word document
+
+```{r}
+# create Word file and object
+detect_doc <- read_docx()
+
+# Add title
+text_style <- fp_text(font.size = 28)
+par_style <- fp_par(text.align = "center")
+
+detect_doc <- body_add_fpar(detect_doc, fpar(ftext("DETECT Data Summary", prop = text_style),
+  fp_p = par_style
+))
+# Add UCLA ls tables
+detect_doc <- detect_doc %>%
+  body_add_par("UCLA Loneliness Scale Data", style = "heading 1") %>%
+  body_add_par("There are 376 rows with completed UCLA loneliness scale data and 563 rows with at least one item missing.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(ls_m, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par("The table shows the counts for unique people while excluding rows with at least one missing UCLA scale item.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(sum_table, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par("The tables show the summary statistics for the UCLA three item scale while excluding rows with at least one missing UCLA scale item as well as rows where response to any item question was refused.") %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(ls_s, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(ls_t, align = "left") %>%
+  body_add_par(value = "")
+
+# Add Sociodemographic Information tables
+detect_doc <- detect_doc %>%
+  body_add_par("Sociodemographic Information Data", style = "heading 1") %>%
+  body_add_par("The table below shows the frequencies for categorical variables in the sociodemographic Information dataset while excluding rows where items in the UCLA loneliness scale were either missing or had a response of 'Refused'.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(sdls_tab, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par("The table below shows the central tendency and variation measures for some numerically coded sociodemographic information variables while excluding rows where items in the UCLA loneliness scale were either missing or had a response of 'Refused'. Additionally, rows that had 'Refused' and 'Don't know' responses for the sociodemographic information variables were filtered out.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(sdls_tab_n, align = "left")
+
+# Add General Health Data tables
+detect_doc <- detect_doc %>%
+  body_add_par("General Health Data", style = "heading 1") %>%
+  body_add_par("The table below shows the frequencies for categorical variables in the general health dataset while excluding rows where items in the UCLA loneliness scale were either missing or had a response of 'Refused'.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(gh_ls_tab, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par("The table below shows the central tendency and variation measures for some numerically coded general health variables while excluding rows where items in the UCLA loneliness scale were either missing or had a response of 'Refused'. Additionally, rows that had 'Refused' and 'Don't know' responses for the general health variables were filtered out.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(gh_ls_n_tab, align = "left")
+
+# Add Self Report Data tables
+detect_doc <- detect_doc %>%
+  body_add_par("Self Report Data", style = "heading 1") %>%
+  body_add_par("Frequency table for categorical variables in the self report dataset. This table does not include rows where items in the UCLA loneliness scale were either missing or had a response of 'Refused'.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(sr_ls_tab, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par("The table below shows the central tendency and variation measures for some numerically coded self report variables while excluding rows where items in the UCLA loneliness scale were either missing or had a response of 'Refused'. Additionally, rows that had 'Refused' and 'Don't know' responses for the self report variables were filtered out.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(sr_ls_n_tab, align = "left")
+
+# Add APS Investigations Data tables
+detect_doc <- detect_doc %>%
+  body_add_par("APS Investigations Data", style = "heading 1") %>%
+  body_add_par("Frequency table for categorical variables in the APS Investigations which excluded rows where items in the UCLA loneliness scale were either missing or had a response of 'Refused'.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(aps_ls_tab, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par("The table below shows the central tendency and variation measures for some numerically coded APS Investigations variables while excluding rows where items in the UCLA loneliness scale were either missing or had a response of 'Refused'. Additionally, rows that had 'Refused' and 'Don't know' responses for the APS Investigations variables were filtered out.") %>%
+  body_add_par(value = "") %>%
+  body_add_flextable(aps_ls_n_tab, align = "left") %>%
+  
+
+# print the word document
+print(detect_doc, target = "C:/Users/DELL/OneDrive - UTHealth Houston/Desktop./UCLA_loneliness_scale_descriptive_summary.docx")
+
+
+```
+
+```{r}
+# Calculate summary statistics for each group
+summary_stats <- aggregate(total_score ~ neglect_go_4cat, data = sr_ls, FUN = function(x) c(mean = mean(x), sd = sd(x)))
+
+# Print the summary statistics
+print(summary_stats)
+
+
+```
+
+```         
+```
+
+```         
+```
+
+```         
+```
+
+```         
+```
+
+```         
+```
+
+```         
+```
