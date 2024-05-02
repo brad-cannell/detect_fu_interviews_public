@@ -1,0 +1,99 @@
+---
+title: "Table 1 for UCLA loneliness scale data"
+format: html
+editor: visual
+---
+
+# Load packages and user defined functions
+
+```{r}
+library(here)
+library(readr)
+library(table1)
+library(flextable)
+library(expss)
+library(dplyr)
+library(freqtables)
+
+n_percent_path <- here::here("r", "n_percent_ci.R")
+source(n_percent_path)
+```
+
+#Load data
+
+```{r}
+# sociodemo graphic information data set
+soc_dem_path <- here::here("data", "cleaned_rds_files", "sociodemographic_information_import.rds")
+
+soc_dem <- readr::read_rds(soc_dem_path)
+
+```
+
+```{r}
+# participant data set
+par_path <- here::here("data", "cleaned_rds_files", "participant_import.rds")
+
+par <- readr::read_rds(par_path)
+
+```
+
+#Merge the variable "sex" from a different dataset "participant" to "sociodemographic dataset"
+
+```{r}
+# Merge sex variable from participant data set to sociodemographic variables for table 1
+
+table1_vars <- par %>% select(medstar_id, sex_3cat_f) %>% right_join(soc_dem, by = "medstar_id")
+```
+
+\# Categorize the variables "age" and household size "sode_people_9cat_f"
+
+```{r}
+table1_vars <- table1_vars %>% 
+  mutate(
+    # Create new categorical age variable with 4 age groups
+    age_4cat_f = case_when(
+      sode_age_years >= 65 & sode_age_years < 75 ~ "65-74",
+      sode_age_years >= 75 & sode_age_years < 85 ~ "75-84",
+      sode_age_years >= 85 & sode_age_years < 95 ~ "85-94",
+      sode_age_years >= 95                       ~ "95+"
+    ),
+
+    age_4cat_f = factor(age_4cat_f, 
+                        levels = c("65-74", "75-84", "85-94", "95+")
+                        ),
+    # Create new household size variable with 9 levels
+    sode_people_9cat_f = factor(sode_people)
+  )
+```
+
+# Label the variables needed on the Table
+
+```{r}
+table1_vars <- apply_labels(table1_vars,
+                            age_4cat_f = "Age",
+                            sex_3cat_f  = "Sex",
+                            sode_people_9cat_f = "Household size",
+                            sode_marital_8cat_f  = "Marital status",
+                            sode_race_eth_6cat_f = "Race/ ethnicity",
+                            sode_school_9cat_f  = "Educationlevel",
+                            sode_employed_11cat_f = "Employment status",
+                            sode_income_9cat_f = "Household income",
+                            sode_military_4cat_f = "Military service",
+                            sogi_orientation_8cat_f = "Sexual orientation")
+```
+
+# Create table 1
+
+```{r}
+cap <- "Table 1 showing sociodemographic information of respondents"
+
+
+overall_tab <- table1(~ age_4cat_f + sex_3cat_f + sode_people_9cat_f + sode_marital_8cat_f + sode_hispanic_4cat_f + sode_school_9cat_f + sode_employed_11cat_f + sode_income_9cat_f + sode_military_4cat_f + sogi_orientation_8cat_f,
+  data = table1_vars,
+  caption = cap
+)
+overall_tab <- t1flex(overall_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+overall_tab <- width(overall_tab, width = 3)
+overall_tab <- bold(overall_tab, bold = FALSE, part = "all")
+overall_tab
+```
