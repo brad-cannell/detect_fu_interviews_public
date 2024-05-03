@@ -8,6 +8,7 @@ title: "Create APS Investigations Codebook"
 library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(haven)
+library(here)
 library(readr)
 source("../r/variable_descriptions.R")
 ```
@@ -18,8 +19,11 @@ Using the CodebookR package, we will create a data dictionary for follow-up inte
 
 # Load cleaned data
 ```{r}
-#| warning: false
-aps_inv <- read_rds("../data/cleaned_rds_files/aps_investigations_import.rds")
+aps_inv_path <- here::here("data", "cleaned_rds_files", "aps_investigations_import.rds")
+```
+
+```{r}
+aps_inv <- readr::read_rds(aps_inv_path)
 ```
 
 # Set column attributes
@@ -98,42 +102,53 @@ aps_inv <- aps_inv %>%
     description = "Full name of older individual"
   ) %>%
   cb_add_col_attributes(
-    aps_report_4cat,
-    description = "AI_1. Has anyone from Adult Protective Services ever attempted to investigate whether or not you were living with elder abuse or neglect?",
-    skip_pattern = "Skip to section 6 if any answer is given but Yes",
-    value_labels = c(
-      "Yes"        = 1,
-      "No"         = 2,
-      "Don’t know" = 7,
-      "Refused"    = 9
-    ),
-    col_type = "Categorical"
-  ) %>%
-  cb_add_col_attributes(
-    aps_report_4cat_f,
+    aps_report,
     description = "AI_1. Has anyone from Adult Protective Services ever attempted to investigate whether or not you were living with elder abuse or neglect?",
     skip_pattern = "Skip to section 6 if any answer is given but Yes"
   ) %>%
   cb_add_col_attributes(
-    aps_times_5cat,
+    aps_report_2cat,
+    description = "AI_1. Has anyone from Adult Protective Services ever attempted to investigate whether or not you were living with elder abuse or neglect?",
+    skip_pattern = "Skip to section 6 if any answer is given but Yes",
+    value_labels = c(
+      "No"        = 0,
+      "Yes"       = 1
+    ),
+    col_type = "Categorical"
+  ) %>%
+  cb_add_col_attributes(
+    aps_report_2cat_f,
+    description = "AI_1. Has anyone from Adult Protective Services ever attempted to investigate whether or not you were living with elder abuse or neglect?",
+    skip_pattern = "Skip to section 6 if any answer is given but Yes"
+  ) %>%
+  cb_add_col_attributes(
+    aps_times,
+    description = "AI_2. How many times has this happened in your life?",
+    skip_pattern = "If answer is 0 or Refused, go to Section 6. If answer is 1 go to AI_4."
+  ) %>%
+  cb_add_col_attributes(
+    aps_times_3cat,
     description = "AI_2. How many times has this happened in your life?",
     skip_pattern = "If answer is 0 or Refused, go to Section 6. If answer is 1 go to AI_4.",
     value_labels = c(
       "0"          = 0,
       "1"          = 1,
-      "2+"         = 2,
-      "Don’t know" = 7,
-      "Refused"    = 9
+      "2+"         = 2
     ),
     col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
-    aps_times_5cat_f,
+    aps_times_3cat_f,
     description = "AI_2. How many times has this happened in your life?",
     skip_pattern = "If answer is 0 or Refused, go to Section 6. If answer is 1 go to AI_4."
   ) %>%
   cb_add_col_attributes(
-    aps_first_8cat,
+    aps_first,
+    description = "AI_3. When was the first time APS attempted to do an investigation?",
+    skip_pattern = "If answer is Refused, go to Section 6. If answer is 1 to 7, go to AI_4."
+  ) %>%
+  cb_add_col_attributes(
+    aps_first_6cat,
     description = "AI_3. When was the first time APS attempted to do an investigation?",
     skip_pattern = "If answer is Refused, go to Section 6. If answer is 1 to 7, go to AI_4.",
     value_labels = c(
@@ -142,19 +157,21 @@ aps_inv <- aps_inv %>%
       "1-5 years ago"                              = 3,
       "In the past year but more than a month ago" = 4,
       "In the past month"                          = 5,
-      "In the past week"                           = 6,
-      "Don’t know"                                 = 7,
-      "Refused"                                    = 9
+      "In the past week"                           = 6
     ),
     col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
-    aps_first_8cat_f,
+    aps_first_6cat_f,
     description = "AI_3. When was the first time APS attempted to do an investigation?",
     skip_pattern = "If answer is Refused, go to Section 6. If answer is 1 to 7, go to AI_4."
   ) %>%
   cb_add_col_attributes(
-    aps_recent_8cat,
+    aps_recent,
+    description = "AI_4. When was the most recent time APS attempted to do an investigation?"
+  ) %>%
+  cb_add_col_attributes(
+    aps_recent_6cat,
     description = "AI_4. When was the most recent time APS attempted to do an investigation?",
     value_labels = c(
       "In the past week"                           = 1,
@@ -162,14 +179,12 @@ aps_inv <- aps_inv %>%
       "In the past year but more than a month ago" = 3,
       "1-5 years ago"                              = 4,
       "5-10 years ago"                             = 5,
-      "10 or more years ago"                       = 6,
-      "Don’t know"                                 = 7,
-      "Refused"                                    = 9
+      "10 or more years ago"                       = 6
     ),
     col_type = "Categorical"
   ) %>%
   cb_add_col_attributes(
-    aps_recent_8cat_f,
+    aps_recent_6cat_f,
     description = "AI_4. When was the most recent time APS attempted to do an investigation?"
   )
 ```
@@ -194,10 +209,14 @@ aps_inv_desc <- var_descriptions(aps_inv)
 
 
 ## Save as rds file
+
 ```{r}
-write_rds(aps_inv_desc, "../codebooks/variable_descriptions/aps_investigations_var_desc.rds")
+aps_inv_desc_path <- here::here("codebooks", "variable_descriptions", "aps_investigations_var_desc.rds")
 ```
 
+```{r}
+readr::write_rds(aps_inv, aps_inv_desc_path)
+```
 
 # Pass data frame to the codebook function
 ```{r}
@@ -210,7 +229,10 @@ aps_codebook <- codebook(
 )
 ```
 
+```{r}
+aps_codebook_path <- here::here("codebooks", "aps_investigations_codebook.docx")
+```
 
 ```{r}
-print(aps_codebook, "../codebooks/aps_investigations_codebook.docx")
+print(aps_codebook, aps_codebook_path)
 ```
