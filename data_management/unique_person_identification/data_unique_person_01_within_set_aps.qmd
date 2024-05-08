@@ -9,6 +9,7 @@ format: html
 
 The APS records data set was divided into 5 separate, interconnected excel files. These files (WILL BE) documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`.
 
+<<<<<<< HEAD
 ## Data Wrangling
 
 -   Placeholder
@@ -18,6 +19,19 @@ The APS records data set was divided into 5 separate, interconnected excel files
 ## Data Cleaning
 
 -   Placeholder
+=======
+contained 18152 observations of 47 variables which included patient demographic information, APS record keeping information, and APS investigation determination results.
+
+## Data Wrangling
+
+-   Addition of variable to indicate row number in original data set
+
+    -   `aps_row`
+
+## Data Cleaning
+
+-   Conversion of
+>>>>>>> fdcbf42f6e9b68bf208523c1d13edf669bee9ec2
 
 # 📦 Load Packages and Functions
 
@@ -36,7 +50,13 @@ suppressPackageStartupMessages({
 
 ## Functions
 
+<<<<<<< HEAD
 Placeholder
+=======
+### Unique Value Summaries
+
+A previously written function, written to display counts of each unique observations within a selection of columns, was added for our processing.
+>>>>>>> fdcbf42f6e9b68bf208523c1d13edf669bee9ec2
 
 # 📥 Load Data
 
@@ -70,7 +90,11 @@ rm (aps_path)
 
 
 # Warning: Expecting numeric in B144102 / R144102C2: got 'blank'
+<<<<<<< HEAD
 # 2024-05-08: APS data imported with 568562 rows and 11 columns.
+=======
+# 2024-05-06: APS data imported with 568562 rows and 11 columns.
+>>>>>>> fdcbf42f6e9b68bf208523c1d13edf669bee9ec2
 # Data last modified on OneDrive 2024-03-21 18:35:52 
 ```
 
@@ -107,7 +131,11 @@ cat(
 rm (usps_path)
 
 
+<<<<<<< HEAD
 # 2024-05-08: USPS Zip Code data imported with 43307 rows and 4 columns.
+=======
+# 2024-05-06: USPS Zip Code data imported with 43307 rows and 4 columns.
+>>>>>>> fdcbf42f6e9b68bf208523c1d13edf669bee9ec2
 # Data last modified on OneDrive 2024-05-06 14:48:02 
 ```
 
@@ -117,7 +145,10 @@ We performed a modification of the USPS data so that it acted as a dictionary, w
 # Alter data so that ZIP CODE acts as a key, indicating the state associated
 # with each ZIP CODE for Delivery (service) area and Physical (actual
 # location of service delivery) for each ZIP CODE.
+<<<<<<< HEAD
 
+=======
+>>>>>>> fdcbf42f6e9b68bf208523c1d13edf669bee9ec2
 usps_zip <- dplyr::full_join(
   # Isolate State for Each Physical Zip Code
   usps_zip |>
