@@ -1,0 +1,664 @@
+---
+title: "Cleaning APS"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+The APS records data set was divided into 5 separate, interconnected excel files. These files (WILL BE) documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`.
+
+## Data Wrangling
+
+-   Placeholder
+
+    -   Placeholder
+
+## Data Cleaning
+
+-   Placeholder
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r, warning = FALSE}
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(readxl)
+  library(here)
+  library(data.table)
+})
+
+```
+
+## Functions
+
+Placeholder
+
+# 📥 Load Data
+
+## APS "Client.xlsx"
+
+APS client data was loaded for processing from XLSX format. Data types were specified for key fields to minimize loss of data, such as in date formats. We also standardized variable naming into lowercase, replacing spaces with underscores and eliminating "\r\n" elements of names (which represent Microsoft Formatting).
+
+We anticipated an error in row 144,102 for column C ("Client ID") as the Excel document has it listed as "blank".
+
+```{r}
+aps_path <- here("data","DETECT Shared with APS","Clients.xlsx")
+aps <- readxl::read_excel(aps_path,
+                  sheet = "Client Detail",
+                  col_types = c(
+                    "numeric", "numeric", "date", rep("text",8)
+                    )
+                  ) |>
+       dplyr::rename_with( ~ tolower(gsub(" ", "_", .x, fixed = TRUE))) |>
+       dplyr::rename_with( ~ tolower(gsub("\r\n", "", .x, fixed = TRUE)))
+
+# Print import message for broad checks.
+cat(
+  paste0(Sys.Date(), ":"),
+  "APS data imported with", nrow(aps), "rows and", ncol(aps), "columns.\n",
+  "Data last modified on OneDrive",
+  as.character(file.info(aps_path)$mtime), "\n"
+)
+
+# Remove path from memory, no longer needed
+rm (aps_path)
+
+
+# Warning: Expecting numeric in B144102 / R144102C2: got 'blank'
+# 2024-05-08: APS data imported with 568562 rows and 11 columns.
+# Data last modified on OneDrive 2024-03-21 18:35:52 
+```
+
+## USPS Zip Code Validation Data
+
+The United States Postal Service releases an Excel file detailing ZIP Codes with their associated Area and District Codes. This includes State data for a State-level verification of Zip Code values. This file used the version obtained on the [USPS website](https://postalpro.usps.com/ZIP_Locale_Detail), last updated May 03, 2024.
+
+```{r}
+usps_path <- here("data","USPS_ZIP_Locale_Detail.xls")
+usps_zip <- readxl::read_excel(usps_path,
+  # Select only the desired data
+                  col_types = c(
+                    rep("skip", 4), "text", rep("skip", 2), rep("text", 3),
+                    "skip"
+                    ),
+                  col_names = c(
+                    'delivery_zip', 'city', 'state', 'phys_zip'
+                    ),
+                  # skips row of headers
+                  skip = 1
+                  ) |>
+  # Remove rows with duplicated rows
+  dplyr::distinct()
+
+# Print import message for broad checks.
+cat(
+  paste0(Sys.Date(), ":"),
+  "USPS Zip Code data imported with", nrow(usps_zip), "rows and", ncol(usps_zip), "columns.\n",
+  "Data last modified on OneDrive",
+  as.character(file.info(usps_path)$mtime), "\n"
+)
+
+# Remove path from memory, no longer needed
+rm (usps_path)
+
+
+# 2024-05-08: USPS Zip Code data imported with 43307 rows and 4 columns.
+# Data last modified on OneDrive 2024-05-06 14:48:02 
+```
+
+We performed a modification of the USPS data so that it acted as a dictionary, with the zip code as the unique key.
+
+```{r}
+# Alter data so that ZIP CODE acts as a key, indicating the state associated
+# with each ZIP CODE for Delivery (service) area and Physical (actual
+# location of service delivery) for each ZIP CODE.
+
+usps_zip <- dplyr::full_join(
+  # Isolate State for Each Physical Zip Code
+  usps_zip |>
+    dplyr::select('state', 'phys_zip') |>
+    dplyr::distinct() |>
+    dplyr::rename_at(
+      c('state', 'phys_zip'),
+      ~c('usps_state_phys', 'client_zip_code')
+    ) |>
+    # Change value for any repeated Zip Code (multiple States for Physical)
+    # so that each Zip is only present once
+    dplyr::mutate(usps_state_phys = ifelse(
+      (
+        duplicated(client_zip_code)|
+        duplicated(client_zip_code, fromLast = TRUE)
+       ),
+       'Multiple',
+       usps_state_phys
+      )
+      ) |>
+    dplyr::distinct(),
+  # Isolate State for Each Delivery Zip Code
+  usps_zip |>
+    dplyr::select('state', 'delivery_zip') |>
+    dplyr::distinct() |>
+    dplyr::rename_at(
+      c('state', 'delivery_zip'),
+      ~c('usps_state_delivery', 'client_zip_code')
+    ) |>
+    # Change value for any repeated Zip Code (multiple States for Physical)
+    # so that each Zip is only present once
+    dplyr::mutate(usps_state_delivery = ifelse(
+      (
+        duplicated(client_zip_code)|
+          duplicated(client_zip_code, fromLast = TRUE)
+        ),
+       'Multiple',
+       usps_state_delivery
+      )
+      ) |>
+    dplyr::distinct(),
+  by = 'client_zip_code'
+)
+```
+
+
+# Initial Data Structure
+
+## APS Data
+
+The APS client data set contained 568,562 observations for 11 variables.
+
+```{r}
+dim(aps)
+
+# [1] 568562     11
+```
+
+This included 378,418 unique Client ID values, which should be unique to each subject.
+
+```{r}
+length(unique(aps$client_id))
+
+# [1] 378418
+```
+
+There was only one observation which was missing a value for Client ID, which was anticipated (was entered as "blank" in original Excel document).
+
+```{r}
+nrow(aps |>
+       dplyr::filter(is.na(aps$client_id))
+     )
+
+# [1] 1
+```
+
+Per APS documentation (see notes documents in data folders), each APS Case should have one Client ID (Clients may have more than one Case, each Case only has one client, One-to-Many relationship of Client-Case). The data set initially included 568,385 values for Case ID, indicating some Case IDs possibly represented more than one observation (and thus possibly more than one Client ID was assigned to a Case ID).
+
+```{r}
+length(unique(aps$case_id))
+
+# [1] 568385
+```
+
+There were 290,004 observations that contained a duplicated Client ID.
+
+```{r}
+nrow(aps |> 
+       dplyr::filter(
+         duplicated(client_id) | duplicated(client_id, fromLast = TRUE)
+         )
+     )
+
+# [1] 290004
+```
+
+This represented 99,860 Client IDs and 289,975 Case IDs.
+
+```{r}
+cat("Client IDs:", 
+    nrow(unique(aps |> 
+       dplyr::filter(
+         duplicated(client_id) | duplicated(client_id, fromLast = TRUE)
+         ) |>
+         dplyr::select(client_id)
+      )),
+    ";", "Case IDs:",
+    nrow(unique(aps |> 
+       dplyr::filter(
+         duplicated(client_id) | duplicated(client_id, fromLast = TRUE)
+         ) |>
+         dplyr::select(case_id)
+      ))
+    )
+
+# Client IDs: 99860 ; Case IDs: 289975
+```
+
+There were 351 observations that contained a duplicated Case ID.
+
+```{r}
+nrow(aps |> 
+       dplyr::filter(
+         duplicated(case_id) | duplicated(case_id, fromLast = TRUE)
+         )
+     )
+
+# [1] 290004
+```
+
+This represented 99,860 Client IDs and 289,975 Case IDs. This indicated likely "failed matches" (one subject represented by more than one Client ID), likely due to human/system error in data entry.
+
+```{r}
+cat("Client IDs:", 
+    nrow(unique(aps |> 
+       dplyr::filter(
+         duplicated(case_id) | duplicated(case_id, fromLast = TRUE)
+         ) |>
+         dplyr::select(client_id)
+      )),
+    ";", "Case IDs:",
+    nrow(unique(aps |> 
+       dplyr::filter(
+         duplicated(case_id) | duplicated(case_id, fromLast = TRUE)
+         ) |>
+         dplyr::select(case_id)
+      ))
+    )
+
+# Client IDs: 349 ; Case IDs: 174
+```
+
+# Data Modification
+
+Data required some validation and modification to maximize returns from fastLink processing. First, all leading and trailing white space was removed from any string values.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name', 'client_street_address', 
+                  'client_city', 'client_state', 'client_county'
+                  ), 
+                  ~stringr::str_trim(., side = 'both')
+                ))
+```
+
+## Zip Codes
+
+We expected ZIP codes to follow a 5-digit format. Many entries contained a 5+4 format (10 character, #####-#### format). Only 7 entries did not directly match either format. These were manually reviewed.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(nchar(client_zip_code) < 10) |>
+  dplyr::filter(nchar(client_zip_code) != 5)
+
+nrow(checking)
+
+# [1] 7
+```
+
+4 Zip Codes were otherwise valid, but had leading zeros truncated by Excel. These were fixed by re-adding the leading zeroes to the string value for the zip code
+
+```{r}
+aps <- aps |>
+  # Add leading 0s to truncated Zip Codes.
+  dplyr::mutate(client_zip_code = dplyr::case_when(
+    nchar(client_zip_code) == 3 ~ paste0("00", client_zip_code),
+    nchar(client_zip_code) == 4 ~ paste0("0", client_zip_code),
+    TRUE ~ client_zip_code)
+    ) 
+```
+
+The remaining 3 observations appeared to be fixable by truncating to 5 digits, along with the remainder of the data set's 10 character values:
+
+-   1 Zip Code had 5 digits which appeared to be otherwise valid, with a hyphen ("-") and no 4 digit addition to the zip code. This was fixed by truncating the hyphen so only the first 5 digits were kept.
+
+-   2 Zip Codes had all 9 digits, but without the anticipated hyphen between the 5 and 4 digit components of zip code. These were fixed by truncating so only the first 5 digits were kept.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_zip_code = ifelse(
+      nchar(client_zip_code)>5,
+      substr(client_zip_code, start=1, stop=5),
+      client_zip_code)
+  )
+```
+
+We performed a state-level verification of Zip Code data using the USPS Zip Code service data. We identified 130 observations where the Client State did not match either the USPS physical or delivery service areas based on the Zip Code.
+
+```{r}
+checking <- aps %>%
+  tibble::add_column(
+    usps_state_phys = NA_character_, 
+    usps_state_delivery = NA_character_
+    ) |>
+  # Add USPS data
+  dplyr::rows_update(
+    usps_zip, 
+     by = "client_zip_code", 
+     unmatched = "ignore"
+  ) |>
+  # Flag mismatches between USPS and APS state based on zip code
+  dplyr::mutate(
+    flag_physical_zip = dplyr::case_when(
+      is.na(usps_state_phys) ~ FALSE,
+      (!is.na(usps_state_phys) & !is.na(client_state)) & 
+        (usps_state_phys == client_state) ~
+        FALSE,
+      (is.na(usps_state_phys) & is.na(client_state)) ~ FALSE,
+      TRUE ~ TRUE
+    ),
+    flag_delivery_zip = dplyr::case_when(
+      is.na(usps_state_delivery) ~ FALSE,
+      (!is.na(usps_state_delivery) & !is.na(client_state)) & 
+        (usps_state_delivery == client_state) ~
+        FALSE,
+      (is.na(usps_state_delivery) & is.na(client_state)) ~ FALSE,
+      TRUE ~ TRUE
+    ),
+    flag_zip = ifelse(flag_physical_zip | flag_delivery_zip, TRUE, FALSE),
+    # If it matched either physical or delivery, unflag the row
+    flag_zip = dplyr::case_when(
+      !is.na(usps_state_phys) & !flag_physical_zip ~ FALSE,
+      !is.na(usps_state_delivery) & !flag_delivery_zip ~ FALSE,
+      TRUE ~ flag_zip
+    )
+  ) |>
+  # Extract only the flagged observations
+  dplyr::filter(flag_zip) |>
+  # Reorder variables for ease of manual checking
+  dplyr::relocate(
+    flag_zip, flag_physical_zip, flag_delivery_zip, client_zip_code,
+    usps_state_phys, usps_state_delivery,
+    client_city, client_county, client_state, client_street_address
+    ) |>
+  dplyr::arrange(client_zip_code)
+
+nrow(checking)
+
+# [1] 130
+```
+
+Manual review involved searching for street addresses (if provided) using Google Maps and comparison against remainder of the APS provided address data fields. The vast majority of point fixes involved an minor typographical error, or unusual entry of data (such as states within city fields). 
+
+Point-fixes were made by calling data from the "checking" subset to avoid overwriting other entries with identical values for Case ID that were not flagged for manual review, minimizing collateral changes to the data.
+
+There were 87 observations that were deemed to require no revision, largely due to ZIP codes that were along state borders (thus postal service crossed state lines for the given location). There were 6 observations with issues that were unable to be resolved, largely due to missing street addresses and/or conflicting results when searching for a reliable match. There were 37 observations that received point-fixes.
+
+```{r}
+# ZIP 28207 to 78207 (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '28207') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '78207'
+
+# ZIP 32667 to missing value; Non-US address (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '32667') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- NA_character_
+
+
+# ZIP 46502 to 76502 (3 rows)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '46502') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '76502'
+
+
+# Entry for ZIP 48202 to City "DETROIT", State "MI", county "OUT OF STATE" (2 rows)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '48202') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_city'] <- 'DETROIT'
+
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '48202') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_state'] <- 'MI'
+
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '48202') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_county'] <- 'OUT OF STATE'
+
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '48202') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_county'] <- 'OUT OF STATE'
+
+# ZIP 64114 to 77831 (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '64114') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '77831'
+
+# ZIP 67026 to 76028 (3 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '67026') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '76028'
+
+# Entry for ZIP 70125 State to "LA" (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '70125') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_state'] <- 'LA'
+
+# ZIP 70526 to 78526 (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '70526') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '78526'
+
+# ZIP 70602  to 76579 (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '70602') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '76579'
+
+# Entry for ZIP 73840 to 71854, state "AR", County "OUT OF STATE" (3 rows)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '73840') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_state'] <- 'AR'
+
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '73840') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_county'] <- 'OUT OF STATE'
+
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '73840') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '71854'
+
+
+# ZIP 74067 to 78067 (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '74067') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '78067'
+
+# ZIP 74543 to 78543 (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '74543') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '78543'
+
+# ZIP 74756 state to OK (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '74756') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_state'] <- 'OK'
+
+# ZIP 78368 to a missing value (4 rows)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '78368') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- NA_character_
+
+# Entry for ZIP 78595 state "TX", county to a missing value (4 rows)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '78595') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_state'] <- 'TX'
+
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '78595') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_county'] <- NA_character_
+
+# Entry for ZIP 80102 to 79045, county to "DEAF SMITH" (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '80102') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_county'] <- 'DEAF SMITH'
+
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '80102') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '79045'
+
+# ZIP 80134 to 76201 (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '80134') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '76201'
+
+# Entry for ZIP 82331 state to "WY" (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '82331') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_state'] <- 'WY'
+
+# Entry for ZIP 87575 state to 'NM', county to 'OUT OF STATE' (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '87575') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_state'] <- 'NM'
+
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '87575') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_county'] <- 'OUT OF STATE'
+
+# Entry for ZIP 88063 state to "NM" (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '88063') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_state'] <- 'NM'
+
+# ZIP 88125 to missing value; Non-US address (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '88125') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- NA_character_
+
+# ZIP 89420 to missing value; Non-US address (1 row)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '89420') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- NA_character_
+
+# ZIP 97524 to 78852 (2 rows)
+aps[aps$case_id %in% pull(
+  checking |> 
+    dplyr::filter(client_zip_code == '97524') |> 
+    dplyr::select(case_id) |> 
+    dplyr::distinct()
+  ),'client_zip_code'] <- '78852'
+
+```
+
+We purged the USPS ZIP code data and our checking subset for memory management.
+
+```{r}
+rm(usps_zip)
+rm(checking)
+```
+
+## Case Control
+
+We converted all string values into lowercase, and again enforced stripped leading or trailing white spaces.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name', 'client_street_address', 
+                  'client_city', 'client_state', 'client_county'
+                  ), 
+                  ~tolower(stringr::str_trim(., side = 'both'))
+                ))
+```
+
+
+```{r}
+
+```
+
+# 💾
