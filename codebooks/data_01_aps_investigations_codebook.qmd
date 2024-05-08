@@ -215,7 +215,7 @@ aps_inv_desc_path <- here::here("codebooks", "variable_descriptions", "aps_inves
 ```
 
 ```{r}
-readr::write_rds(aps_inv, aps_inv_desc_path)
+readr::write_rds(aps_inv_desc, aps_inv_desc_path)
 ```
 
 # Pass data frame to the codebook function

@@ -7,16 +7,16 @@ format: html
 
 ```{r, warning=FALSE, echo=FALSE, output = FALSE, include=FALSE}
 library(flextable)
+library(here)
 library(table1)
 library(dplyr)
 library(tibble)
-library(misty)
+#library(misty)
 library(officer)
 library(tidyverse)
-library(readr)
 library(purrr)
 library(stringr)
-library(mice)
+#library(mice)
 library(lubridate)
 library(writexl)
 library(readxl)
@@ -24,27 +24,36 @@ library(readxl)
 
 # Load cleaned data
 
-Load the participant, self report, LEAD panel assessment,LEAD panel meeting attendance, observational measures and sociodemographic information datasets
+Load the participant, self report, LEAD panel assessment, LEAD panel meeting attendance, observational measures and sociodemographic information data sets
 
 ```{r}
-#| warning: false
-socio_demo <- read_rds("../data/cleaned_rds_files/sociodemographic_information_import.rds")
-observational_measures <- read_rds("../data/cleaned_rds_files/observational_measures_import.rds")
-lead_panel_assessment <- read_rds("../data/cleaned_rds_files/lead_panel_assessment_import.rds")
-participant <- read_rds("../data/cleaned_rds_files/participant_import.rds")
-lead_attendance <- read_excel("../data/lead_panel_meeting_attendance_reports/Combined LEAD panel meeting attendance.xlsx")
+socio_demo_path <- here::here("data", "cleaned_rds_files", "sociodemographic_information_import.rds")
+obs_meas_path <- here::here("data", "cleaned_rds_files", "observational_measures_import.rds")
+lpa_path <- here::here("data", "cleaned_rds_files", "lead_panel_assessment_import.rds")
+participant_path <- here::here("data", "cleaned_rds_files", "participant_import.rds")
+lpa_attendance_path <- here::here("data", "lead_panel_meeting_attendance_reports", "combined_LEAD_panel_meeting_attendance.xlsx")
 ```
 
+```{r}
+socio_demo <- readRDS(socio_demo_path)
+observational_measures <- readRDS(socio_demo_path)
+lead_panel_assessment <- readRDS(socio_demo_path)
+participant <- readRDS(participant_path)
+lead_attendance <- read_excel(lpa_attendance_path)
+```
+
+
 # Load User Defined Function Files
+
 ```{r}
 # Create summary of unique cases
-source("../user_defined_functions/unique_case_count.R")
+source(here::here("r", "unique_case_count.R"))
 
 # Create summary of dissenting votes by discipline
-source("../user_defined_functions/vote_agreement.R")
+source(here::here("r", "vote_agreement.R"))
 
 # Import function that will be used to add shade to the table by variable name
-source("../R/add_shade_column.R")
+source(here::here("r", "add_shade_column.R"))
 ```
 
 
