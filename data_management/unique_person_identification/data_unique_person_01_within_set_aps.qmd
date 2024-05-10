@@ -37,6 +37,12 @@ suppressPackageStartupMessages({
 
 ## Functions
 
+```{r}
+# Function to consolidate and count unique values found in variable(s)
+source(here::here("r", "get_unique_value_summary.R"))
+```
+
+
 Placeholder
 
 # 📥 Load Data
@@ -48,7 +54,7 @@ APS client data was loaded for processing from XLSX format. Data types were spec
 We anticipated an error in row 144,102 for column C ("Client ID") as the Excel document has it listed as "blank".
 
 ```{r}
-aps_path <- here("data","DETECT Shared with APS","Clients.xlsx")
+aps_path <- here::here("data","DETECT Shared with APS","Clients.xlsx")
 aps <- readxl::read_excel(aps_path,
                   sheet = "Client Detail",
                   col_types = c(
@@ -80,7 +86,7 @@ rm (aps_path)
 The United States Postal Service releases an Excel file detailing ZIP Codes with their associated Area and District Codes. This includes State data for a State-level verification of Zip Code values. This file used the version obtained on the [USPS website](https://postalpro.usps.com/ZIP_Locale_Detail), last updated May 03, 2024.
 
 ```{r}
-usps_path <- here("data","USPS_ZIP_Locale_Detail.xls")
+usps_path <- here::here("data","USPS_ZIP_Locale_Detail.xls")
 usps_zip <- readxl::read_excel(usps_path,
   # Select only the desired data
                   col_types = c(
@@ -271,9 +277,45 @@ cat("Client IDs:",
 # Client IDs: 349 ; Case IDs: 174
 ```
 
-# Data Modification
+There were 27,161 unique values in the field for first names. These were extracted for a brief manual examination for trends and potential issues.
 
-Data required some validation and modification to maximize returns from fastLink processing. First, all leading and trailing white space was removed from any string values.
+```{r}
+checking <- get_unique_value_summary(aps, 'client_first_name') |>
+  dplyr::arrange(value) |>
+  dplyr::mutate(row_num = row_number())
+
+nrow(checking)
+
+# 27161
+```
+
+There were 7,588 unique values in the field for middle names. These were extracted for a brief manual examination for trends and potential issues.
+
+```{r}
+checking <- get_unique_value_summary(aps, 'client_middle_name') |>
+  dplyr::arrange(value) |>
+  dplyr::mutate(row_num = row_number())
+
+nrow(checking)
+
+# 7588
+```
+
+There were 57,846 unique values in the field for middle names. These were extracted for a brief manual examination for trends and potential issues.
+
+```{r}
+checking <- get_unique_value_summary(aps, 'client_last_name') |>
+  dplyr::arrange(value) |>
+  dplyr::mutate(row_num = row_number())
+
+nrow(checking)
+
+# 57846
+```
+
+# Data Validation and Modification
+
+Data required some validation and modification to maximize returns from fastLink processing. First, all leading and trailing white space was removed from any string values, and values were converted to lowercase.
 
 ```{r}
 aps <- aps |>
@@ -282,9 +324,959 @@ aps <- aps |>
                   'client_last_name', 'client_street_address', 
                   'client_city', 'client_state', 'client_county'
                   ), 
-                  ~stringr::str_trim(., side = 'both')
+                  ~tolower(stringr::str_trim(., side = 'both'))
                 ))
 ```
+
+We also reduced any instances of multiple white spaces ("  ") into a single white space, for consistency.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name', 'client_street_address', 
+                  'client_city', 'client_state', 'client_county'
+                  ), 
+                  ~stringr::str_replace_all(.x, "( {2,})", " ")
+                ))
+```
+
+
+## Name Fields
+
+Names values were already separated into First, Middle Initial, and Last.
+
+### "Unknown"
+
+We inspected name values for "Unknown", a common placeholder that is better represented by a missing value. We found 75 observations with a potential value for "Unknown" in at least one name field.
+
+```{r}
+target_regex <- "(unkn)|(don't)|(homel)|(unk\\.)"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 75
+```
+
+Several of these observations had potentially valuable information for subject matching, specifically "male" or "female" in one of the name fields along with a value for "unknown". We shifted these gender values into a notes column, and converted those values to missing (`NA`) values.
+
+```{r}
+aps <- aps |>
+  # Initiate columns
+  dplyr::mutate(
+    client_msc = NA_character_, 
+    client_msc_first = NA_character_,
+    client_msc_last = NA_character_,
+    client_msc_middle = NA_character_
+  ) |>
+  # Shift from first, middle, and last name field to a notes column
+  dplyr::mutate(
+    # Shift "male" or "female" from first name to notes field
+    client_msc_first = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        client_first_name == 'male' ~ 'male', 
+        client_first_name == 'female' ~ 'female',
+        TRUE ~ client_msc_first
+      ),
+      client_msc_first),
+    client_first_name = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        client_first_name == 'male' ~ NA_character_,
+        client_first_name == 'female' ~NA_character_,
+        TRUE ~ client_first_name
+      ),
+      client_first_name
+      )
+  ) |>
+  dplyr::mutate(
+    # Shift "male" or "female" from Middle name to notes field
+    client_msc_middle = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        client_middle_name == 'male' ~ 'male', 
+        client_middle_name == 'female' ~ 'female',
+        TRUE ~ client_msc_middle
+      ),
+      client_msc_middle),
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        client_middle_name == 'male' ~ NA_character_,
+        client_middle_name == 'female' ~NA_character_,
+        TRUE ~ client_middle_name
+      ),
+      client_middle_name
+      )
+  ) |>
+  dplyr::mutate(
+    # Shift "male" or "female" from last name to notes field
+    client_msc_last = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        client_last_name == 'male' ~ 'male', 
+        client_last_name == 'female' ~ 'female',
+        TRUE ~ client_msc_last
+      ),
+      client_msc_last),
+    client_last_name = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        client_last_name == 'male' ~ NA_character_,
+        client_last_name == 'female' ~NA_character_,
+        TRUE ~ client_last_name
+      ),
+      client_last_name
+      )
+  ) |>
+  # Collect data into a single, neat notes column with NAs omitted
+  dplyr::mutate(
+    client_msc = paste(
+      client_msc_first, client_msc_middle, client_msc_last, 
+      sep = "; "
+      ),
+    client_msc = stringr::str_remove_all(client_msc, "NA; "),
+    client_msc = stringr::str_remove_all(client_msc, "; NA"),
+    client_msc = stringr::str_remove_all(client_msc, "NA"),
+    client_msc = ifelse(client_msc == '', NA_character_, client_msc)
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc_first, client_msc_middle, client_msc_last))
+```
+
+A point-fix was utilized to correct the only entry with "don't know" in a name field.
+
+There were also several observations that contained "unknown" in one name field with either "person" or "ward" as the only other potentially informative value, both of which were better expressed as missing (`NA`) values in this context. There were no names such as "Edward" that would otherwise be valid but caught in our regular expressions within this set. 🔴 Any modification to this data processing pipeline should include verification that this is still true to avoid loss of valuable data.
+
+```{r}
+aps <- aps |>
+  # "don't know" in middle name
+  dplyr::mutate(
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id,
+      ifelse(
+        client_middle_name == "don't know",
+        NA_character_,
+        client_middle_name
+      ),
+      client_middle_name
+      )
+  ) |>
+    # Remove names that are "person" or "ward" that were caught in "Unknown"
+    # name checks
+  dplyr::mutate(
+    # First name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_first_name, '(person)') ~ NA_character_, 
+        stringr::str_detect(client_first_name, '(ward)') ~ NA_character_,
+        TRUE ~ client_first_name
+      ),
+      client_first_name),
+    # Middle Name
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_middle_name, '(person)') ~ NA_character_,
+        stringr::str_detect(client_middle_name, '(ward)') ~NA_character_,
+        TRUE ~ client_middle_name
+      ),
+      client_middle_name
+      ),
+    # Last Name
+    client_last_name = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_last_name, '(person)') ~ NA_character_,
+        stringr::str_detect(client_last_name, '(ward)') ~NA_character_,
+        TRUE ~ client_last_name
+      ),
+      client_last_name
+      )
+  )
+```
+
+We were then able to set any of our "unknown" name values to missing values, maintaining helpful data.
+
+```{r}
+aps <- aps |> 
+  dplyr::mutate(
+    client_first_name = ifelse(
+      stringr::str_detect(client_first_name, target_regex),
+      NA_character_,
+      client_first_name
+    ),
+    client_middle_name = ifelse(
+      stringr::str_detect(client_middle_name, target_regex),
+      NA_character_,
+      client_middle_name
+    ),
+    client_last_name = ifelse(
+      stringr::str_detect(client_last_name, target_regex),
+      NA_character_,
+      client_last_name
+    )
+  )
+```
+
+We additionally identified 8 rows with a name value of "none". We isolated these observations for manual examination.
+
+```{r}
+target_regex <- "^(none)"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 8
+```
+
+We determined that all of the "none" values likely represented an "unknown" value, and converted those values to missing values.
+
+```{r}
+aps <- aps |> 
+  dplyr::mutate(
+    client_first_name = ifelse(
+      stringr::str_detect(client_first_name, target_regex),
+      NA_character_,
+      client_first_name
+    ),
+    client_middle_name = ifelse(
+      stringr::str_detect(client_middle_name, target_regex),
+      NA_character_,
+      client_middle_name
+    ),
+    client_last_name = ifelse(
+      stringr::str_detect(client_last_name, target_regex),
+      NA_character_,
+      client_last_name
+    )
+  )
+```
+
+Due to the US convention of naming unknown subjects "Jane Doe" or "John Doe", we checked for rows where the last name was "doe". These 6 rows were isolated for manual review. All appeared to be potentially valid instances of a subject with the last name of "Doe", rather than an anonymous placeholder.
+
+```{r}
+
+checking <- aps |> 
+  dplyr::filter(
+    client_last_name == 'doe'
+    )
+
+nrow (checking)
+
+# [1] 6
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+### Numbers in Names
+
+In previous checks, several name fields were identified which had numbers rather than name data. Names do not typically contain numerical digits, but numerical digits may frequently occur as a typographical or system error in entry. We isolated 11 entries with a numerical digit in any name field.
+
+```{r}
+target_regex <- "([0-9]+)"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 11
+```
+
+There were two observations that merited a point-fix to shift potentially useful data into our new notes field.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # Subject with a name of "trailer #10"
+    client_msc = ifelse(
+      case_id %in% checking$case_id & client_last_name == "#10",
+      'trailer #10',
+      client_msc
+      ),
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & client_last_name == "#10",
+      NA_character_,
+      client_first_name
+      ),
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & client_last_name == "#10",
+      NA_character_,
+      client_last_name
+      ),
+    # Possibly important numbers in a last name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & client_last_name == "44947",
+      '44947',
+      client_msc
+      ),
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & client_last_name == "44947",
+      NA_character_,
+      client_last_name
+      )
+  )
+```
+
+
+Numbers were otherwise omitted from all name fields. Empty strings were converted into missing values.
+
+```{r}
+ aps <- aps |>
+  dplyr::mutate(
+    client_first_name = stringr::str_remove_all(
+      client_first_name, target_regex
+      ),
+    client_middle_name = stringr::str_remove_all(
+      client_middle_name, target_regex
+      ),
+    client_last_name = stringr::str_remove_all(
+      client_last_name, target_regex
+      )
+  ) |>
+  dplyr::mutate(across(
+    c(client_first_name, client_middle_name, client_last_name),
+    ~dplyr::na_if(., '')
+    )
+  )
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+### Unexpected Characters (non A-Z or a-z)
+
+We expected most, if not all, names in our subset to consist only of the letters A-Z without special characters, punctuation, or other characters.
+
+#### Hyphens (-)
+
+The most common character we expected to be validly present was a hyphen (-), due to traditions of hyphenating names. We isolated 4,785 entries with a hyphen in any name field for manual review.
+
+```{r}
+target_regex <- "([-]+)"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 4785
+```
+ 
+While all 4,785 observation had a valid use of hyphens, some modification was still required due to the inconsistent use of white space with hyphenated names (i.e. Smith-Jones as "smith- jones", "smith -jones", or "smith-jones"). As such, we stripped white space surrounding hyphens from observations in our data set. This was complicated due to valid use of hyphens and spaces in multi-part names (e.g. "de la cruz- smith") in first and last name fields.
+ 
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # First Name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_replace_all(client_first_name, ' -', '-'),
+      client_first_name
+    ),
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_replace_all(client_first_name, '- ', '-'),
+      client_first_name
+    ),
+    # Last Name
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_replace_all(client_last_name, ' -', '-'),
+      client_last_name
+    ),
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_replace_all(client_last_name, '- ', '-'),
+      client_last_name
+    )
+  )
+```
+
+We checked for any instances with more than one consecutive hyphen ("--", etc.) after the initial corrections. We isolated the 8 observations for manual review.
+
+```{r}
+target_regex <- "(-{2,})"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 8
+```
+
+The instances of multiple hyphens all appeared within last name values. We adjusted these entries to ensure only a single hyphen was present.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # Last Name
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_replace_all(client_last_name, target_regex, '-'),
+      client_last_name
+    )
+  )
+```
+
+We checked for any instances where a hyphen was the first character in the field. We identified 0 occurrences.
+
+```{r}
+target_regex <- "^(-)"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 0
+```
+
+We checked for any instances where a hyphen was the last character in the field. We identified 4 occurrences.
+
+```{r}
+target_regex <- "(-)$"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 4
+```
+
+We adjusted these entries to trim the trailing hyphen.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # First Name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_replace_all(client_first_name, target_regex, ''),
+      client_first_name
+    ),
+    # Middle Name
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_replace_all(client_middle_name, target_regex, ''),
+      client_middle_name
+    ),
+    # Last Name
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_replace_all(client_last_name, target_regex, ''),
+      client_last_name
+    )
+  )
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+#### Double Quote (") and quote-surrounded nicknames.
+ 
+Several subjects appeared to have names in double quotation marks, particularly in the middle name field. These values were likely to represent nicknames or aliases. We isolated 14 entries with names surrounded by double-quotes, present in both the first and middle name fields.
+
+```{r}
+target_regex <- '(["]+)'
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 14
+```
+ 
+We shifted these likely nickname values into our notes field, and removed them from the name fields. 
+ 
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # Extract from Middle Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_match(client_middle_name, '(".*?")'),
+      client_msc
+    ),
+    # Extract from First Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_match(client_first_name, '(".*?")'),
+      client_msc
+    ),
+    # Remove from Middle Name
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_remove(client_middle_name, '(".*?")'),
+      client_middle_name
+    ),
+    # Remove from First Name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_remove(client_first_name, '(".*?")'),
+      client_first_name
+    )
+  ) |>
+  # Convert empty strings to missing values
+  dplyr::mutate(across(
+    c(client_first_name, client_middle_name, client_last_name),
+    ~dplyr::na_if(., '')
+    )
+  )
+```
+ 
+We assessed for similar entries using single quotes rather than double quotes, and found a single observation with a single quote nickname in the first name field.
+
+```{r}
+target_regex <- "('.*?')+"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 1
+```
+
+We shifted this likely nickname values into our notes field, and removed it from the name field. 
+ 
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # Extract from First Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_match(client_first_name, "('.*?')"),
+      client_msc
+    ),
+    # Remove from First Name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_remove(client_first_name, "('.*?')"),
+      client_first_name
+    )
+  ) |>
+  # Convert empty strings to missing values
+  dplyr::mutate(across(
+    c(client_first_name, client_middle_name, client_last_name),
+    ~dplyr::na_if(., '')
+    )
+  )
+```
+
+We assessed for similar entries using parentheses rather than double quotes, and found two observations with a parenthesis surrounded nickname (first name and middle name fields)
+
+```{r}
+target_regex <- "(\\(.*?\\))+"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 2
+```
+
+We shifted these likely nickname values into our notes field, and removed them from the name fields. 
+ 
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # Extract from First Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_match(client_first_name, "(\\(.*?\\))"),
+      client_msc
+    ),
+    # Remove from First Name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_remove(client_first_name, "(\\(.*?\\))"),
+      client_first_name
+    ),
+    # Extract from Middle Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_match(client_middle_name, "(\\(.*?\\))"),
+      client_msc
+    ),
+    # Remove from Middle Name
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_remove(client_middle_name, "(\\(.*?\\))"),
+      client_middle_name
+    ), 
+  ) |>
+  # Convert empty strings to missing values
+  dplyr::mutate(across(
+    c(client_first_name, client_middle_name, client_last_name),
+    ~dplyr::na_if(., '')
+    )
+  )
+```
+
+In the examination of name values, we also identified a single nickname that appeared to be indicated in the middle name field, preceded by "goes by". We isolated this observation for further evaluation.
+
+```{r}
+target_regex <- "goes by (.*)"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 1
+```
+
+We shifted this likely nickname value into our notes field, and removed it from the middle name field. 
+ 
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # Extract from Middle Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_match(client_middle_name, "goes by (.*)"),
+      client_msc
+    ),
+    # Remove from Middle Name
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_remove(client_middle_name, "goes by (.*)"),
+      client_middle_name
+    ), 
+  ) |>
+  # Convert empty strings to missing values
+  dplyr::mutate(across(
+    c(client_first_name, client_middle_name, client_last_name),
+    ~dplyr::na_if(., '')
+    )
+  )
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+#### Single Quotes (')
+
+Single quotes (') may be valid and commonly present in some names, such as in Irish and Scottish conventions (e.g. "O'Brien"). We isolated 682 entries with a single quote in any name field for manual review. 
+
+```{r}
+target_regex <- "([']+)"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 681
+```
+
+While most occurrences of single quotes appeared to be valid, modification was still required due to the inconsistent use of white space with single quotes in names (i.e. O'Brien as "o'brien", "o' brien", "o 'brien", or "o ' brien"). As such, we stripped white space surrounding single quotes from observations in our data set. This was complicated due to valid use of hyphens and spaces in multi-part names (e.g. "de la cruz- smith") in the name fields.
+
+Additionally, we were unable to correct for what appeared to be usage of a single quote when a hyphen was appropriate (i.e. "Smith-Jones" as "smith'jones") due to the complexity of generating a solution without sizable point-fixes with small potential benefit to string-matching after correction.
+ 
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # First Name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_replace_all(client_first_name, " '", "'"),
+      client_first_name
+    ),
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_replace_all(client_first_name, "' ", "'"),
+      client_first_name
+    ),
+  # Middle Name
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_replace_all(client_middle_name, " '", "'"),
+      client_middle_name
+    ),
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_replace_all(client_middle_name, "' ", "'"),
+      client_middle_name
+    ),
+    # Last Name
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_replace_all(client_last_name, " '", "'"),
+      client_last_name
+    ),
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_replace_all(client_last_name, "' ", "'"),
+      client_last_name
+    )
+  )
+```
+
+We checked for any instances where a single quote was the first character in the field. We identified no occurrences.
+
+```{r}
+target_regex <- "^(')"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 0
+```
+
+We checked for any instances where a single quote was the last character in the field. We identified 13 occurrences.
+
+```{r}
+target_regex <- "(')$"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 13
+```
+
+We adjusted these entries to trim the trailing single quote.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # First Name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_replace_all(client_first_name, target_regex, ''),
+      client_first_name
+    ),
+    # Middle Name
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_replace_all(client_middle_name, target_regex, ''),
+      client_middle_name
+    ),
+    # Last Name
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_replace_all(client_last_name, target_regex, ''),
+      client_last_name
+    )
+  )
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+#### Examination for suffixes
+
+JR and SR are common suffixes to names, but may artificially increase string-distance. We isolated 157 entries with a potential suffix match in any name field for manual review. 
+
+```{r}
+target_regex <- "((junior)|(senior)|(jr)|(sr))[^a-z]?$"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 157
+```
+
+Suffix items appeared in all fields. Values were shifted from middle name and last name fields, but left in first name fields as these are also possible initial-isms or otherwise valid first names.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # Extract from Middle Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_match(client_middle_name, target_regex),
+      client_msc
+    ),
+    # Remove from Middle Name
+    client_middle_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_middle_name, target_regex),
+      stringr::str_remove(client_middle_name, target_regex),
+      client_middle_name
+    ),
+    # Extract from Last Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_match(client_last_name, target_regex),
+      client_msc
+    ),
+    # Remove from Last Name
+    client_last_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_last_name, target_regex),
+      stringr::str_remove(client_last_name, target_regex),
+      client_last_name
+    )
+  ) |>
+  # Convert empty strings to missing values
+  dplyr::mutate(across(
+    c(client_first_name, client_middle_name, client_last_name),
+    ~dplyr::na_if(., '')
+    )
+  )
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+#### Potential titles in name fields
+
+Mr., Ms., Mrs., and Dr. are the primary titles used in the US. Sr. and Sra. are common Spanish-language titles used in the US. 
+```{r}
+target_regex <- "^((mrs)|(sra)|(ms)|(mr)|(sr)|(dr))[^a-z]?"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 817
+```
+
+
+#### Removal of other unexpected characters
+
+
 
 ## Zip Codes
 
@@ -422,28 +1414,28 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '48202') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_city'] <- 'DETROIT'
+  ),'client_city'] <- 'detroit'
 
 aps[aps$case_id %in% pull(
   checking |> 
     dplyr::filter(client_zip_code == '48202') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_state'] <- 'MI'
+  ),'client_state'] <- 'mi'
 
 aps[aps$case_id %in% pull(
   checking |> 
     dplyr::filter(client_zip_code == '48202') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_county'] <- 'OUT OF STATE'
+  ),'client_county'] <- 'out of state'
 
 aps[aps$case_id %in% pull(
   checking |> 
     dplyr::filter(client_zip_code == '48202') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_county'] <- 'OUT OF STATE'
+  ),'client_county'] <- 'out of state'
 
 # ZIP 64114 to 77831 (1 row)
 aps[aps$case_id %in% pull(
@@ -467,7 +1459,7 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '70125') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_state'] <- 'LA'
+  ),'client_state'] <- 'la'
 
 # ZIP 70526 to 78526 (1 row)
 aps[aps$case_id %in% pull(
@@ -491,14 +1483,14 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '73840') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_state'] <- 'AR'
+  ),'client_state'] <- 'ar'
 
 aps[aps$case_id %in% pull(
   checking |> 
     dplyr::filter(client_zip_code == '73840') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_county'] <- 'OUT OF STATE'
+  ),'client_county'] <- 'out of state'
 
 aps[aps$case_id %in% pull(
   checking |> 
@@ -530,7 +1522,7 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '74756') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_state'] <- 'OK'
+  ),'client_state'] <- 'ok'
 
 # ZIP 78368 to a missing value (4 rows)
 aps[aps$case_id %in% pull(
@@ -546,7 +1538,7 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '78595') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_state'] <- 'TX'
+  ),'client_state'] <- 'tx'
 
 aps[aps$case_id %in% pull(
   checking |> 
@@ -561,7 +1553,7 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '80102') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_county'] <- 'DEAF SMITH'
+  ),'client_county'] <- 'deaf smith'
 
 aps[aps$case_id %in% pull(
   checking |> 
@@ -584,7 +1576,7 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '82331') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_state'] <- 'WY'
+  ),'client_state'] <- 'wy'
 
 # Entry for ZIP 87575 state to 'NM', county to 'OUT OF STATE' (1 row)
 aps[aps$case_id %in% pull(
@@ -592,14 +1584,14 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '87575') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_state'] <- 'NM'
+  ),'client_state'] <- 'nm'
 
 aps[aps$case_id %in% pull(
   checking |> 
     dplyr::filter(client_zip_code == '87575') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_county'] <- 'OUT OF STATE'
+  ),'client_county'] <- 'out of state'
 
 # Entry for ZIP 88063 state to "NM" (1 row)
 aps[aps$case_id %in% pull(
@@ -607,7 +1599,7 @@ aps[aps$case_id %in% pull(
     dplyr::filter(client_zip_code == '88063') |> 
     dplyr::select(case_id) |> 
     dplyr::distinct()
-  ),'client_state'] <- 'NM'
+  ),'client_state'] <- 'nm'
 
 # ZIP 88125 to missing value; Non-US address (1 row)
 aps[aps$case_id %in% pull(
@@ -642,20 +1634,7 @@ rm(usps_zip)
 rm(checking)
 ```
 
-## Case Control
 
-We converted all string values into lowercase, and again enforced stripped leading or trailing white spaces.
-
-```{r}
-aps <- aps |>
-  dplyr::mutate(dplyr::across(c(
-                  'client_first_name', 'client_middle_name', 
-                  'client_last_name', 'client_street_address', 
-                  'client_city', 'client_state', 'client_county'
-                  ), 
-                  ~tolower(stringr::str_trim(., side = 'both'))
-                ))
-```
 
 
 ```{r}
