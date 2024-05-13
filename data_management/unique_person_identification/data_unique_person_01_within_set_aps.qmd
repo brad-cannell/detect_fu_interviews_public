@@ -1257,9 +1257,13 @@ rm(target_regex)
 
 #### Potential titles in name fields
 
-Mr., Ms., Mrs., and Dr. are the primary titles used in the US. Sr. and Sra. are common Spanish-language titles used in the US. 
+Mr., Ms., Mrs., and Dr. are the primary titles used in the US. Sr. and Sra. are common Spanish-language titles used in the US. We isolated 14 potential occurrences for manual review.
+
 ```{r}
-target_regex <- "^((mrs)|(sra)|(ms)|(mr)|(sr)|(dr))[^a-z]?"
+target_regex <- paste0(
+  "^((doctor)|(mister)|(misus)|(miss)|(mrs)|(senora)|",
+  "(senorita)|(senora)|(sra)|(ms)|(mr)|(sr)|(dr))(?![a-z]+)"
+  )
 
 checking <- aps |> 
   dplyr::filter(
@@ -1270,15 +1274,155 @@ checking <- aps |>
 
 nrow (checking)
 
-# [1] 817
+# [1] 14
 ```
 
+All 11 potential titles were found in first name fields. Extraction was complicated by additional values within the field that were valuable (example: first name of "mr. smith" with no value in middle or last name fields) and values which simply required trimming (example: first name of "dr. john" with last name value of "doe").
+
+First, we shifted desired values to our note ("client_msc") variable.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # Extract from First Name
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_match(client_first_name, target_regex),
+      client_msc
+    ),
+    # Remove from First Name
+    client_first_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_first_name, target_regex),
+      stringr::str_remove(client_first_name, target_regex),
+      client_first_name
+    )
+  )
+```
+
+Then, we identified our single row where there was no additional last name name information.
+
+```{r}
+target_row <- pull(aps |>
+  dplyr::filter(
+    (case_id %in% checking$case_id) & is.na(client_last_name)
+    ) |>
+  dplyr::select(case_id)
+  )
+```
+
+We shifted the remaining information in the targeted observation's first name field into the last name field.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_last_name = ifelse(
+      (case_id %in% checking$case_id &
+        case_id == target_row),
+      str_extract(client_first_name, "\\. ([a-z]+)"),
+      client_last_name
+    ),
+    client_first_name = ifelse(
+      (case_id %in% checking$case_id &
+        case_id == target_row),
+      NA_character_,
+      client_first_name
+    )
+  )
+```
+
+We purged our checking subset, target regular expression, and target_row values for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+rm(target_row)
+```
 
 #### Removal of other unexpected characters
 
+Any characters other than single quotes, hyphens, white spaces, or alphanumeric characters were no longer anticipated to be valid. We additionally set the Spanish Language character "ñ" as acceptable. We isolated 2,254 potential occurrences for manual review.
+
+```{r}
+target_regex <- "([^a-zñ '-])"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_first_name, target_regex) |
+      stringr::str_detect(client_middle_name, target_regex) |
+      stringr::str_detect(client_last_name, target_regex)
+    )
+
+nrow (checking)
+
+# [1] 2254
+```
+
+On review, all remaining unanticipated characters to a single white space, across all name fields.
+
+```{r}
+aps <- aps |>
+  # Convert non-anticipated punctuation to white space
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name'
+                  ), 
+                  ~ifelse(
+                    case_id %in% checking$case_id,
+                    stringr::str_replace_all(.x, target_regex, ""),
+                    .x
+                    )
+                  )
+                )
+```
+
+We then performed cleaning: multiple white spaces were converted to a single white space; leading and trailing white spaces were trimmed; and empty strings were converted to missing values.
+
+```{r}
+aps <- aps |>
+  # Trim multiple white spaces to single white space
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name'
+                  ), 
+                  ~ifelse(
+                    case_id %in% checking$case_id,
+                    stringr::str_replace_all(., "( {2,})", " "),
+                    .
+                    )
+                  )
+                ) |>
+  # Trim leading and trailing white spaces
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name'
+                  ), 
+                  ~stringr::str_trim(., side = 'both')
+                  )
+                ) |>
+  # Convert empty strings to missing values
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name'
+                  ), 
+                  ~ifelse(. == '', NA_character_, .)
+                  )
+                ) 
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+## Address Fields
 
 
-## Zip Codes
+
+### Zip Codes
 
 We expected ZIP codes to follow a 5-digit format. Many entries contained a 5+4 format (10 character, #####-#### format). Only 7 entries did not directly match either format. These were manually reviewed.
 
@@ -1408,7 +1552,8 @@ aps[aps$case_id %in% pull(
   ),'client_zip_code'] <- '76502'
 
 
-# Entry for ZIP 48202 to City "DETROIT", State "MI", county "OUT OF STATE" (2 rows)
+# Entry for ZIP 48202 to City "DETROIT", State "MI", 
+#county "OUT OF STATE" (2 rows)
 aps[aps$case_id %in% pull(
   checking |> 
     dplyr::filter(client_zip_code == '48202') |> 
