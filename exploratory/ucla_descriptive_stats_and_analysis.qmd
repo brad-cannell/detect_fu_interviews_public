@@ -11,7 +11,7 @@ getwd()
 ```
 
 ```{r}
-setwd("C:\\Users\\DELL\\OneDrive - UTHealth Houston\\Desktop\\CANNELL'S LAB\\detect_fu_interviews_public\\exploratory\\cleaned_rds_files")
+setwd("C:/Users/DELL/OneDrive - UTHealth Houston/DET dataset/GITHUB REP/detect_fu_interviews_public/exploratory")
 ```
 
 ```{r}
@@ -23,6 +23,13 @@ library(misty)
 library(mice)
 library(officer)
 library(tidyverse)
+library(expss)
+library(dplyr)
+library(freqtables)
+library(here)
+
+n_percent_path <- here::here("r", "n_percent_ci.R")
+source(n_percent_path)
 ```
 
 # Load Cleaned data
@@ -80,9 +87,6 @@ ls_m <- width(ls_m, width = 1)
 ls_m
 ```
 
-```{r, fig.width = 12}
-
-```
 
 ### summary of the count of unique people who completed the UCLA loneliness scale
 
@@ -685,20 +689,477 @@ print(summary_stats)
 
 ```
 
-```         
+
+#Merge the variable "sex" from a different dataset "participant" to "sociodemographic dataset"
+
+```{r}
+# Merge sex variable from participant data set to sociodemographic variables for table 1
+
+table1_vars <- par %>% select(medstar_id, sex_3cat_f) %>% right_join(soc_dem, by = "medstar_id")
 ```
 
-```         
+
+Categorize the variables "age" and household size "sode_people_9cat_f"
+
+```{r}
+table1_vars <- table1_vars %>% 
+  mutate(
+    # Create new categorical age variable with 4 age groups
+    age_4cat_f = case_when(
+      sode_age_years >= 65 & sode_age_years < 75 ~ "65-74",
+      sode_age_years >= 75 & sode_age_years < 85 ~ "75-84",
+      sode_age_years >= 85 & sode_age_years < 95 ~ "85-94",
+      sode_age_years >= 95                       ~ "95+"
+    ),
+
+    age_4cat_f = factor(age_4cat_f, 
+                        levels = c("65-74", "75-84", "85-94", "95+")
+                        ),
+    # Create new household size variable with 9 levels
+    sode_people_9cat_f = factor(sode_people)
+  )
 ```
 
-```         
+
+# Label the variables needed on the Table
+
+```{r}
+table1_vars <- apply_labels(table1_vars,
+                            age_4cat_f = "Age",
+                            sex_3cat_f  = "Sex",
+                            sode_people_9cat_f = "Household size",
+                            sode_marital_8cat_f  = "Marital status",
+                            sode_race_eth_6cat_f = "Race/ ethnicity",
+                            sode_school_9cat_f  = "Educationlevel",
+                            sode_employed_11cat_f = "Employment status",
+                            sode_income_9cat_f = "Household income",
+                            sode_military_4cat_f = "Military service",
+                            sogi_orientation_8cat_f = "Sexual orientation")
 ```
 
-```         
+
+# Table 1 creation
+
+```{r}
+cap <- "Table 1 showing sociodemographic information of respondents"
+
+
+overall_tab <- table1(~ age_4cat_f + sex_3cat_f + sode_people_9cat_f + sode_marital_8cat_f + sode_hispanic_4cat_f + sode_school_9cat_f + sode_employed_11cat_f + sode_income_9cat_f + sode_military_4cat_f + sogi_orientation_8cat_f,
+  data = table1_vars,
+  caption = cap
+)
+overall_tab <- t1flex(overall_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+overall_tab <- width(overall_tab, width = 3)
+overall_tab <- bold(overall_tab, bold = FALSE, part = "all")
+overall_tab
 ```
 
-```         
+
+Cross-tabulation of Marital Status by Loneliness Score (in the continuous format) 
+
+```{r}
+# Create caption/ title
+cap_1 <- "Marital Status by Loneliness Score"
+
+
+marital_tab <- table1(~sode_marital_8cat_f | total_score,
+  data = table1_vars_lsd,
+  caption = cap_1
+)
+marital_tab <- t1flex(marital_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+marital_tab <- width(marital_tab, width = 2.0)
+marital_tab <- bold(marital_tab, bold = FALSE, part = "all")
+marital_tab
 ```
 
-```         
+
+Cross-tabulation of Household Size by Loneliness Score (in the continuous format)
+
+```{r}
+# Create caption/ title
+cap_1 <- "Household Size by Loneliness score"
+
+
+liv_sit_tab <- table1(~ sode_people_9cat_f | total_score,
+  data = table1_vars_lsd,
+  caption = cap_1
+)
+liv_sit_tab <- t1flex(liv_sit_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+liv_sit_tab <- width(liv_sit_tab, width = 2.0)
+liv_sit_tab <- bold(liv_sit_tab, bold = FALSE, part = "all")
+liv_sit_tab
 ```
+
+
+Cross-tabulation of Health Conditions( using the variable-PEG) by Loneliness Score (in the continuous format)
+
+```{r}
+# Create caption/ title
+cap_1 <- "Health Conditions by Loneliness score"
+
+
+health_con_tab <- table1(~ PEG_total | total_score,
+  data = gh_ls_new,
+  caption = cap_1
+)
+health_con_tab <- t1flex(health_con_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+health_con_tab <- width(health_con_tab, width = 2.0)
+health_con_tab <- bold(health_con_tab, bold = FALSE, part = "all")
+health_con_tab
+
+```
+
+
+# Merging socio-dem,loneliness_score,general health, self-report and aps datasets together for subsequent analysis
+
+```{r}
+soc_dem_ls_gh_n <- left_join(gh_ls_n, soc_dem_ls_n)
+soc_dem_ls_gh_sr_n<-left_join(soc_dem_ls_gh_n,sr_ls_n)
+soc_dem_ls_gh_sr_aps_n<-left_join(soc_dem_ls_gh_sr_n,aps_ls_n)
+```
+
+
+# Categorizing loneliness score(with labels) based on the mean
+
+```{r}
+# Calculate mean score
+mean_score <- mean(soc_dem_ls_gh_sr_aps_n$total_score, na.rm = TRUE)
+
+# Create the loneliness_cat variable
+soc_dem_ls_gh_sr_aps_n <- soc_dem_ls_gh_sr_aps_n %>%
+  mutate(loneliness_cat = ifelse(total_score > mean_score, ">Mean score", "<=Mean score"))
+
+
+# Create table with labels
+table(loneliness_cat)
+
+```
+
+
+# Categorizing depression score(with labels) based on the mean
+
+```{r}
+# Calculate mean score
+depres_mean_score <- mean(soc_dem_ls_gh_sr_aps_n$depres_total, na.rm = TRUE)
+
+# Create the loneliness_cat variable
+soc_dem_ls_gh_sr_aps_n <- soc_dem_ls_gh_sr_aps_n %>%
+  mutate(depres_cat = ifelse(depres_total > depres_mean_score, ">Mean score", "<=Mean score"))
+
+
+# Create table with labels
+table(depres_cat)
+```
+
+
+# Categorizing PEG score(with labels) based on the mean
+
+```{r}
+# Calculate mean score
+peg_mean_score <- mean(soc_dem_ls_gh_sr_aps_n$PEG_total, na.rm = TRUE)
+
+# Create the loneliness_cat variable
+soc_dem_ls_gh_sr_aps_n <- soc_dem_ls_gh_sr_aps_n %>%
+  mutate(peg_cat = ifelse(PEG_total > peg_mean_score, ">Mean score", "<=Mean score"))
+
+
+# Create table with labels
+table(peg_cat)
+```
+
+
+# Removal of missing data from the categorized loneliness score variable
+
+```{r}
+# Remove rows with missing values in loneliness_cat
+soc_dem_ls_gh_sr_aps_n <- soc_dem_ls_gh_sr_aps_n[complete.cases(soc_dem_ls_gh_sr_aps_n$loneliness_cat), ]
+```
+
+
+# Cross-tabulation of Marital Status by Loneliness Score (in the categorical format)
+
+```{r}
+# Create caption/ title
+cap_1 <- "Marital Status by Loneliness Score"
+
+
+marital_tab <- table1(~sode_marital_8cat_f | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1
+)
+marital_tab <- t1flex(marital_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+marital_tab <- width(marital_tab, width = 2.0)
+marital_tab <- bold(marital_tab, bold = FALSE, part = "all")
+marital_tab
+```
+
+
+# Obtaining chi-square p-value of marital status by loneliness cross-tab
+
+```{r}
+# Create caption/ title
+cap_1 <- "Marital Status by Loneliness Score"
+
+pvalue <- function(x, ...) {    # Construct vectors of data y, and groups (strata) g    
+  y <- unlist(x)    
+  g <- factor(rep(1:length(x), times=sapply(x, length)))    
+  if (is.numeric(y)) {        
+    # For numeric variables, perform a standard 2-sample t-test        
+    p <- t.test(y ~ g)$p.value    } 
+  else {        # For categorical variables, perform a chi-squared test of independence        
+      p <- chisq.test(table(y, g))$p.value    }    # Format the p-value, using an HTML entity for the less-than sign.    
+  # The initial empty string places the output on the line below the variable label.    
+  c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))}
+
+marital_tab <- table1(~sode_marital_8cat_f | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1, overall=F, extra.col=list("P-value"=pvalue)
+)
+
+t1flex(marital_tab)
+
+
+```
+
+
+# Cross-tabulation of Health Condition (using PEG) by Loneliness Score (in the categorical format)
+
+```{r}
+# Create caption/ title
+cap_1 <- "PEG by Loneliness Score"
+
+
+peg_tab <- table1(~peg_cat | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1
+)
+peg_tab <- t1flex(peg_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+peg_tab <- width(peg_tab, width = 2.0)
+peg_tab <- bold(peg_tab, bold = FALSE, part = "all")
+peg_tab
+```
+
+
+# Obtaining chi-square p-value of PEG by loneliness cross-tab
+
+```{r}
+cap_1 <- "PEG by Loneliness Score"
+
+pvalue <- function(x, ...) {    # Construct vectors of data y, and groups (strata) g    
+  y <- unlist(x)    
+  g <- factor(rep(1:length(x), times=sapply(x, length)))    
+  if (is.numeric(y)) {        
+    # For numeric variables, perform a standard 2-sample t-test        
+    p <- t.test(y ~ g)$p.value    } 
+  else {        # For categorical variables, perform a chi-squared test of independence        
+      p <- chisq.test(table(y, g))$p.value    }    # Format the p-value, using an HTML entity for the less-than sign.    
+  # The initial empty string places the output on the line below the variable label.    
+  c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))}
+
+
+peg_tab <- table1(~peg_cat | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1, overall = F, extra.col=list("P-value" = pvalue)
+)
+
+t1flex(peg_tab)
+
+```
+
+
+# Cross-tabulation of Depression score (categorical format) by Loneliness Score (in the categorical format)
+
+```{r}
+# Create caption/ title
+cap_1 <- "Depession Score by Loneliness Score"
+
+
+depres_tab <- table1(~depres_cat | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1
+)
+depres_tab <- t1flex(depres_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+depres_tab <- width(depres_tab, width = 2.0)
+depres_tab <- bold(depres_tab, bold = FALSE, part = "all")
+depres_tab
+```
+
+
+# Obtaining chi-square p-value of Depression by loneliness cross-tab
+
+```{r}
+# Create caption/ title
+cap_1 <- "Depression Score by Loneliness Score"
+
+pvalue <- function(x, ...) {    # Construct vectors of data y, and groups (strata) g    
+  y <- unlist(x)    
+  g <- factor(rep(1:length(x), times=sapply(x, length)))    
+  if (is.numeric(y)) {        
+    # For numeric variables, perform a standard 2-sample t-test        
+    p <- t.test(y ~ g)$p.value    } 
+  else {        # For categorical variables, perform a chi-squared test of independence        
+      p <- chisq.test(table(y, g))$p.value    }    # Format the p-value, using an HTML entity for the less-than sign.    
+  # The initial empty string places the output on the line below the variable label.    
+  c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))}
+
+depres_tab <- table1(~depres_cat | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1, overall=F, extra.col=list("P-value"=pvalue)
+)
+
+t1flex(depres_tab)
+
+
+```
+
+
+# Cross-tabulation of Physical Function (categorical format) by Loneliness Score (in the categorical format)
+
+```{r}
+# Create caption/ title
+cap_1 <- "physical Function by Loneliness Score"
+
+
+phys_fn_tab <- table1(~outcomes_health_vigorous_5cat+outcomes_health_moderate_5cat+outcomes_health_uphill_5cat+outcomes_health_bend_5cat+outcomes_health_unable_5cat+outcomes_health_bend_5cat+outcomes_health_block_5cat+outcomes_health_bathe_5cat | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1
+)
+phys_fn_tab <- t1flex(phys_fn_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+phys_fn_tab <- width(phys_fn_tab, width = 2.0)
+phys_fn_tab <- bold(phys_fn_tab, bold = FALSE, part = "all")
+phys_fn_tab
+```
+
+
+# Add the variable "physical_function_total" to the recently merged dataset "soc_dem_ls_gh_sr_aps_n" 
+
+```{r}
+# Create columns representing physical_function_total scores.
+soc_dem_ls_gh_sr_aps_n  <- soc_dem_ls_gh_sr_aps_n  %>% mutate(
+  physical_function_total= rowSums(.[20:25])
+)
+
+# Exclude 'Refused' and 'Don't know' responses for all variables
+pat <- c("Don't know", "Refused")
+soc_dem_ls_gh_sr_aps_n <- soc_dem_ls_gh_sr_aps_n %>%
+  filter(
+    if_all(
+      everything(), ~ !grepl(paste(pat, collapse = "|"), .)
+    )
+  ) %>%
+  droplevels()
+
+```
+
+
+# Calculation of Mean Functional score for physical function and categorize it into two based on the mean value
+
+```{r}
+# Calculate mean score
+physical_function_mean_score <- mean(soc_dem_ls_gh_sr_aps_n$physical_function_total, na.rm = TRUE)
+
+# Create the physical_function_cat variable
+soc_dem_ls_gh_sr_aps_n <- soc_dem_ls_gh_sr_aps_n %>%
+  mutate(physical_function_cat = ifelse(physical_function_total > physical_function_mean_score, ">Mean score", "<=Mean score"))
+
+# Create table with labels
+table(soc_dem_ls_gh_sr_aps_n$physical_function_cat)
+```
+
+
+# Cross-tabulation of Physical Function(categorical format) by Loneliness Score (in the categorical format)
+
+```{r}
+# Create caption/ title
+cap_1 <- "Physical function by Loneliness Score"
+
+
+phys_fn_tab <- table1(~physical_function_cat | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1
+)
+phys_fn_tab <- t1flex(phys_fn_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+phys_fn_tab <- width(phys_fn_tab, width = 2.0)
+phys_fn_tab <- bold(phys_fn_tab, bold = FALSE, part = "all")
+phys_fn_tab
+```
+
+
+# Obtaining chi-square p-value of physical Function by loneliness cross-tab
+
+```{r}
+# Create caption/ title
+cap_1 <- "Physical Function by Loneliness Score"
+
+pvalue <- function(x, ...) {    # Construct vectors of data y, and groups (strata) g    
+  y <- unlist(x)    
+  g <- factor(rep(1:length(x), times=sapply(x, length)))    
+  if (is.numeric(y)) {        
+    # For numeric variables, perform a standard 2-sample t-test        
+    p <- t.test(y ~ g)$p.value    } 
+  else {        # For categorical variables, perform a chi-squared test of independence        
+      p <- chisq.test(table(y, g))$p.value    }    # Format the p-value, using an HTML entity for the less-than sign.    
+  # The initial empty string places the output on the line below the variable label.    
+  c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))}
+
+phys_fn_tab <- table1(~physical_function_cat | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1, overall=F, extra.col=list("P-value"=pvalue)
+)
+
+t1flex(phys_fn_tab)
+
+
+```
+
+
+#Self Reported Abuse by Total Loneliness Score
+
+```{r}
+# Create caption/ title
+cap_1 <- "Self Reported Abuse VS Loneliness Score"
+
+selfreported_abuse_tab <- table1(~physical_hit_4cat_f+ physical_hurt_4cat_f+ physical_restrain_4cat_f+ sexual_harm_4cat_f +sexual_picture_4cat_f + sexual_forced_4cat_f + sexual_touched_4cat_f + emotional_yelled_4cat_f + emotional_embarrassed_4cat_f + emotional_harassed_4cat_f + emotional_refused_4cat_f + finance_person_permission_4cat_f + finance_copies_4cat_f + finance_person_decisions_4cat_f + finance_person_stolen_4cat_f + finance_person_tricked_4cat_f + finance_person_forged_4cat_f | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1
+)
+selfreported_abuse_tab <- t1flex(selfreported_abuse_tab, tablefn = c("qflextable", "flextable", "regulartable"))
+selfreported_abuse_tab<- width(selfreported_abuse_tab, width = 2.0)
+selfreported_abuse_tab<- bold(selfreported_abuse_tab, bold = FALSE, part = "all")
+selfreported_abuse_tab
+```
+
+
+# Obtaining chi-square p-value of self-report abuse by loneliness cross-tab
+
+
+```{r}
+# Create caption/ title
+cap_1 <- "Self Reported Abuse VS Loneliness Score"
+
+
+
+pvalue <- function(x, ...) {    # Construct vectors of data y, and groups (strata) g    
+  y <- unlist(x)    
+  g <- factor(rep(1:length(x), times=sapply(x, length)))    
+  if (is.numeric(y)) {        
+    # For numeric variables, perform a standard 2-sample t-test        
+    p <- t.test(y ~ g)$p.value    } 
+  else {        # For categorical variables, perform a chi-squared test of independence        
+      p <- chisq.test(table(y, g))$p.value    }    # Format the p-value, using an HTML entity for the less-than sign.    
+  # The initial empty string places the output on the line below the variable label.    
+  c("", sub("<", "&lt;", format.pval(p, digits=3, eps=0.001)))}
+
+
+selfreported_abuse_tab <- table1(~physical_hit_4cat_f+ physical_hurt_4cat_f+ physical_restrain_4cat_f+ sexual_harm_4cat_f +sexual_picture_4cat_f + sexual_forced_4cat_f + sexual_touched_4cat_f + emotional_yelled_4cat_f + emotional_embarrassed_4cat_f + emotional_harassed_4cat_f + emotional_refused_4cat_f + finance_person_permission_4cat_f + finance_copies_4cat_f + finance_person_decisions_4cat_f + finance_person_stolen_4cat_f + finance_person_tricked_4cat_f + finance_person_forged_4cat_f | loneliness_cat,
+  data = soc_dem_ls_gh_sr_aps_n,
+  caption = cap_1, overall = F, extra.col=list("P-value" = pvalue)
+)
+print(selfreported_abuse_tab)
+
+```
+
+
+
+
+
