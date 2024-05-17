@@ -31,6 +31,7 @@ suppressPackageStartupMessages({
   library(readxl)
   library(here)
   library(data.table)
+  library(rvest)
 })
 
 ```
@@ -168,6 +169,36 @@ usps_zip <- dplyr::full_join(
     dplyr::distinct(),
   by = 'client_zip_code'
 )
+```
+
+## County Data
+
+We isolated a list of all counties in Texas using the [Texas Health and Human Services list of Texas Counties and Public Health Regions](https://www.dshs.texas.gov/center-health-statistics/center-health-statistics-texas-county-numbers-public-health-regions). As Texas HHS notes, counties may have a variety of valid spellings so counties which do not match the list are not necessarily invalid.
+
+```{r}
+url <- paste0(
+  "https://www.dshs.texas.gov/center-health-statistics/center-health-",
+  "statistics-texas-county-numbers-public-health-regions"
+  )
+
+# Scrape county list from table on webpage
+web_data <- url |>
+  rvest::read_html() |>
+  rvest::html_elements('table') |>
+  rvest::html_table()
+
+# Extract desired column and enforce format
+web_data <- web_data [[1]] |>
+  dplyr::rename_at("County\n\tName", ~"county") |>
+  dplyr::select(county) |>
+  dplyr::mutate(county = tolower(county))
+
+# Convert to list
+counties <- pull(web_data)
+
+# Purge unnecessary variables for memory management
+rm(url)
+rm(web_data)
 ```
 
 
@@ -1420,8 +1451,6 @@ rm(target_regex)
 
 ## Address Fields
 
-
-
 ### Zip Codes
 
 We expected ZIP codes to follow a 5-digit format. Many entries contained a 5+4 format (10 character, #####-#### format). Only 7 entries did not directly match either format. These were manually reviewed.
@@ -1779,11 +1808,946 @@ rm(usps_zip)
 rm(checking)
 ```
 
+### States
 
+We expected all values for state to represent US state values in two-character format (example: "TX") per [USPS standards](https://about.usps.com/who/profile/history/state-abbreviations.htm). With the inclusion of Puerto Rico (PR), District of Columbia (DC), and missing values (`NA`), we had 53 anticipated values. We isolated counts of our 62 unique state values for manual review.
 
 
 ```{r}
+checking <- get_unique_value_summary(aps, 'client_state') |> 
+  dplyr::arrange(value)
 
+nrow(checking)
+# [1] 62
 ```
+
+All unanticipated values started with 'x' or 'z'. These 184 occurrences were isolated for further manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    (stringr::str_starts(client_state, 'x') | 
+       (stringr::str_starts(client_state, 'z'))
+     )
+    ) |>
+  dplyr::arrange(client_state)
+
+nrow(checking)
+
+# [1] 184
+```
+
+Point fixes were determined and executed, with creation of a "Country" column:
+
+-   "xd" and "zc" referred to addresses in Mexico
+-   "xe" referred to addresses in Mexico and Peru
+
+    -   Additional cleaning of the city was required for the Peru entries, which gave the city as "lima, peru"
+    
+-   "xf" referred to addresses in Great Britain
+-   "za" referred to addresses in Canada
+-   "ze" referred to addresses in Russia
+-   "zh" referred to addresses in Honduras
+-   "zj" referred to addresses in Lagos
+-   "zl" referred to addresses in Taiwan
+
+    -   Additional cleaning of the city was required as the city was given as "Taipei, Taiwan"
+
+```{r}
+aps <- aps |>
+  # Initialize empty "Country" column
+  dplyr::mutate(
+    client_country = NA_character_
+  ) |>
+  dplyr::mutate(
+    # "xe" entries for Lima, Peru
+    client_country = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'xe' & client_city == "lima, peru"),
+        'peru',
+        client_country
+      ),
+    client_city = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'xe' & client_city == "lima, peru"),
+        'lima',
+        client_city
+      ),
+    client_state = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'xe' & client_city == "lima"),
+        'resolved',
+        client_state
+      )
+  ) |>
+  dplyr::mutate(
+  # "xd", xe", and "zc" entries for Mexico
+    client_country = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state %in% c('xd', 'xe', 'zc')),
+        'mexico',
+        client_country
+      ),
+# "xf" entries for Great Britain
+    client_country = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'xf'),
+        'great britain',
+        client_country
+      ),
+  # "za" entries for Canada
+    client_country = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'za'),
+        'canada',
+        client_country
+      ),
+  # "ze" entries for Russia
+    client_country = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'ze'),
+        'russia',
+        client_country
+      ),
+    # "zh" entries for Honduras
+    client_country = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'zh'),
+        'honduras',
+        client_country
+      ),
+    # "zj" entries for Lagos
+    client_country = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'zj'),
+        'lagos',
+        client_country
+      ),
+    # "zl" entries for Taiwan
+    client_country = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'zl'),
+        'taiwan',
+        client_country
+      ),
+    client_city = 
+      ifelse(
+        (case_id %in% checking$case_id) & 
+          (client_state == 'zl'),
+        'taipei',
+        client_city
+      ) 
+  ) |>
+  # Remove cleaned state entries
+  dplyr::mutate(
+    client_state = ifelse(
+      case_id %in% checking$case_id,
+      NA_character_,
+      client_state
+    )
+  )
+```
+
+We also checked for any observation where the value for state was missing (without a country value indicating it was an out-of-country address), but ZIP code or county were present. We found no such remaining values.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    (is.na(client_state) & is.na(client_country)) & 
+      (!is.na(client_zip_code)|!is.na(client_county))
+  )
+
+nrow(checking)
+# [1] 0
+```
+
+We purged our checking subset for memory management.
+
+```{r}
+rm(checking)
+```
+
+### Counties
+
+Observations listing the state as Texas were expected to indicate a Texas County, if any county. We isolated the 546 observations wherein the listed county was not present on our Texas HHS list of Counties for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::mutate(
+    flag_county = FALSE
+  ) |>
+  dplyr::mutate(
+    flag_county = ifelse(
+      client_state == 'tx' & !is.na(client_county),
+      ifelse(!(client_county %in% counties),
+             TRUE,
+             flag_county
+             ),
+      flag_county
+    )
+  ) |>
+  dplyr::filter(
+    flag_county
+    )
+
+nrow(checking)
+# [1] 546
+```
+
+On examination, this was due to 544 rows with a county of "de witt", and 2 with a county of "out of state". On review, "De Witt" county was contained in our verification list as "dewitt", making "de witt" valid.
+
+```{r}
+get_unique_value_summary(checking, 'client_county')
+```
+
+The two observations with values of "out of state" did indeed belong to out of state addresses, with one address belonging to Mexico. We targeted these observations for point-fixes.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_state = ifelse(
+      case_id %in% checking$case_id & client_city == 'california',
+      'ca',
+      client_state
+    ),
+    client_country = ifelse(
+      case_id %in% checking$case_id & client_city == 'nuevo leon',
+      'mexico',
+      client_country
+    ),
+    client_state = ifelse(
+      case_id %in% checking$case_id & client_city == 'nuevo leon',
+      NA_character_,
+      client_state
+    )
+  )
+```
+
+We isolated the 1,793 observations that indicated a state of Texas but were missing a value for county for manual review. No information was contained in these observations (street address or city values) to suggest a non-Texas address. Individual street addresses were *not* individually checked using mapping software in this stage.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(client_state == 'tx' & is.na(client_county))
+
+nrow(checking)
+# [1] 1793
+```
+
+We isolated the 48 observations that did not indicate a state of Texas, but had a value for county that was not either a missing value or "out of state".
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    (client_state != 'tx' | is.na(client_state)) &
+       !is.na(client_county) & (client_county != 'out of state')
+     )
+
+nrow(checking)
+# [1] 48
+```
+
+After manual review, we identified several cities which had valid counties (county with same name as a Texas county, but validly associated with the indicated city and/or zip code). We performed point fixes to an observation with an address close to a state line (state and zip code modification after address confirmation with Google Maps) and a city with a significant typo in the city name. We otherwise shifted all invalid county values to 'out of state'.
+
+```{r}
+target_cities <- c(
+  'calico rock', 'debeque', 'denver', 'miramar', 'augusta', 'new orleans', 
+  'new mexico', 'akron', 'unavailable', 'oklahoma', 'walters', 'yukon', 
+  'varnville', 'coah'
+  )
+
+aps <- aps |>
+  dplyr::mutate(
+    # Fix "Anthony, NM" which refers to "Anthony, TX"
+    client_zip_code = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'anthony',
+      '79821',
+      client_zip_code
+    ),
+    client_state = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'anthony',
+      'tx',
+      client_state
+    ),
+    # Fix found city name typo
+    client_city = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'allonia',
+      'vallonia',
+      client_city
+    )
+  ) |>
+  dplyr::mutate(
+    # Clear invalid county names
+    client_county = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city %in% target_cities,
+      'out of state',
+      client_county
+    )
+  )
+```
+
+We purged our target cities, list of counties, and checking subset for memory management.
+
+```{r}
+rm(checking)
+rm(target_cities)
+rm(counties)
+```
+
+### Cities
+
+We expected values for cities to contain only letters, and no value that was equivalent to "unknown". Previous exploration had identified a city with a name of "unavailable" (which did not match any city/town in the US per Google searches) and at least one observation where the city name was a spelled out version of the state, when no such city was known to exist in the state.
+
+#### Unanticipated characters
+
+We first identified observations with any unanticipated characters (any non-letter, except a white space). We isolated these 26 observations for manual review.
+
+```{r}
+target_regex <- "([^a-z ]+)"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_city, target_regex)
+    )
+
+nrow (checking)
+# [1] 26
+```
+
+We identified several issues which would require dedicated screening and modification: variations on "Fort Worth" or similar "Ft" or "Mt" city names, and a variation of "North Richland Hills" (caught due to periods). However, we did identify several issues (commas or backticks at the end of a city name which were likely typos, city name with a hyphen or forward slash indicating a region rather than a specific city/town) that could be fixed in this batch of corrections. We additionally performed point-fixes for observations which indicated a value in "CITY, STATE" format.
+
+After point-fixes were made, all remaining unanticipated characters (anything other than a whitespace, single quote, or letter from a-z) were removed. Multiple white spaces were consolidated into a single white space. Leading and trailing white spaces were trimmed. Empty strings were converted to missing values.
+
+```{r}
+target_regex <- "([^a-z ']+)"
+
+aps <- aps |>
+  dplyr::mutate(
+    # Shift value for Torreon, Coahuila
+    client_msc = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'torreon, coahuila',
+      'torreon, coahuila',
+      client_msc),
+    client_city = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'torreon, coahuila',
+      'torreon',
+      client_city),
+    # Shift value for Argyle - North Lake to Argyle
+    client_city = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'argyle - north lake',
+      'argyle',
+      client_city),    
+    # Shift value for Wylie/Dallas Area
+    client_msc = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'wylie/dallas area',
+      'wylie/dallas area',
+      client_msc),
+    client_city = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'wylie/dallas area',
+      'wylie',
+      client_city),    
+    # Shift value for "Dallas, Texas" in city field
+    client_city = ifelse(
+      (case_id %in% checking$case_id) &
+        client_city == 'dallas, texas',
+      'dallas',
+      client_city)
+  ) |>
+  # Remove all non-desired characters
+  dplyr::mutate(
+    client_city = ifelse(
+      case_id %in% checking$case_id,
+      stringr::str_replace_all(client_city, target_regex, ''),
+      client_city
+    )
+  ) |>
+  # Consolidate multiple white spaces into a single white space
+  dplyr::mutate(
+    client_city = stringr::str_replace_all(client_city, "( {2,})", " ")
+  ) |>
+  # Trim leading and trailing white spaces
+  dplyr::mutate(
+    client_city = stringr::str_trim(client_city, side = 'both')
+  ) |> 
+  # Convert empty strings to missing values
+  dplyr::mutate(
+    client_city = dplyr::na_if(client_city, '')
+  )
+```
+
+#### Prefixes and Suffixes
+
+In previous data, city values with prefixes of "City of", "Town of", "Village of", or "Census Designated Place" as well as suffixes of "historical" were identified. We checked our current data for any such values, and found no matches.
+
+```{r}
+target_regex <- "((census)|(histor)|(village of)|(town of)|(city of))"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_city, target_regex)
+    )
+
+nrow (checking)
+# [1] 0
+```
+
+#### Unknown or Equivalents
+
+In previous exploration and cleaning, we identified a city value of "unavailable" which was not valid for any area in the US. Similarly, there is no known city named "Unknown" in the US. Previous data had values for a city of "Uncertain", which could be a valid city in a Texas. We checked our current data for any values for "unknown" or it's equivalents, isolating the 27 matches for manual review.
+
+```{r}
+target_regex <- "((unkn)|(unav)|(uncer))"
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_city, target_regex)
+    )
+
+nrow (checking)
+# [1] 27
+```
+
+All entries indicated an unknown value, with an equally missing or otherwise "unknown" value for street address. No potentially valid cities were identified when searching individual states. As such, we shifted all of these values to a missing value.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_city = ifelse(
+      stringr::str_detect(client_city, target_regex),
+      NA_character_,
+      client_city
+    )
+  )
+```
+
+#### State Names in Cities
+
+While there are several cities which include state names (such as Oklahoma City and New York City), there have been previously identified instances within the data set wherein a city actually includes the state name. R contains a built-in data set which includes state names and abbreviations.
+
+```{r}
+state_data <- data.frame(name = state.name, abbr = state.abb) |>
+  # Convert string fields to lowercase values
+  dplyr::mutate(dplyr::across(dplyr::everything(), ~tolower(.x))) |>
+  # Arrange values from longest to shortest, and alphabetically within
+  # the same length
+  dplyr::mutate(name_length = stringr::str_length(name)) |>
+  dplyr::arrange(dplyr::desc(name_length), name)
+```
+
+
+We checked our data for any city name that contained a state name, and found 4,861 matches. We isolated these matches for further manual review.
+
+```{r}
+target_regex <- paste0(
+  "(",
+  paste(state_data$name, collapse = ")|("), ")"
+)
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_city, target_regex)
+    )
+
+nrow (checking)
+# [1] 4861
+```
+
+While the vast majority of cities were determined to be valid, we also identified several cities which required revision. Four of these could be targeted to the city name, but additional revisions required further specification.
+
+```{r}
+target_cities <- c(
+  'louisiana', 'new mexico', 'pennsylvania', 'south carolina'
+  )
+
+aps <- aps |>
+  dplyr::mutate(
+    # Street address includes ' santa fe', no zip code
+    client_zip_code = ifelse(
+      (case_id %in% checking$case_id) & client_city == 'texas' &
+        (stringr::str_detect(client_street_address, ' santa fe')),
+      '77510',
+      client_zip_code
+    ),
+    client_city = ifelse(
+      (case_id %in% checking$case_id) & 
+        (client_city == 'texas' & client_zip_code == '77510'),
+      'santa fe',
+      client_city
+    ),
+    client_street_address = ifelse(
+      (case_id %in% checking$case_id) & client_city == 'santa fe',
+      stringr::str_remove(client_street_address, ' santa fe'),
+      client_street_address
+    ),
+  # Street address includes ", galveston"
+    client_street_address = ifelse(
+      (case_id %in% checking$case_id) & 
+        (client_city == 'texas' & client_zip_code == '77551'),
+      stringr::str_remove(client_street_address, ', galveston,'),
+      client_street_address
+    ),
+    client_city = ifelse(
+      (case_id %in% checking$case_id) & 
+        (client_city == 'texas' & client_zip_code == '77551'),
+      'galveston',
+      client_city
+    ),
+    # City from ZIP Code
+    client_city = ifelse(
+      (case_id %in% checking$case_id) & 
+        (client_city == 'texas' & client_zip_code == '79902'),
+      'el paso',
+      client_city
+    ),
+    # Oregon, NM specifically as invalid
+    client_city = ifelse(
+      (case_id %in% checking$case_id) & 
+        (client_city == 'oregon' & client_state == 'nm'),
+      NA_character_,
+      client_city
+    ),    
+    # Adding 'city' to 'New York' and 'Oklahoma' cities
+    client_city = ifelse(
+      (case_id %in% checking$case_id) &
+        (client_city %in% c('new york', 'oklahoma')),
+      stringr::str_c(client_city, ' city'),
+      client_city
+    ),
+    # Point-fix of single address, ZIP code issue
+    client_zip_code = ifelse(
+      (case_id %in% checking$case_id) & 
+        (client_zip_code == '77831'),
+      '64414',
+      client_zip_code
+    ),
+    # Remove cities of 'florida' in the state of florida only
+    client_city = ifelse(
+      (case_id %in% checking$case_id) &
+        (client_city == 'florida' & client_state == 'fl'),
+      NA_character_,
+      client_city
+    )
+  ) |>
+  # Broader correction based on target list
+  dplyr::mutate(
+    client_city = ifelse(
+      (case_id %in% checking$case_id) & 
+        (client_city %in% target_cities),
+      NA_character_,
+      client_city
+    )
+  )
+```
+
+We similarly checked for any values which contained the two letter state abbreviation at the end of a city value (example: "dallas tx"). We isolated the 14 matching rows for manual review.
+   
+```{r}
+target_regex <- paste0(
+  "[^a-z]+((", 
+  paste(pull(state_data |> 
+               dplyr::arrange(name) |> 
+               dplyr::select(abbr)), 
+        collapse = ")|("), 
+  "))$"
+  )
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_city, target_regex)
+    )
+
+nrow (checking)
+# [1] 14
+```
+
+All 14 values followed the formula "city tx", and had state values of "tx". As such, we trimmed the extraneous data.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_city = ifelse(
+      case_id %in% checking$case_id,
+      stringr::str_remove(client_city, ' tx'),
+      client_city
+    )
+  )
+```
+
+We purged our memory of our target regular expression, list of target cities, state name and abbreviation data, and our checking subset for memory management.
+
+```{r}
+rm(target_regex)
+rm(target_cities)
+rm(state_data)
+rm(checking)
+```
+
+#### Standardizing Format of "Fort" and "Mt" City Names
+  
+In prior exploration and cleaning, we observed several components of city names which may or may not be abbreviated - with multiple formats included in values. This includes Fort Worth (abbreviated to "Ft Worth"), Mount Pleasant (abbreviated to Mt Pleasant). It also included cardinal direction indicators, such as North Richland Hills (abbreviated to N Richland Hills). This cleaning was required to minimize string distances from otherwise identical values.
+
+We isolated the 27,681 observations which contained these values for examination.
+
+```{r}
+target_regex <- paste0(
+  "^((mount)|(fort)|(ft)|(mt)|(north)|(south)|(east)|(west)|",
+  "(port)|(point)|(prt)|(pnt)|(pt)|",
+  "(nw )|(ne )|(sw )|(se )|(s )|(e )|(w )|(n ))"
+)
+
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_city, target_regex)
+  )
+
+nrow(checking)
+# 27681
+```
+
+In examining these values, we find 153 unique variations of city name, and are able to identify broader trends.
+
+```{r}
+get_unique_value_summary(checking, 'client_city') |>
+  dplyr::arrange(value)
+```
+
+Before any aggregate modifications, several point-fixes were made. This was primarily to correct several misspellings, or adjust city based on zip code.
+
+```{r}
+aps <- aps |>
+  # "WEST" Cluster
+  dplyr::mutate(
+    # adjust ZIP code of 76654 in 'west, tx' to 76691
+    client_zip_code = ifelse(
+      case_id %in% checking$case_id & 
+        (client_city == 'west' & client_zip_code == 76654),
+      '76691',
+      client_zip_code
+    ),
+    # fix typo in 'columbia'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'west colombia',
+      'west columbia',
+      client_city
+    ),
+    # convert 'west ingram' into 'ingram'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'west ingram',
+      'ingram',
+      client_city
+    ),
+    # fix typo in 'west tawakoni'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'west towankani',
+      'west tawakoni',
+      client_city
+    ),
+    # add 'city' back to 'west valley city'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'west valley',
+      'west valley city',
+      client_city
+    ),
+    # adjust ZIP code of 79549 in 'westbrook, tx' to 79565
+    client_zip_code = ifelse(
+      case_id %in% checking$case_id & 
+        (client_city == 'westbrook' & client_zip_code == 79549),
+      '79565',
+      client_zip_code
+    ),
+    # remove 'westheimer, tx' city (this is a road name)
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'westheimer',
+      'westheimer',
+      client_msc
+    ),
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'westheimer',
+      NA_character_,
+      client_city
+    )
+  ) |>
+  # SOUTH Cluster
+  dplyr::mutate(
+    # convert 'south austin' to 'austin'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'south austin',
+      'austin',
+      client_city
+    ),    
+    # convert 'south clifton' to 'clinton'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'south clifton',
+      'clinton',
+      client_city
+    ),    
+    # convert 'south haven' to 'southaven'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'south haven',
+      'southaven',
+      client_city
+    ),    
+  ) |>
+  # NORTH Cluster
+  dplyr::mutate(
+    # Convert 'n richland hills' with ZIP of 76118 to 'richland hills'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        (client_city == 'n richland hills' & client_zip_code =='76118'),
+      'richland hills',
+      client_city
+    ),    
+    # convert 'north richard hills' with ZIP of 76187 to 76182
+    client_zip_code = ifelse(
+      case_id %in% checking$case_id & 
+        (client_city == 'north richard hills' & client_zip_code == 76187),
+      '76182',
+      client_zip_code
+    ),    
+    # Consolidate version of 'north richland hills
+    client_city = ifelse(
+      case_id %in% checking$case_id &
+        (client_city %in% c(
+          'n richlnd hls', 'north richard hills', 'north richland hills', 'n richland hills'
+        )),
+      'north richland hills',
+      client_city
+    ),
+    # convert 'north stone mountain' to 'stone mountain'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'north stone mountain',
+      'stone mountain',
+      client_city
+    )
+  ) |>
+  # FORT Cluster
+  dplyr::mutate(
+    # convert 'fort blvd' to 'port bolivar'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'fort blvd',
+      'port bolivar',
+      client_city
+    ),    
+    # convert 'forthancock' to 'fort hancock'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'forthancock',
+      'fort hancock',
+      client_city
+    ),    
+    # convert 'fort mc kavett' to 'fortt mckavett'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'fort mc kavett',
+      'fort mckavett',
+      client_city
+    ),    
+    # 'fort worth' + ZIP 76180 + street address that DOES NOT include
+    # 'riverview', 'manor', 'deaver', 'susan', or 'green castle'
+    # to 'north richland hills'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        (client_city == 'fort worth' & client_zip_code == '76180' &
+           !stringr::str_detect(
+             client_street_address, 
+             "((green castle)|(riverview)|(deaver)|(manor)|(susan))")),
+      'north richland hills',
+      client_city
+    ),        
+    # 'fort worth' + ZIP 76182 + street address that DOES NOT include 'buck'
+    # to 'north richland hills'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        (client_city == 'fort worth' & client_zip_code == '76182' &
+           !stringr::str_detect(
+             client_street_address, 
+             "(buck)")),
+      'north richland hills',
+      client_city
+    ),   
+    # convert 'fort fort' to 'fort worth'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'fort fort',
+      'fort worth',
+      client_city
+    ),    
+    # convert 'fortworth' to 'fort worth'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'fortworth',
+      'fort worth',
+      client_city
+    ),    
+    # convert 'forth worth' to 'fort worth'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'forth worth',
+      'fort worth',
+      client_city
+    )
+  ) |>
+  # MOUNT Cluster
+  dplyr::mutate(
+    # convert 'mount pleasent' to 'mount pleasant'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'mount pleasent',
+      'mount pleasant',
+      client_city
+    ),
+    # convert 'mount vernont' to 'mount vernon'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'mount vernont',
+      'mount vernon',
+      client_city
+    )
+  )|>
+  # POINT/PORT Cluster
+  dplyr::mutate(
+    # convert 'pointe' to 'point'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'pointe',
+      'point',
+      client_city
+    ),
+    # convert 'point blank' to 'pointblank'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'point blank',
+      'pointblank',
+      client_city
+    ),
+    # convert 'port boliver' to 'port bolivar'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'port boliver',
+      'port bolivar',
+      client_city
+    ),
+    # convert 'port isable' to 'port isabel'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'port isable',
+      'port isabel',
+      client_city
+    ),
+    # convert 'port lacaca' to 'port lavaca'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city == 'port lacaca',
+      'port lavaca',
+      client_city
+    ),
+    # consolidate 'port atrthor', 'port autrthor', and 'port acres'
+    # into 'port arthur'
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city %in% c(
+          'port atrthor', 'port autthor', 'port acres'
+          ),
+      'port arthur',
+      client_city
+    ),
+    # consolidate 'port o connor' and 'port oconnor' into 
+    # "port o'connor"
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        client_city %in% c(
+          'port oconnor', 'port o connor'
+          ),
+      "port o'connor",
+      client_city
+    )
+  )
+```
+
+We then made more systematic modifications. These modifications aimed to minimize variance in string distances, while maintaining important distance values.
+-   Cardinal direction prefixes to city names were converted to a single letter abbreviation
+
+    -   Cardinal directions only appeared as single word values (such as 'south', but not 'southeast')
+    
+-   'Mt' would be expanded to 'Mount'
+-   'Ft' prefixes would be expanded to 'Fort'
+-   No modifications would be made to "Point" or "Port" prefixes, as no occurences of abbreviations were found to currently exist (and the words themselves are fairly short)
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    # cardinal directions
+    client_city = ifelse(
+      stringr::str_detect(client_city, '^(east )'),
+      stringr::str_replace(client_city, '^(east )', 'e '),
+      client_city
+    ),  
+    client_city = ifelse(
+      stringr::str_detect(client_city, '^(west )'),
+      stringr::str_replace(client_city, '^(west )', 'w '),
+      client_city
+    ),  
+    client_city = ifelse(
+      stringr::str_detect(client_city, '^(north )'),
+      stringr::str_replace(client_city, '^(north )', 'n '),
+      client_city
+    ),  
+    client_city = ifelse(
+      stringr::str_detect(client_city, '^(south )'),
+      stringr::str_replace(client_city, '^(south )', 's '),
+      client_city
+    ),  
+    # 'mt' to 'mount'
+    client_city = ifelse(
+      stringr::str_detect(client_city, '^(mt)'),
+      stringr::str_replace(client_city, '^(mt)', 'mount'),
+      client_city
+    ),
+    # 'ft' to 'fort'
+    client_city = ifelse(
+      stringr::str_detect(client_city, '^(ft)'),
+      stringr::str_replace(client_city, '^(ft)', 'fort'),
+      client_city
+    )
+    
+  ) 
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(target_regex)
+rm(checking)
+```
+
 
 # 💾
