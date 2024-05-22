@@ -372,6 +372,22 @@ aps <- aps |>
                 ))
 ```
 
+## Addition of Columns
+
+We added a notes column, which would allow us to shift any potentially valuable information for reconciliation into our data set, which is stored in the wrong field or otherwise would complicate implementation of fuzzy-matching algorithms.
+
+We also added separate address fields in anticipation of address cleaning: one for PO Boxes, one for business/building name or other such identifiers, and one each for secondary address classifier and value (such as "Apartment" and the corresponding Apartment number value).
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_notes = NA_character_,
+    client_pobox = NA_character_,
+    client_street_address_name = NA_character_,
+    client_street_address_scnd1_type = NA_character_,
+    client_street_address_scnd1_val = NA_character_,
+  )
+```
 
 ## Name Fields
 
@@ -400,7 +416,7 @@ Several of these observations had potentially valuable information for subject m
 
 ```{r}
 aps <- aps |>
-  # Initiate columns
+  # Initiate subset-specific notes columns
   dplyr::mutate(
     client_msc = NA_character_, 
     client_msc_first = NA_character_,
@@ -479,8 +495,26 @@ aps <- aps |>
     client_msc = stringr::str_remove_all(client_msc, "NA"),
     client_msc = ifelse(client_msc == '', NA_character_, client_msc)
   ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Name Fields:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Name Fields:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
   # Remove temporary columns
-  dplyr::select(-c(client_msc_first, client_msc_middle, client_msc_last))
+  dplyr::select(-c(
+    client_msc, client_msc_first, client_msc_middle, client_msc_last
+    )
+  )
 ```
 
 A point-fix was utilized to correct the only entry with "don't know" in a name field.
@@ -602,7 +636,6 @@ aps <- aps |>
 Due to the US convention of naming unknown subjects "Jane Doe" or "John Doe", we checked for rows where the last name was "doe". These 6 rows were isolated for manual review. All appeared to be potentially valid instances of a subject with the last name of "Doe", rather than an anonymous placeholder.
 
 ```{r}
-
 checking <- aps |> 
   dplyr::filter(
     client_last_name == 'doe'
@@ -639,10 +672,14 @@ nrow (checking)
 # [1] 11
 ```
 
-There were two observations that merited a point-fix to shift potentially useful data into our new notes field.
+There were two observations that merited a point-fix to shift potentially useful data into our notes field.
 
 ```{r}
 aps <- aps |>
+# Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_, 
+  ) |>
   dplyr::mutate(
     # Subject with a name of "trailer #10"
     client_msc = ifelse(
@@ -671,7 +708,24 @@ aps <- aps |>
       NA_character_,
       client_last_name
       )
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Name Fields:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Name Fields:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 
@@ -886,6 +940,10 @@ We shifted these likely nickname values into our notes field, and removed them f
  
 ```{r}
 aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_
+  ) |>
   dplyr::mutate(
     # Extract from Middle Name
     client_msc = ifelse(
@@ -921,7 +979,24 @@ aps <- aps |>
     c(client_first_name, client_middle_name, client_last_name),
     ~dplyr::na_if(., '')
     )
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Name Fields:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Name Fields:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
  
 We assessed for similar entries using single quotes rather than double quotes, and found a single observation with a single quote nickname in the first name field.
@@ -945,6 +1020,10 @@ We shifted this likely nickname values into our notes field, and removed it from
  
 ```{r}
 aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_
+  ) |>
   dplyr::mutate(
     # Extract from First Name
     client_msc = ifelse(
@@ -966,7 +1045,24 @@ aps <- aps |>
     c(client_first_name, client_middle_name, client_last_name),
     ~dplyr::na_if(., '')
     )
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Name Fields:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Name Fields:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 We assessed for similar entries using parentheses rather than double quotes, and found two observations with a parenthesis surrounded nickname (first name and middle name fields)
@@ -990,6 +1086,10 @@ We shifted these likely nickname values into our notes field, and removed them f
  
 ```{r}
 aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_
+  ) |>
   dplyr::mutate(
     # Extract from First Name
     client_msc = ifelse(
@@ -1025,7 +1125,24 @@ aps <- aps |>
     c(client_first_name, client_middle_name, client_last_name),
     ~dplyr::na_if(., '')
     )
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Name Fields:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Name Fields:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 In the examination of name values, we also identified a single nickname that appeared to be indicated in the middle name field, preceded by "goes by". We isolated this observation for further evaluation.
@@ -1049,6 +1166,10 @@ We shifted this likely nickname value into our notes field, and removed it from 
  
 ```{r}
 aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
   dplyr::mutate(
     # Extract from Middle Name
     client_msc = ifelse(
@@ -1070,7 +1191,24 @@ aps <- aps |>
     c(client_first_name, client_middle_name, client_last_name),
     ~dplyr::na_if(., '')
     )
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Name Fields:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Name Fields:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 We purged our checking subset and target regular expression for memory management.
@@ -1241,6 +1379,10 @@ Suffix items appeared in all fields. Values were shifted from middle name and la
 
 ```{r}
 aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
   dplyr::mutate(
     # Extract from Middle Name
     client_msc = ifelse(
@@ -1276,7 +1418,24 @@ aps <- aps |>
     c(client_first_name, client_middle_name, client_last_name),
     ~dplyr::na_if(., '')
     )
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Name Fields:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Name Fields:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 We purged our checking subset and target regular expression for memory management.
@@ -1314,6 +1473,10 @@ First, we shifted desired values to our note ("client_msc") variable.
 
 ```{r}
 aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
   dplyr::mutate(
     # Extract from First Name
     client_msc = ifelse(
@@ -1329,7 +1492,24 @@ aps <- aps |>
       stringr::str_remove(client_first_name, target_regex),
       client_first_name
     )
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Name Fields:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Name Fields:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 Then, we identified our single row where there was no additional last name name information.
@@ -2135,6 +2315,10 @@ After point-fixes were made, all remaining unanticipated characters (anything ot
 target_regex <- "([^a-z ']+)"
 
 aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
   dplyr::mutate(
     # Shift value for Torreon, Coahuila
     client_msc = ifelse(
@@ -2190,7 +2374,24 @@ aps <- aps |>
   # Convert empty strings to missing values
   dplyr::mutate(
     client_city = dplyr::na_if(client_city, '')
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("City:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; City:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 #### Prefixes and Suffixes
@@ -2433,6 +2634,10 @@ Before any aggregate modifications, several point-fixes were made. This was prim
 
 ```{r}
 aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
   # "WEST" Cluster
   dplyr::mutate(
     # adjust ZIP code of 76654 in 'west, tx' to 76691
@@ -2690,7 +2895,24 @@ aps <- aps |>
       "port o'connor",
       client_city
     )
-  )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("City:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; City:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 We then made more systematic modifications. These modifications aimed to minimize variance in string distances, while maintaining important distance values.
@@ -2748,6 +2970,517 @@ We purged our checking subset and target regular expression for memory managemen
 rm(target_regex)
 rm(checking)
 ```
+
+
+### Street Addresses
+
+#### PO BOX Entries
+
+Previous iterations of similar tasks and exploration of the existing data have revealed multiple PO BOX addresses within the data. While these may be valid mailing addresses, they are not typically helpful for fuzzy matching. We utilized regular expressions to attempt to isolate potential PO BOX values for manual review.We isolated these 1,531 observations for manual review.
+
+```{r}
+target_regex <- c(
+  paste0(
+      "^(po box|po  box|p\\.o\\. box|p\\.o box|pobox|",
+      "p\\. o\\. box| p\\. o box|p o box|box|po|p\\.o|",
+      "p\\. o\\.|p o|p\\.o\\.)"
+    ),
+    paste0(
+      "\\s(po box|po  box|p\\.o\\. box|p\\.o box|pobox|",
+      "p\\. o\\. box|p\\. o box|p o box|box|po|p\\.o|p\\. o\\.|",
+      "p o|p\\.o\\.)$")
+    )
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_street_address, target_regex[1]) |
+      stringr::str_detect(client_street_address, target_regex[2])
+    )
+
+nrow(checking)
+# [1] 1513
+```
+
+We identified that the variations that contained actual PO Boxes were prefixed with "po box", "p o box", "p.o. box", or "pob". One address was found to be valid and not a PO BOX (matched by the word 'box' in the street name), and another was a foreign address (matched due to 'po' at start of street name). 
+
+One street name required a point fix as it gave a county road address as "box # county road #". The original address value was shifted to the client notes, and the address was otherwise standardized to "# cr #" format.
+
+All of the remaining PO BOX addresses were standardized to strip the "po box" prefixes, and isolate the remaining value into a new field: 'client_pobox'
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_
+  ) |>
+  dplyr::mutate(
+    # Catch the "box # county road #" address and standardize
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(
+          client_street_address, 
+          '([0-9]+) county road ([0-9]+)$'),
+      client_street_address,
+      client_msc
+      ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(
+          client_street_address, 
+          '([0-9]+) county road ([0-9]+)$'),
+      paste(
+        str_match(client_street_address,'([0-9]+) county road ([0-9]+)$')[,2],
+        'cr', 
+        str_match(client_street_address,'([0-9]+) county road ([0-9]+)$')[,3]
+        ),
+      client_street_address
+      ),
+    # Catch and standardize remaining actual PO BOX values into 'client_pobox'
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(
+          client_street_address, 
+          '^(p\\.o\\. box)|(p o box)|(po box)|(pob )'),
+      client_street_address,
+      client_msc
+    ),
+    client_pobox = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(
+          client_street_address, 
+          '^(p\\.o\\. box)|(p o box)|(po box)|(pob )'),
+      stringr::str_match(
+        client_street_address,
+        '^((p\\.o\\. box)|(p o box)|(po box)|(pob ))[ \\-,\\.#]*(.+)')[,7],
+      client_pobox
+      ),
+    client_street_address = ifelse(
+      !is.na(client_pobox) |
+        stringr::str_detect(
+          client_street_address, 
+          '^(p\\.o\\. box)|(p o box)|(po box)|(pob )'),
+      NA_character_,
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Street Addr:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+We purged our checking subset and target regular expression for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+#### Unknown and Equivalents
+
+Previous iterations of similar tasks and exploration of the existing data have revealed multiple potential values which would indicate a missing, unknown, or otherwise omitted entry for street address. We utilized regular expressions to attempt to isolate potential instances of these values for manual review.
+
+We isolated 343 observations which potentially contained any match to our suspected "unknown" equivalent content.
+
+```{r}
+target_regex <- c(
+    paste0(
+      "(unknown|unknow|unk|unable to obtain|unable to attain|putp|",
+      "decl|refused|ref|n/a|none|declined|unable|residence|xxx)"
+      ),
+    "^([a-z])$",
+    "^([0-9])*$",
+    "^(pt|subj)"
+)
+
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_street_address, target_regex[1])|
+      stringr::str_detect(client_street_address, target_regex[2])|
+      stringr::str_detect(client_street_address, target_regex[3])|
+      stringr::str_detect(client_street_address, target_regex[4])
+  )
+
+nrow (checking)
+# [1] 344
+```
+
+Many of these appeared to be valid entries, so subsets based on each of our regular expressions were examined for more precise review.
+
+We isolated the 327 entries that matched our first regular expression.
+
+```{r}
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_street_address, target_regex[1])
+  )
+
+nrow (checking)
+# [1] 327
+```
+
+All entries in this set which contained digits appeared to be potentially valid street addresses. The 18 rows with values without numbers were further isolated for review.
+
+```{r}
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_street_address, target_regex[1]) &
+      !stringr::str_detect(client_street_address, '([0-9]+)')
+  )
+
+nrow (checking)
+# [1] 18
+```
+
+All of these values appear to be equivalent to "unknown" with the exception of a single entry with a value of "fairefield hotel". Unfortunately, this entry is in a major metropolitan area with multiple Fairfield hotels, so no replacement of the business name with an address was possible at this time. That value was shifted into the notes column, and all street addresses in this cluster were shifted to missing values.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
+  # Shift single observation for 'fairefield hotel' to notes
+  dplyr::mutate(
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        client_street_address == 'fairefield hotel',
+      client_street_address,
+      client_msc
+    )
+  )|>
+  dplyr::mutate(
+  # Convert all matching values to missing values
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      NA_character_,
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Street Addr:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+There were no entries that matched our second regular expression.
+
+```{r}
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_street_address, target_regex[2])
+  )
+
+nrow (checking)
+# [1] 0
+```
+
+We isolated the 16 entries that matched our third regular expression.
+
+```{r}
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_street_address, target_regex[3])
+  )
+
+nrow (checking)
+# [1] 16
+```
+
+As all of these values only had text, we shifted the values to the notes field, and otherwise converted street address to an missing value.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
+  # Shift values into notes field
+  dplyr::mutate(
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  )|>
+  dplyr::mutate(
+  # Convert all matching values to missing values
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      NA_character_,
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Street Addr:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+We isolated the 16 entries that matched our fourth regular expression.
+
+```{r}
+checking <- aps |> 
+  dplyr::filter(
+    stringr::str_detect(client_street_address, target_regex[4])
+  )
+
+nrow (checking)
+# [1] 1
+```
+
+This entry had a street address of 'subjective personal care home' in a major metropolitain area. There was no way to substitute or otherwise resolve this address, so we shifted the value to the notes field and otherwise removed the value.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
+  # Shift values into notes field
+  dplyr::mutate(
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  )|>
+  dplyr::mutate(
+  # Convert all matching values to missing values
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      NA_character_,
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Street Addr:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+We purged our checking subset and target regular expressions for memory management.
+
+```{r}
+rm(checking)
+rm(target_regex)
+```
+
+#### Commas
+
+We identified a comma as a high-priority component of a street address which might indicate a non-valid component within the street address field. We isolated the 150 observations that contained a comma in the street address field for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(,)')
+  )
+
+nrow(checking)
+# [1] 150
+```
+
+We refined this set by eliminating any commas that were at the end of a street address value, with no text after the comma. This reduced our set to 116 matches.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '(,)$'),
+      stringr::str_remove_all(client_street_address, '(,)$'),
+      client_street_address
+    )
+  )
+
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(,)')
+  )
+
+nrow(checking)
+# [1] 116
+```
+
+We identified several entries which had additional values for city, state, and/or zip code within the street address field. For the vast majority of these entries, the other fields already contained the relevant data. There were three particular entries which required additional fixes or notes: one entry with 'vicc' indicating it was part of the Valley International Country Club (moved to notes), and two entries (one for New Braunfels and one for Converse) that had cities of "San Antonio" (while those cities are in the San Antonio metro area, the proper city was updated). 
+
+We were able to use a single regular expression for most of our city fixes, but we did require additional regular expressions for values indicating 'Houston', 'Irving', and 'Detroit'.
+
+```{r}
+target_regex <- paste0(
+  '(.+?)(?:,*?)( crowley| springto| humb| fort worth| odessa| san|',
+  ' converse| new braunfels| vicc| alamo)'
+  )
+  
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |>
+  # First, update 'point fixes' in fields other than street address
+  dplyr::mutate(
+  # Shift 'VCC' to notes
+    client_msc = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(.+?)(?:,*?)( vicc)'),
+      'Valley International Country Club (VICC)',
+      client_msc
+    ),
+  # Update CITY for 'converse' catch
+    client_city = ifelse(
+      case_id %in% checking$case_id &
+        client_city == 'san antonio' &
+        stringr::str_detect(
+          client_street_address, 
+          '(.+?)(?:,*?)( converse)'),
+      'converse',
+      client_city
+    ),
+  # Update CITY for 'new braunfels' catch
+    client_city = ifelse(
+      case_id %in% checking$case_id &
+        client_city == 'san antonio' &
+        stringr::str_detect(
+          client_street_address, 
+          '(.+?)(?:,*?)( new braunfels)'),
+      'new braunfels',
+      client_city
+    )
+  ) |>
+  dplyr::mutate(
+  # Remove values for cities in target regex from street address
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, target_regex),
+      stringr::str_match(client_street_address, target_regex)[,2],
+      client_street_address
+    ),
+  # Remove values for city of 'houston' from street address
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(.+?)(, houston, texas|, houston| houston|houston, texas)$'
+          ),
+      stringr::str_match(
+        client_street_address, 
+        '(.+?)(, houston, texas|, houston| houston|houston, texas)$'
+        )[,2],
+      client_street_address
+    ),
+  # Remove values for city of 'detroit' from street address
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(.+?)(?:,*?)( detroit, mi)(.+?)'
+          ),
+      stringr::str_match(
+        client_street_address, 
+        '(.+?)(?:,*?)( detroit, mi)(.+?)'
+        )[,2],
+      client_street_address
+    ),
+  # Remove values for city of 'irving' from street address
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(.+?)(?:,*?)( irving, tx)(.+)'
+          ),
+      stringr::str_match(
+        client_street_address, 
+        '(.+?)(?:,*?)( irving, tx)(.+)'
+        )[,2],
+      client_street_address
+    ),
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc
+      is.na(client_notes),
+      paste("Street Addr:", client_msc),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+
+```
+
+We further narrowed our manual verification subset, so that it only included values that continued to have commas in the street address field. The 87 remaining observations were successfully isolated.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(,)')
+  )
+
+nrow(checking)
+# [1] 87
+```
+
 
 
 # 💾
