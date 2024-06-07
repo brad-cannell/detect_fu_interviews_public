@@ -5598,7 +5598,7 @@ aps <- aps |>
         # Fix overall spacing failures and mutated numerical street names
         stringr::str_detect(
           client_street_address, '^(91416)'
-        ) ~ '914-1/2 S 16th st',
+        ) ~ '914-1/2 s 16th st',
         stringr::str_detect(
           client_street_address, '^(121237)'
         ) ~ '12123 7-1/2 st',
@@ -6088,6 +6088,210 @@ rm(modified_set2)
 rm(checking)
 ```
 
+#### Any Remaining Non-Standard Characters
+
+We checked for any other remaining non-standard characters (anything other than a letter, number, white space, or hyphen. We isolated the 1,678 observations that contained a non-standard character in the street address field for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '([^a-z0-9 /-])')
+  )
+
+nrow(checking)
+# [1] 1678
+```
+
+##### Periods (.)
+
+There were 1,437 entries which contained a period (.) character.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(\\.)')
+  )
+
+nrow(checking)
+# [1] 1,437
+```
+
+Only one entry had data that required modification to ensure no meaningful data loss occurred in the bulk fix (replacing all periods with a single white space). We performed this point-fix and bulk fix.
+
+```{r}
+aps <- aps |>
+  # Point-fix single entry that would lose valuable content if periods
+  # converted to white space
+  dplyr::mutate(
+    client_street_address = ifelse(
+      stringr::str_detect(client_street_address, 'mile 6.5 w'),
+      stringr::str_replace(
+        client_street_address, 
+        'mile 6.5 w', 
+        'mile 6-1/2 w'
+        ),
+      client_street_address
+    )
+  ) |>
+  # Convert all periods to white space
+  dplyr::mutate(
+    client_street_address = stringr::str_replace_all(
+      client_street_address, 
+      '\\.', 
+      ' ')
+  )
+```
+
+##### Pound (#) Sign
+
+There were 257 entries which contained a period (.) character.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(#)')
+  )
+
+nrow(checking)
+# [1] 257
+```
+
+The 17 entries that started with the symbol were isolated for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '^(#)')
+  )
+
+nrow(checking)
+# [1] 17
+```
+
+These symbols could be omitted without any data loss, so we performed the omission.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      stringr::str_detect(client_street_address, '^(#)'),
+      stringr::str_remove(client_street_address, '^(#)'),
+      client_street_address
+    )
+  )
+```
+
+There were no entries that ended with the symbol.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(#)$')
+  )
+
+nrow(checking)
+# [1] 17
+```
+
+The 250 remaining entries that contained a pound (#) symbol were re-isolated for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(#)')
+  )
+
+nrow(checking)
+# [1] 250
+```
+
+None of these were found to have significant data loss when the values after the pound (#) sign were shifted to the "unit value" field. This shift was performed for all entries that were not outside of the US, and the trimmed values removed from the street address field. 
+
+```{r}
+aps <- aps |>
+# Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Shift all to notes
+    client_msc = ifelse(
+      case_id %in% checking$case_id & is.na(client_country) &
+        stringr::str_detect(client_street_address, '(#)'),
+      client_street_address,
+      client_msc
+    ),
+    # Shift values to "unit value" field
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id & is.na(client_country) &
+        stringr::str_detect(client_street_address, '(#)'),
+      stringr::str_match(client_street_address, '([# ]+)([a-z0-9 ]+)$')[,3],
+      client_street_address_scnd1_val
+    ),
+    # Remove from street address field
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & is.na(client_country) &
+        stringr::str_detect(client_street_address, '(#)'),
+      stringr::str_remove(client_street_address,
+                 stringr::str_match(
+                   client_street_address, 
+                   '([# ]+)([a-z0-9 ]+)$'
+                   )[,1]
+                 ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+##### Ampersand (&) or word ( and )
+
+In previous cleaning, we noted the use of the ampersand (&) character, along with use of "and" to add cross streets or other information.  We isolated the 126 observations that contained either an ampersand (&) or the word ( and ) in the street address field for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(&| and )')
+  ) |>
+  dplyr::filter(is.na(client_country))
+
+nrow(checking)
+# [1] 126
+```
+
+
+##### Any remaining special characters
+
+We checked for any other remaining non-standard characters (anything other than a letter, number, white space, or hyphen. We isolated the ### observations that contained a non-standard character in the street address field for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '([^a-z0-9 /-])')
+  ) |>
+  dplyr::filter(is.na(client_country))
+
+nrow(checking)
+# [1] 
+```
 
 
 # 💾
