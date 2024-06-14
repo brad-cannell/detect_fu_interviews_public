@@ -406,6 +406,27 @@ aps <- aps |>
                 ))
 ```
 
+We standardized single quotes, so that ’, ‘, and ' were all standardized to '. We similarly standardized double quotes, so that “,” and " were all standardized to ". 
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name', 'client_street_address', 
+                  'client_city', 'client_state', 'client_county'
+                  ), 
+                  ~stringr::str_replace_all(.x, "(’|‘)", "'")
+                )) |>
+  dplyr::mutate(dplyr::across(c(
+                  'client_first_name', 'client_middle_name', 
+                  'client_last_name', 'client_street_address', 
+                  'client_city', 'client_state', 'client_county'
+                  ), 
+                  ~stringr::str_replace_all(.x, '(“|”)', '"')
+                ))
+```
+
+
 ## Addition of Columns
 
 We added a notes column, which would allow us to shift any potentially valuable information for reconciliation into our data set, which is stored in the wrong field or otherwise would complicate implementation of fuzzy-matching algorithms.
@@ -3387,7 +3408,21 @@ rm(checking)
 rm(target_regex)
 ```
 
-#### Commas
+#### Non-Standard Characters (non letter, non number, non-white space)
+
+We then turned towards cleaning any unanticipated special characters (anything other than a letter, number, or white space). As there were 3,638 rows with these characters, we proceeded to use targetted subsets in cleaning to ensure manageable sizes in manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '([^a-z0-9 ])')
+  )
+
+nrow(checking)
+# [1] 3638
+```
+
+##### Commas
 
 We identified a comma as a high-priority component of a street address which might indicate a non-valid component within the street address field. We isolated the 150 observations that contained a comma in the street address field for manual review.
 
@@ -3429,7 +3464,7 @@ These observations were manually divided into 4 groups for further assessment an
 -   Addresses which appeared to have business names for the street address with a secondary address (Room or apartment number) separated by the comma (2 rows)
 -   Addresses which appeared to have overall questionable street addresses (more than one street name, odd numerical format, etc.) (13 rows)
 
-##### Different Address Portions in Street Address
+###### Different Address Portions in Street Address
 
 We identified several entries which had additional values for city, state, and/or zip code within the street address field. For the vast majority of these entries, the other fields already contained the relevant data. There were three particular entries which required additional fixes or notes: one entry with 'vicc' indicating it was part of the Valley International Country Club (moved to notes), and two entries (one for New Braunfels and one for Converse) that had cities of "San Antonio" (while those cities are in the San Antonio metro area, the proper city was updated). 
 
@@ -3561,7 +3596,7 @@ nrow(checking)
 # [1] 87
 ```
 
-##### Comma/Hyphen in "Street Number" Portion of Street Address
+###### Comma/Hyphen in "Street Number" Portion of Street Address
 
 We next focused on the six entries which appeared to have more than one numerical value within the "street number" (leading) portion of the street address. 
 
@@ -3686,7 +3721,7 @@ aps <- aps |>
 ```
 
 
-##### Business Name Only with Secondary Address Portion
+###### Business Name Only with Secondary Address Portion
 
 There were two observations that appeared to have a business name followed by a secondary address field (unit, apartment, etc.). Luckily, both of those building names were identifiable to a single location within the city, state, and zip provided. As such, we shifted the business name to the "client_street_address_name" field, secondary addressing to "client_street_address_scnd1_type" and "client_street_address_scnd1_val" as appropriate, and updated the street addresses.
 
@@ -3750,7 +3785,7 @@ aps <- aps |>
 ```
 
 
-##### Otherwise Questionable Format and/or Values for Street Address
+###### Otherwise Questionable Format and/or Values for Street Address
 
 There were 13 rows with street address values that otherwise continued to remain questionable, but did not fit into the prior categories. Many of these were found to have unusual street names (such as a highway with a letter at the end of the numerical designation, but separated erroneously by a comma), name the type of street (private road, etc), or were otherwise unusual. There was also an entry with an alternative street name (in a rural area) - we did not modify that value in this pass, but did copy the existing street name value to the notes column.
 
@@ -3949,7 +3984,7 @@ nrow(checking)
 # [1] 66
 ```
 
-##### Secondary Address Components
+###### Secondary Address Components
 
 We excluded the entries where we had previously identified an address that was likely outside of the USA. We isolated the remaining 55 observations for manual review. All appeared to reference secondary address components (apartment, lot, unit, etc.)
 
@@ -4413,7 +4448,7 @@ rm(target_regex)
 rm(modified_set)
 ```
 
-#### Parentheses
+##### Parentheses
 
 In prior cleaning and standardization, we found parentheses in several fields (which impacted regular expression use). Parentheses were thus identified as a high-priority component of a street address which might indicate a non-valid component within the street address field. We isolated the 12 observations that contained a parenthesis in the street address field for manual review.
 
@@ -4427,7 +4462,7 @@ nrow(checking)
 # [1] 12
 ```
 
-##### Comments, Clarifiers
+###### Comments, Clarifiers
 
 There was a single row which only had a comment found in the street address field. This was shifted to our notes column.
 
@@ -4558,7 +4593,7 @@ aps <- aps |>
   dplyr::select(-c(client_msc))
 ```
 
-##### Alternative names or values for Street Number and/or Name
+###### Alternative names or values for Street Number and/or Name
 
 The remaining values would require a duplication of their row with modification of the street address value (as two street addresses were indicated in one row). First, we copied all such values into the notes field so it would be persistent on the duplicated row. We then isolated a subset of these rows (where we would create our modification, then append to our data set) and deleted the parenthetical items from our data set.
 
@@ -4711,7 +4746,7 @@ rm(checking)
 rm(modified_set)
 ```
 
-#### Hyphens
+##### Hyphens
 
 In prior cleaning and standardization, we found hyphens in street address values. We isolated the 1,403 observations that contained a hyphen in the street address field for manual review.
 
@@ -4725,7 +4760,7 @@ nrow(checking)
 # [1] 467
 ```
 
-##### Hyphen after initial numeric sequence
+###### Hyphen after initial numeric sequence
 
 We refined our subset for examination by isolating the 62 rows that had a hyphen directly after the initial numeric street number value, with or without a white space separator.
 
@@ -4835,7 +4870,7 @@ aps <- aps |>
   dplyr::select(-c(client_msc))
 ```
 
-##### Hyphens with white space before or after
+###### Hyphens with white space before or after
 
 We isolated the 19 observations that contained a hyphen with a leading or trailing white space in the street address field.
 
@@ -4955,7 +4990,7 @@ dplyr::mutate(
   dplyr::select(-c(client_msc)) 
 ```
 
-##### Hyphens with only numerals before and after
+###### Hyphens with only numerals before and after
 
 We isolated the 14 observations that contained a hyphen with leading and trailing numerals in the street address field.
 
@@ -5055,7 +5090,7 @@ aps <- aps |>
   dplyr::select(-c(client_msc))
 ```
 
-##### Hyphens with only letters before and after
+###### Hyphens with only letters before and after
 
 We isolated the 35 observations that contained a hyphen with leading and trailing letters in the street address field. All appeared to be valid.
 
@@ -5069,7 +5104,7 @@ nrow(checking)
 # [1] 35
 ```
 
-##### All remaining Hyphens
+###### All remaining Hyphens
 
 We isolated the 388 observations that continued to contained a hyphen in the street address field. While the vast majority appeared to be valid, a few outlier entries were selected for further verification and manual review.
 
@@ -5298,7 +5333,7 @@ rm(checking)
 rm(modified_set)
 ```
 
-#### Slashes
+##### Slashes
 
 In prior cleaning and standardization, we found slashes in street address values. We isolated the 1,409 observations that contained a slash in the street address field for manual review.
 
@@ -5312,7 +5347,7 @@ nrow(checking)
 # [1] 1409
 ```
 
-##### Anything other than a number on either side.
+###### Anything other than a number on either side.
 
 As the vast majority of entries appeared to have fractional numbers ("1/2") responsible for their inclusion in our checking subset, we could put these values aside for now to concentrate our cleaning efforts. We further refined our subset for concentrated cleaning by isolating entries that had something other than a number on either side of the slash. These 9 entries were isolated for further manual verification and cleaning.
 
@@ -5440,7 +5475,7 @@ aps <- aps |>
   )
 ```
 
-##### Fraction as first portion of street address
+###### Fraction as first portion of street address
 
 We checked for any entries that started with a fractional number, as street numbers were not likely to be only a fraction. These 8 entries were isolated for further manual verification and cleaning.
 
@@ -5513,7 +5548,7 @@ aps <- aps |>
 ```
 
 
-##### Fraction after first numerical values
+###### Fraction after first numerical values
 
 We checked for any entries that had a fractional number immediately following the alphanumerical value at the start of the string. These 834 entries were isolated for further manual verification and cleaning.
 
@@ -5663,7 +5698,7 @@ aps <- aps |>
   )
 ```
 
-##### Fraction at the End of the String
+###### Fraction at the End of the String
 
 We checked for any entries that had a fractional number at the end of the string. These 242 entries were isolated for further manual verification and cleaning.
 
@@ -5887,7 +5922,7 @@ rm(checking)
 ```
 
 
-##### Remaining Slashes
+###### Remaining Slashes
 
 We checked for any entries that had a fractional number that had not otherwise been resolved by utilizing a hyphen to join the fractional to the street number or street name. These 317 entries were isolated for further manual verification and cleaning.
 
@@ -6088,9 +6123,7 @@ rm(modified_set2)
 rm(checking)
 ```
 
-#### Any Remaining Non-Standard Characters
-
-We checked for any other remaining non-standard characters (anything other than a letter, number, white space, or hyphen. We isolated the 1,678 observations that contained a non-standard character in the street address field for manual review.
+We checked for any other remaining non-standard characters (anything other than a letter, number, white space, or hyphen. We found that there were 1,678 observations that continued to contain a non-standard character in the street address field.
 
 ```{r}
 checking <- aps |>
@@ -6277,10 +6310,176 @@ nrow(checking)
 # [1] 126
 ```
 
+We copied any of our modified or un-resolvable street addresses to our notes field. As we had one entry with two street numbers, we isolated a copy of this value for point-modification, which would create one row for each of the street addresses present.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_msc = NA_character_
+  ) |>
+  dplyr::mutate(
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        !stringr::str_detect(
+        client_street_address,
+        paste0(
+          '(est ri|gate|[0-9] 5th|w ave l|[^a-z]l and m|[^a-z]t and p|',
+          'sand and gra|[^a-z]h and r|s and w|f and b|tt and wh|',
+          'ann and dos|ots and sa|wn and co|r and r|a and m|',
+          'reel and ri|a and a|ks and ho|ob and be|ill and da|',
+          'a&m| and one half)'
+          )),
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+   ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+
+modified_set <- aps |>
+  dplyr::filter(stringr::str_detect(client_street_address, '^([0-9]+&[0-9]+)'))
+```
+
+We then performed our point modifications. We took the second value of the street address (for the entry we duplicated) in our separated row, and the first in our combined data. We also isolated two business names, fixed an address which was primarily a business name, added an address from a business name, updated a city and zip from an intersection, removed cross streets, and removed un-resolvable values. We then re-added our modified data into our combined data set.
+
+```{r}
+modified_set <- modified_set |>
+  dplyr::mutate(
+    client_street_address = stringr::str_remove(
+      client_street_address, '^([0-9]+&)'
+      )
+  )
+
+aps <- aps |>
+  dplyr::mutate(
+  # Capture business names
+  client_street_address_name = ifelse(
+    case_id %in% checking$case_id &
+      stringr::str_detect(
+        client_street_address,
+        '(wellness and rehab|t h and f)'),
+    dplyr::case_when(
+      stringr::str_detect(
+        client_street_address,
+        'wellness and rehab') ~ client_street_address,
+      stringr::str_detect(
+        client_street_address,
+        't h and f') ~ 'thf: teague hunting and fishing club',
+      TRUE ~ client_street_address_name
+      ),
+    client_street_address_name
+    ),
+  # Capture city and zip code from an intersection
+  client_city = ifelse(
+    case_id %in% checking$case_id &
+      stringr::str_detect(
+        client_street_address,
+        '(university and)'),
+    'fort worth',
+    client_city
+  ),
+  client_zip_code = ifelse(
+    case_id %in% checking$case_id &
+      stringr::str_detect(
+        client_street_address,
+        '(university and)'),
+    '76107',
+    client_zip_code
+  ),
+  # Add street address
+  client_street_address = ifelse(
+    case_id %in% checking$case_id &
+      stringr::str_detect(
+        client_street_address,
+        '(wellness and rehab)'),
+    '2001 forest ridge dr',
+    client_street_address
+  ),
+  # Street name point modifications
+  client_street_address = ifelse(
+    case_id %in% checking$case_id,
+    dplyr::case_when(
+      # Completely add an address to a business
+      stringr::str_detect(client_street_address, '(wellness and rehab)') ~
+        '2001 forest ridge dr',
+      # Change street name entirely
+      stringr::str_detect(client_street_address, 't h and f') ~
+        stringr::str_replace(
+          client_street_address, 't h and f club rd', 'gate 6'
+          ),
+      # Take first version of street address for the duplicated entry
+      stringr::str_detect(client_street_address, 'westcreek') ~
+        stringr::str_remove(client_street_address, '(&[0-9]+)'),
+      # Fix typo of "alley"
+      stringr::str_detect(client_street_address, '(aly)$') ~
+        stringr::str_replace(client_street_address, '(aly)$', 'alley'),
+      # fix "and one half" to properly be a #-1/2 street number
+      # Remove cross street, fix typo in street name
+      stringr::str_detect(client_street_address, '(bryant blvd)$') ~
+        stringr::str_replace(
+          client_street_address,
+          stringr::str_match(
+            client_street_address, 
+            '^([0-9]+) ((.+?) & south (?:.+?))$'
+            )[,3],
+          'w ave l'),
+      # Fix "and one half" to appropriately "-1/2" in number
+      stringr::str_detect(client_street_address, '( and one half)') ~
+        stringr::str_replace(
+          client_street_address, '( and one half)', '-1/2'
+          ),
+      # Remove a cross street
+      stringr::str_detect(client_street_address, '(& doak)$') ~
+        stringr::str_remove(client_street_address, '(& doak)$'),
+      # Standardize a street name
+      stringr::str_detect(client_street_address, 'a&m') ~
+        stringr::str_replace(client_street_address, 'a&m', 'a and m'),
+      # Remove street address for any un-resolvable entries
+      !stringr::str_detect(
+        client_street_address,
+        paste0(
+          '(est ri|gate|[0-9] 5th|w ave l|[^a-z]l and m|[^a-z]t and p|',
+          'sand and gra|[^a-z]h and r|s and w|f and b|tt and wh|',
+          'ann and dos|ots and sa|wn and co|r and r|a and m|',
+          'reel and ri|a and a|ks and ho|ob and be|ill and da|',
+          'a&m| and one half)'
+          )) ~ NA_character_,
+      TRUE ~ client_street_address
+    ),
+    client_street_address
+  ),
+  )
+
+aps <- dplyr::bind_rows(aps, modified_set)
+```
+
+We purged our checking subset and modified set for memory management
+
+```{r}
+rm(checking)
+rm(modified_set)
+```
 
 ##### Any remaining special characters
 
-We checked for any other remaining non-standard characters (anything other than a letter, number, white space, or hyphen. We isolated the ### observations that contained a non-standard character in the street address field for manual review.
+We checked for any other remaining non-standard characters (anything other than a letter, number, white space, or hyphen. We isolated the remaining 34 observations that continued to contain a non-standard character in the street address field for manual review.
 
 ```{r}
 checking <- aps |>
@@ -6290,7 +6489,312 @@ checking <- aps |>
   dplyr::filter(is.na(client_country))
 
 nrow(checking)
-# [1] 
+# [1] 34
+```
+
+We isolated the few remaining business names and unit numbers. Those entries with single quotes appeared to be valid. We removed any other invalid characters and standardized our white spaces.
+
+```{r}
+aps <- aps |>
+# Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Add Addresses that are being modified to notes
+    client_msc = ifelse(
+      case_id %in% checking$case_id &
+        (stringr::str_detect(client_street_address,'([\t|@|:])') |
+        !stringr::str_detect(client_street_address, '([0-9]+)')),
+      client_street_address,
+      client_msc
+      ),
+    # Capture unit type
+    client_street_address_scnd1_type = ifelse(
+      stringr::str_detect(client_street_address, '(apt)$'),
+      'apt',
+      client_street_address_scnd1_type
+    ),
+    # Capture most business names
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id &
+        !stringr::str_detect(client_street_address, '([0-9]+)'),
+      client_street_address,
+      client_street_address_name
+    ),
+    # Capture other business name
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '^(tccc:)'),
+      'tccc: texoma christian care center',
+      client_street_address_name
+    ),  
+    # Update city from business
+    client_city = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'evergreen'),
+      "farmer's branch",
+      client_city
+    ),
+    # Modify street addresses
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        # Remove formatting string
+        stringr::str_detect(client_street_address, '(\t)') ~ 
+          stringr::str_remove_all(client_street_address, '(\t)'),
+        # Remove the 'apt' suffix
+        stringr::str_detect(client_street_address, '(apt)$') ~
+          stringr::str_remove(client_street_address, '(; apt)$'),
+        # Remove cross street
+        stringr::str_detect(client_street_address, '@') ~
+          stringr::str_remove(client_street_address, '( @.+?)$'),
+        # Add address from business name
+        stringr::str_detect(client_street_address, 'evergreen') ~
+          '11701 mira lago blvd',
+        # Remove business names
+        !stringr::str_detect(client_street_address, '([0-9]+)') ~ 
+          NA_character_,
+        stringr::str_detect(client_street_address, '^(tccc: )') ~
+          stringr::str_remove(client_street_address, 'tccc: '),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+    # Replace any remaining special characters with a white space
+    # except hyphen, forward slash, white space, or single quote
+    client_street_address = stringr::str_replace_all(
+      client_street_address, "([^a-z0-9 '/-])", " "
+    ),
+    # Standardize white spaces so there are no duplicate white spaces
+    client_street_address = stringr::str_replace_all(
+      client_street_address, "( ){2,}", " "
+      ),
+    # Trim leading and trailing white space
+    client_street_address = stringr::str_trim(client_street_address)
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+We purged our checking subset for memory management.
+
+```{r}
+rm(checking)
+```
+
+#### Separation of Secondary Street Address Values
+
+We then turned towards separating secondary address values, such as building, apartment, room, and other values.
+
+##### Apartment
+
+Apartment was found to most commonly have 'apartment', 'apt', or 'appt' as the prefix. We also recognized several street names with 'baptist', 'zapta', and variations of 'captain' which were 'false matches'. We isolated the 271 observations with one of our possible suffixes for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(apartment|apt|appt)') &
+      !stringr::str_detect(
+      client_street_address, 
+      '(captain|capt|baptist enc|zapta rd)')
+  )
+
+nrow(checking)
+# [1] 271
+```
+
+Apartment appeared to (with very few exceptions) appear at the end of the string. We also caught several entries which included apartment complex names but no actual address. 
+
+We performed our point fixes. Luckily, apartment numbers (outside of our point fixes) appeared at the end of strings, the only pre-existing value for 'unit type' was apartment numbers, and any unit with a value for apartment number still within the street address had a missing (`NA`) value for 'unit value'.
+
+
+```{r}
+aps <- aps |>
+# Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Add all original addresses to notes, unless there is both an 
+    # apartment as "unit type" and a number in "unit number"
+    client_msc = ifelse(
+      case_id %in% checking$case_id & 
+        (is.na(client_street_address_scnd1_type)|
+        is.na(client_street_address_scnd1_val)),
+      client_street_address,
+      client_msc
+    ),
+    # Isolate apartment from a switched-order entry
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'rear apt'),
+      'rear',
+      client_street_address_scnd1_val
+    ),
+    client_street_address_scnd1_type = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'rear apt'),
+      'apt',
+      client_street_address_scnd1_type
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'rear apt'),
+      stringr::str_remove(client_street_address, ' rear apt'),
+      client_street_address
+    ),
+    # Isolate apartment from a scrambled entry
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'tigoni'),
+      stringr::str_match(client_street_address, '^([a-z ]+?) apt ([0-9]+)')[,2],
+      client_street_address_name
+    ),
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'tigoni'),
+      stringr::str_match(client_street_address, '^([a-z ]+?) apt ([0-9]+)')[,3],
+      client_street_address_scnd1_val
+    ),
+    client_street_address_scnd1_type = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'tigoni'),
+      'apt',
+      client_street_address_scnd1_type
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'tigoni'),
+      '1527 w sunshine dr',
+      client_street_address
+    ),
+    # Shift complex names to names field
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, 'ranch ap') ~ 
+          paste('mariposa at', client_city),
+        stringr::str_detect(client_street_address, 'camalot') ~ 
+          client_street_address,
+        stringr::str_detect(client_street_address, 'sedona') ~ 
+          client_street_address,
+        stringr::str_detect(client_street_address, 'costal') ~ 
+          'coastal haven senior apartments',
+        stringr::str_detect(client_street_address, 'peach') ~ 
+          client_street_address,
+        stringr::str_detect(client_street_address, 'posada') ~ 
+          client_street_address,
+        stringr::str_detect(client_street_address, 'breezey') ~ 
+          'lake breeze apartments',
+        stringr::str_detect(client_street_address, 'studio 6') ~ 
+          paste0(client_street_address, ', medical center'),
+        TRUE ~ client_street_address_name
+      ),
+      client_street_address_name
+    ),
+    # Replace complex names with street addresses
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, 'ranch ap') ~ 
+          '1301 w whitestone blvd',
+        stringr::str_detect(client_street_address, 'camalot') ~ 
+          '5241 alamo dr',
+        stringr::str_detect(client_street_address, 'sedona') ~ 
+          '2601 nonesuch rd',
+        stringr::str_detect(client_street_address, 'costal') ~ 
+          '4710 middlecoff cir',
+        stringr::str_detect(client_street_address, 'peach') ~ 
+          '3150 peachetree st',
+        stringr::str_detect(client_street_address, 'posada') ~ 
+          '901 lamar st',
+        stringr::str_detect(client_street_address, 'breezey') ~ 
+          '6011 i-30 frontage rd',
+        stringr::str_detect(client_street_address, 'studio 6') ~ 
+          '7719 pasteur ct',
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+    # Add 'apt' as the unit type for any row we are extracting from
+    client_street_address_scnd1_type = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(apartments|apartment|apt|appt)( )?([ 0-9a-z]+)$'),
+      'apt',
+      client_street_address_scnd1_type
+    ),
+    # Extract Apartment Numbers
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(apartments|apartment|apt|appt)( )?([ 0-9a-z]+)$') &
+        is.na(client_street_address_scnd1_val),
+      stringr::str_match(
+        client_street_address, 
+        '(apartments|apartment|apt|appt)( )?([ 0-9a-z]+)$'
+        )[,4],
+      client_street_address_scnd1_val
+    ),
+    # Remove apartment from street address field
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(apartments|apartment|apt|appt)( )*?([ 0-9a-z]*)$'),
+      stringr::str_remove(
+        client_street_address,
+        stringr::str_match(
+          client_street_address, 
+          '(apartments|apartment|apt|appt)( )*?([ 0-9a-z]*)$'
+          )[,1]
+        ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
 ```
 
 
