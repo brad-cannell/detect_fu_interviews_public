@@ -441,6 +441,8 @@ aps <- aps |>
     client_street_address_name = NA_character_,
     client_street_address_scnd1_type = NA_character_,
     client_street_address_scnd1_val = NA_character_,
+    client_street_address_scnd2_type = NA_character_,
+    client_street_address_scnd2_val = NA_character_,
   )
 ```
 
@@ -6795,6 +6797,334 @@ aps <- aps |>
   ) |>
   # Remove temporary columns
   dplyr::select(-c(client_msc))
+```
+
+##### Building
+
+Building was found to most commonly have 'bldg' or 'bd' as the prefix.  We isolated the 14 observations that matched our potential suffixes for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(building|bldg|bd)')
+  )
+
+nrow(checking)
+# [1] 14
+```
+
+Nearly all of the observations were caught because of street name values, and required no further modification. We had two entries which required shifting of secondary address values (one which also had an apartment number, so use of the second secondary set was required) and one which only contained a subdivision name. We performed our modifications.
+
+```{r}
+aps <- aps |>
+# Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Add entry that does not have address in notes and subdivision only
+    # entry to notes field
+    client_msc = ifelse(
+      case_id %in% checking$case_id &
+        (stringr::str_detect(client_street_address, 'bldg 11') |
+           !stringr::str_detect(client_street_address, '([0-9])')),
+      client_street_address,
+      client_msc
+    ),
+    # Add subdivision to address name field
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id &
+        !stringr::str_detect(client_street_address, '([0-9])'),
+      client_street_address,
+      client_street_address_name
+    ),
+    # Point-fixes, 'bldg 11'
+    client_street_address_scnd1_type = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'bldg 11'),
+      'bldg',
+      client_street_address_scnd1_type
+    ), 
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'bldg 11'),
+      '11',
+      client_street_address_scnd1_val
+    ), 
+    # Point-fixes, 'bd 6' 
+    client_street_address_scnd2_type = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'bd 6'),
+      'bldg',
+      client_street_address_scnd2_type
+    ), 
+    client_street_address_scnd2_val = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'bd 6'),
+      '6',
+      client_street_address_scnd2_val
+    ), 
+    # Street Address fixes
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, 'bldg 11') ~
+          stringr::str_remove(client_street_address, ' bldg 11'),
+        stringr::str_detect(client_street_address, 'bd 6') ~
+          stringr::str_remove(client_street_address, ' bd 6'),
+        !stringr::str_detect(client_street_address, '([0-9])') ~ 
+          NA_character_,
+      TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+##### Room
+
+Room was found to most commonly have 'room' or 'rm' as the prefix. This required significant manual trimming due to the prevalence of 'rm' as a combination in text (such as in the common abbreviation of "strm" for "stream" in street names), without being able to rely upon spacing or room numbers only containing numbers (as "room a" or "room b12" are both technically valid and possible).  We isolated the 21 observations that matched our potential suffixes for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(room|rm)') &
+      !stringr::str_detect(
+        client_street_address, 
+        paste0(
+          '(croom|groom|broom|man|arm|ermud|hermi|rmont|orm|strm|urmu|irmo|',
+          'hermo|derm|mark|everm|rmillion|term|rmil|birm|rmou|verm|',
+          'therm|irma|perm|bermac|lermo|erma|fermin|hrmu|turme|urmi|',
+          'irme|erme|urma|ermo|ermi|ermo|ermo|urmo|ermi|erms|urmei|herm|nairm)'
+          )
+      )
+  )
+
+nrow(checking)
+# [1] 21
+```
+
+There were two addresses which required point fixes. Otherwise, our addresses had room number at the end of the street address field. We performed our modifications.
+
+```{r}
+aps <- aps |>
+# Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Add to notes
+    client_msc = ifelse(
+      case_id %in% checking$case_id &
+        is.na(client_street_address_scnd1_val),
+      client_street_address,
+      client_msc
+    ),
+    # Shift business name
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'lions den'),
+      "lion's den extended stay",
+      client_street_address_name
+    ),
+    # Point-fix addresses
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '^([0-9]+) rm ([0-9]+)$'
+          ),
+      stringr::str_replace(client_street_address, 'rm', 'ranch rd'),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'lions den'),
+      stringr::str_replace(
+        client_street_address,
+        stringr::str_match(
+            client_street_address, 
+            '^([0-9]+ lions den )(.+?)$')[,2],
+        '3000 tx hwy 50 ' 
+        ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+    # Extract room numbers
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id &
+        is.na(client_street_address_scnd1_val) &
+        stringr::str_detect(
+          client_street_address, 
+          '(room|rm)(?: )?([ 0-9a-z]+)$'),
+      stringr::str_match(
+        client_street_address, 
+        '(room|rm)(?: )?([ 0-9a-z]+)$'
+        )[,2],
+      client_street_address_scnd1_val
+    ),
+    # Add room number to unit type
+    client_street_address_scnd1_type = ifelse(
+      case_id %in% checking$case_id &
+        is.na(client_street_address_scnd1_type) &
+        stringr::str_detect(
+          client_street_address, 
+          '(room|rm)(?: )?([ 0-9a-z]*)$'
+          ),
+      'rm',
+      client_street_address_scnd1_type
+    ),
+    # Remove room number from address
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(room|rm)(?: )?([ 0-9a-z]*)$'
+          ),
+      stringr::str_remove(
+        client_street_address,
+        stringr::str_match(
+          client_street_address, 
+          '(room|rm)(?: )?([ 0-9a-z]*)$'
+          )[,1]
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))  
+```
+
+##### Suite
+
+Suite was found to most commonly have 'suite' as the prefix. We isolated the 5 observations that matched our potential suffixes for manual review.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, '(suite)') &
+      !stringr::str_detect(
+        client_street_address, 
+        paste0(
+          '(suiter)'
+          )
+        )
+  )
+
+nrow(checking)
+# [1] 5
+```
+
+Only one of these entries had a suite number. The remainder were business names. We performed our modifications.
+
+```{r}
+aps <- aps |>
+# Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Capture names as notes
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    ),
+    # Move business names to the name field
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id &
+        !stringr::str_detect(client_street_address, 'lane'),
+      client_street_address,
+      client_street_address_name
+    ),
+    # Extract suite number
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'lane'),
+      stringr::str_match(client_street_address, '^(.+?) suite ([0-9]+)$')[,3],
+      client_street_address_scnd1_val
+    ),
+    client_street_address_scnd1_type = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'lane'),
+      'suite',
+      client_street_address_scnd1_type
+    ),
+    # Fix Addresses
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, 'lane') ~
+          stringr::str_match(client_street_address, '^(.+?) suite ([0-9]+)$')[,2],
+        stringr::str_detect(client_street_address, 'woodspring') ~ 
+          '255 i-45 n',
+        stringr::str_detect(client_street_address, 'express inn') ~ 
+          '1100 e palestine ave',
+        stringr::str_detect(client_street_address, 'candlewood') ~ 
+          '2401 e tx hwy 190',
+        stringr::str_detect(client_street_address, 'wood spring') ~ 
+          '3210 s sw loop 323',
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc)) 
 ```
 
 
