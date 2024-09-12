@@ -8840,6 +8840,344 @@ aps <- aps |>
   dplyr::select(-c(client_msc))
 ```
 
+##### Remaining Values at Maximum Length
+
+There were 160 rows remaining with street address values at the maximum length (30 characters).
+
+```{r}
+checking <- aps |>
+  dplyr::filter(nchar(client_street_address) == 30
+  )
+
+nrow(checking)
+# [1] 160
+```
+
+There were 19 variants (38 entries) which did not require any modification. One variant was not able to be fully resolved as it provided a directional address along a road which did not appear to exist as named; a best attempt was given to resolve as closely as possible, without losing data fidelity. 
+
+There were entries that contained "farm to market", which was standardized to "ftm"; for one of these, the term "north" was additionally standardized to "n" to minimize non-significant string distancing. Another appeared to lose street name data due to truncation, which was corrected as best as the team was able using street mapping (Google Maps).
+
+Other entries referenced counties by name, which were abbreviated to reduce non-significant string distances.
+
+There were entries that referenced a county jail, a cemetery, and a care facility. These were updated to separate business names from street addresses, where possible.
+
+The other entries required minor modifications, such as the standardization of a military ranking within a street name or re-introduction of truncated street name values less than 5 characters in length. A single entry had a city, state, and partial zip code removed.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+    dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id &
+        (stringr::str_detect(client_street_address, 'on the') |
+          stringr::str_detect(client_street_address, '4-north')|
+          stringr::str_detect(client_street_address, '(market road fm 11)$')|
+          stringr::str_detect(client_street_address, 'farm to market')|
+          stringr::str_detect(client_street_address, 'van zandt county road')|
+          stringr::str_detect(client_street_address, 'limestone county road')|
+          stringr::str_detect(client_street_address, 'county jail')|
+          stringr::str_detect(client_street_address, 'cemetery') |
+          stringr::str_detect(client_street_address, 'village health')|
+          stringr::str_detect(client_street_address, 'morgans p') |
+          stringr::str_detect(client_street_address, 'io springs') |
+          stringr::str_detect(client_street_address, 'w private') |
+          stringr::str_detect(client_street_address, '(frontage ro)$') |
+          stringr::str_detect(client_street_address, 'rosehl') |
+          stringr::str_detect(client_street_address, 'kind jr') |
+          stringr::str_detect(client_street_address, '(lla del)$') |
+          stringr::str_detect(client_street_address, '( ci)$') |
+          stringr::str_detect(client_street_address, '(le d)$') |
+          stringr::str_detect(client_street_address, '(burg r)$') |
+          stringr::str_detect(client_street_address, '(er blv)$') |
+          stringr::str_detect(client_street_address, '(rns r)$') |
+          stringr::str_detect(client_street_address, '(me s)$') | 
+          stringr::str_detect(client_street_address, '(r pk)$') |
+          stringr::str_detect(client_street_address, '(l bl)$') |
+          stringr::str_detect(client_street_address, '(tx [0-9]{2})$')
+          ),
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    # "Best possible" attempt to fix unresolvable value
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'on the'),
+      paste(
+        stringr::str_match(client_street_address, '^([0-9]+)'),
+        'main st'
+        ),
+      client_street_address
+    ),
+    # Standardize Farm to Market Values
+    ## First, catch the "#-north" value
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, '4-north'),
+      stringr::str_replace(
+        client_street_address,
+        '4-north',
+        '4 n'
+      ),
+      client_street_address
+    ),
+    ## Second, fix truncated entry (confirmed via google maps)
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, '(market road fm 11)$'),
+      paste0(
+        client_street_address,
+        '01'
+        ),
+      client_street_address
+    ),
+    ## Third, standardize the 'farm to market' values
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'farm to market'),
+      stringr::str_replace(
+        client_street_address,
+        paste0(
+          '(farm to market road fm|farm to market road|',
+          'farm to market fm|farm to market)'),
+        'ftm'
+      ),
+      client_street_address
+    ),
+    # County Roads with County Name
+    ## First, catch "Van Zandt" County Roads
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'van zandt county road'),
+      stringr::str_replace(
+        client_street_address,
+        'van zandt county road',
+        'vz-cr '
+      ),
+      client_street_address
+    ),
+    ## Second, catch "Limestone" County Roads
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'limestone county road'),
+      stringr::str_replace(
+        client_street_address,
+        'limestone county road',
+        'l-cr'
+      ),
+      client_street_address
+    ),
+    # Business names in street addresses
+    ## First, catch county jail
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'county jail'),
+      stringr::str_match(client_street_address,  '^((.+?)(county jail))')[,2],
+      client_street_address_name
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'county jail'),
+      stringr::str_match(client_street_address, '(county jail )(.+?)$')[,3],
+      client_street_address
+    ),
+    ## Second, catch cemetery
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'cemetery'),
+      stringr::str_match(
+        client_street_address, 
+        '^([0-9]+) ((.+?)(cemetery))'
+        )[,3],
+      client_street_address_name
+    ),
+    client_city = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'cemetery'),
+      'hearne',
+      client_city
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'cemetery'),
+      stringr::str_remove(
+        client_street_address,
+        stringr::str_match(
+          client_street_address, 
+          '^([0-9]+) ((.+?)(cemetery))'
+          )[,3]
+        ),
+      client_street_address
+    ),
+    # Third, catch health facility
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'village health'),
+      stringr::str_match(
+        client_street_address, 
+        '^([0-9]+) ((.+?)(village health))$'
+        )[,3],
+      client_street_address_name
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id & 
+        stringr::str_detect(client_street_address, 'village health'),
+      stringr::str_replace(
+        client_street_address,
+        'village health',
+        'dr'
+      ),
+      client_street_address
+    ),
+    # Remove regional/resort names from street address
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'morgans p'),
+      stringr::str_match(client_street_address, '^(.+?)(morgans p)')[,2],
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'io springs'),
+      stringr::str_remove(
+        client_street_address,
+        'springs'
+      ),
+      client_street_address
+    ),
+    # Standardize military ranking in street address
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'w private'),
+      stringr::str_replace(
+        client_street_address,
+        'lan',
+        'st'
+      ),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'w private'),
+      stringr::str_replace(
+        client_street_address,
+        'private',
+        'pvt'
+      ),
+      client_street_address
+    ),
+    # Remove unnecessary mention of frontage road
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '(frontage ro)$'),
+      stringr::str_remove(
+        client_street_address,
+        ' frontage ro'
+      ),
+      client_street_address
+    ),
+    # Fix error in street name
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'rosehl'),
+      stringr::str_replace(
+        client_street_address,
+        'rosehl',
+        'rosehill'
+      ),
+      client_street_address
+    ),
+    # Adjust localized street name to valid street name
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'kind jr'),
+      paste0(
+        stringr::str_match(
+          client_street_address,
+          '^([0-9]+? )(.+?)kind jr'
+        )[,2],
+        'e hwy 80'
+      ),
+      client_street_address
+    ),
+    # Add missing suffix to street name
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '(lla del)$'),
+      paste(client_street_address, 'sol'),
+      client_street_address
+    ),
+    # Add missing portions of street name suffixes
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        (stringr::str_detect(client_street_address, '( ci)$')|
+        stringr::str_detect(client_street_address, '(le d)$')),
+      paste0(client_street_address, 'r'),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        (stringr::str_detect(client_street_address, '(burg r)$')|
+        stringr::str_detect(client_street_address, '(er blv)$')|
+        stringr::str_detect(client_street_address, '(rns r)$')),
+      paste0(client_street_address, 'd'),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '(me s)$'),
+      paste0(client_street_address, 't'),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '(r pk)$'),
+      paste0(client_street_address, 'wy'),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '(l bl)$'),
+      paste0(client_street_address, 'vd'),
+      client_street_address
+    ),
+    # Remove city, state, and partial zip code
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '(tx [0-9]{2})$'),
+      stringr::str_match(
+        client_street_address, 
+        '^(.+? st)(.+? tx [0-9]{2})$'
+        )[,2],
+      client_street_address
+    ),
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
 # 💾
 
 ```{r}
