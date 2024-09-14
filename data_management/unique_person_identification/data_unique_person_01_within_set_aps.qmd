@@ -9178,6 +9178,47 @@ aps <- aps |>
   dplyr::select(-c(client_msc))
 ```
 
+#### Standardization of Common Street Address Components
+
+There are multiple components of street names which are both common and long in string-length in a way that may inflate non-significant string distances and "muffle" significant differences. This includes components such as "country road", "private road", and "farm to market", all of which may have multiple equivalent abbreviations (inflated non-signficant string distances) and convey meaningful differences in a separate component (numerical "suffix", such as "County Road 123" and "County Road 124" requiring omission of the "County Road" component to appropriately convey in string-distancing that these are separate streets).
+
+As such, we examined the patterns of these values in our data set and sought to standardize the values to short abbreviations to maximize the meaningfulness of string-distances in street address values for our fuzzy matching algorithms.
+
+##### (CR) County Road
+
+There were several observations identified in prior examination and standardization which referenced county roads. While roads are formally standardized to "COUNTY ROAD" according to [USPS standards](https://pe.usps.com/text/pub28/28apf.htm), we chose to standardize to "CR" to reduce non-significant string distances. We identified the following values as likely referencing "county road" in addressing: county road, country road, cnty, cr, -cr, cr road, cr rd, county rd, country rd. 
+
+We also examined all values which contained "county" or "country" for additional values, though none were identified in this screen.
+
+There were 14,615 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address, 
+      paste0('(county road|country road|cnty| cr |-cr|',
+             'cr rd|cr road|county rd|country rd)'
+           )
+      )
+  )
+
+nrow(checking)
+# [1] 14615
+```
+
+###### Standardization of County Road Values
+
+We chose to standardize all "County Road" variants to "CR".
+
+[CODE PLACEHOLDER - AUBERGINE]
+
+###### Standardization of County Name Components of County Road Values
+
+Several county roads feature the name of the county as part of the street name to differentiate similar streets in nearby counties. For example, Harris county may have a "Harris CR 123" and Travis county may have a "Travis CR 123". It is common practice to abbreviate these county names to 1 or 2 letter values. No official standardization of these abbreviations was found in our literature review search, so we chose to adopt an internal standardization.
+
+[CODE PLACEHOLDER - AUBERGINE]
+
 # 💾
 
 ```{r}
