@@ -81,7 +81,7 @@ participant |>
 ```
 
 ```{r}
-# Keep only the columns of interest
+# Select the columns of interest
 parti <- participant |>
   select(
     medstar_id, x_created_timestamp, x_record_month, x_record_year,
@@ -348,8 +348,6 @@ pos_det <- purrr::reduce(list(part_id, any_pos_abuse), dplyr::right_join, by = "
 # Save list as an Excel sheet
 # write_xlsx(pos_det, "LEAD_positive_determination_list.xlx")
 ```
-
-
 
 ## Merge participant, observational measures, sociodemographic and LEAD dateframes
 

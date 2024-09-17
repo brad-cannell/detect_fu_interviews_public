@@ -1,0 +1,27 @@
+name,description,label
+x_primary_key,Unique record ID used internally by the database,
+x_created_by,Person who created the record,
+x_created_timestamp,Timestamp when the record was created,
+x_modified_by,Person who modified the record,
+x_modified_timestamp,Timestamp when the record was modified,
+x_record_status,Status of the record as determined by research team,
+x_error_message,Error message entered by research team,
+medstar_id,Unique record number in MedStar System,
+name_full,Full name of older individual,Full name
+aps_report,AI_1. Has anyone from Adult Protective Services ever attempted to investigate whether or not you were living with elder abuse or neglect?,Previous APS investigation attempt
+aps_report_2cat,AI_1. Has anyone from Adult Protective Services ever attempted to investigate whether or not you were living with elder abuse or neglect?,Previous APS investigation attempt
+aps_report_2cat_f,AI_1. Has anyone from Adult Protective Services ever attempted to investigate whether or not you were living with elder abuse or neglect?,Previous APS investigation attempt
+aps_times,AI_2. How many times has this happened in your life?,Number of APS investigation attempts
+aps_times_3cat,AI_2. How many times has this happened in your life?,Number of APS investigation attempts
+aps_times_3cat_f,AI_2. How many times has this happened in your life?,Number of APS investigation attempts
+aps_first,AI_3. When was the first time APS attempted to do an investigation?,First APS investigation attempt
+aps_first_6cat,AI_3. When was the first time APS attempted to do an investigation?,First APS investigation attempt
+aps_first_6cat_f,AI_3. When was the first time APS attempted to do an investigation?,First APS investigation attempt
+aps_recent,AI_4. When was the most recent time APS attempted to do an investigation?,Most recent APS investigation attempt
+aps_recent_6cat,AI_4. When was the most recent time APS attempted to do an investigation?,Most recent APS investigation attempt
+aps_recent_6cat_f,AI_4. When was the most recent time APS attempted to do an investigation?,Most recent APS investigation attempt
+x_record_month,Month record was created,
+x_record_year,Year record was created,
+x_record_comment,Comments by interviewer,
+xc_case_id,Calculated by the database from the last 5 characters of the MedstarID,
+xc_lead_panel_summary_count,"Calculated count of positive abuse instances across SelfReport, ApsInvestigations, and ObservationalMeasures",

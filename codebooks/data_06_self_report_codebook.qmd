@@ -8,7 +8,7 @@ library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(readr)
 library(here)
-source("../r/variable_descriptions.R")
+source(here::here("r", "variable_descriptions.R"))
 ```
 
 # Purpose of the program
