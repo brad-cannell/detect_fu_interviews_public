@@ -7,6 +7,9 @@
 #'   factor. The first column will be the list of all possible values found in
 #'   the input data frame column(s), with counts for each column processed.
 #'   
+#'   Dependencies: dplyr
+#'   
+#'   Built: R (4.2.2); dplyr (1.1.1)
 #'
 #' @param .df A data frame or vectorized column from a data frame ($ or [['']])
 #' @param ... Specified column names. May be strings or symbols. 
