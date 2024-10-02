@@ -1,10 +1,10 @@
-# Create a data frame with two variables: 
-# - The final abuse determination made by the LEAD panel and;
-# - The abuse determination made using the DETECT tool at the initial visit
+# The function in this file does the following:
+# - Creates a data frame with two variables: 
+#   + The final abuse determination made by the LEAD panel (for a specified abuse type or the aggregate of all types)  and;
+#   + The abuse determination made using the DETECT tool at the initial visit
+# - Creates a formatted confusion matrix.
 
-# This data frame will be used to create a confusion matrix for the LEAD panel assessment master table site.
-
-# Required libraries: tidyverse, flextable
+# Required libraries: tidyverse (tidyr, tibble, dplyr), flextable
 
 compare_det <- function(lead_final_det, detect_tool, abuse_type){
   

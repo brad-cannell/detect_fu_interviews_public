@@ -789,7 +789,7 @@ The categories were a little different for `emotional_incident_person` and `emot
 self_rep <- self_rep %>%
   mutate(
     emotional_person_stranger_v2       = str_detect(emotional_incident_person_v2, "A stranger"),
-    emotional_spouse_v2                = str_detect(emotional_incident_person_v2, "A spouse or partner"),
+    emotional_person_spouse_v2         = str_detect(emotional_incident_person_v2, "A spouse or partner"),
     emotional_person_ex_partner_v2     = str_detect(emotional_incident_person_v2, "An ex-spouse or parner"),
     emotional_person_parent_v2         = str_detect(emotional_incident_person_v2, "A parent or step-parent"),
     emotional_person_sibling_v2        = str_detect(emotional_incident_person_v2, "A brother or sister"),
@@ -1058,7 +1058,7 @@ Participants were allowed to choose more than one person during the interview. S
 self_rep <- self_rep %>%
   mutate(
     physical_person_stranger_v2       = str_detect(physical_incident_person_v2, "A stranger"),
-    physical_spouse_v2                = str_detect(physical_incident_person_v2, "A spouse or partner"),
+    physical_person_spouse_v2         = str_detect(physical_incident_person_v2, "A spouse or partner"),
     physical_person_ex_partner_v2     = str_detect(physical_incident_person_v2, "An ex-spouse or parner"),
     physical_person_parent_v2         = str_detect(physical_incident_person_v2, "A parent or step-parent"),
     physical_person_sibling_v2        = str_detect(physical_incident_person_v2, "A brother or sister"),
@@ -1082,7 +1082,7 @@ self_rep <- self_rep %>%
 self_rep <- self_rep %>%
   mutate(
     physical_person_stranger       = str_detect(physical_incident_person, "A stranger"),
-    physical_spouse                = str_detect(physical_incident_person, "A spouse or partner"),
+    physical_person_spouse         = str_detect(physical_incident_person, "A spouse or partner"),
     physical_person_ex_partner     = str_detect(physical_incident_person, "An ex-spouse or parner"),
     physical_person_parent         = str_detect(physical_incident_person, "A parent or step-parent"),
     physical_person_sibling        = str_detect(physical_incident_person, "A brother or sister"),
@@ -1348,7 +1348,7 @@ Participants were allowed to choose more than one person during the interview. S
 self_rep <- self_rep %>%
   mutate(
     sexual_person_stranger_v2       = str_detect(sexual_incident_person_v2, "A stranger"),
-    sexual_spouse_v2                = str_detect(sexual_incident_person_v2, "A spouse or partner"),
+    sexual_person_spouse_v2         = str_detect(sexual_incident_person_v2, "A spouse or partner"),
     sexual_person_ex_partner_v2     = str_detect(sexual_incident_person_v2, "An ex-spouse or parner"),
     sexual_person_parent_v2         = str_detect(sexual_incident_person_v2, "A parent or step-parent"),
     sexual_person_sibling_v2        = str_detect(sexual_incident_person_v2, "A brother or sister"),
@@ -1372,7 +1372,7 @@ self_rep <- self_rep %>%
 self_rep <- self_rep %>%
   mutate(
     sexual_person_stranger       = str_detect(sexual_incident_person, "A stranger"),
-    sexual_spouse                = str_detect(sexual_incident_person, "A spouse or partner"),
+    sexual_person_spouse         = str_detect(sexual_incident_person, "A spouse or partner"),
     sexual_person_ex_partner     = str_detect(sexual_incident_person, "An ex-spouse or parner"),
     sexual_person_parent         = str_detect(sexual_incident_person, "A parent or step-parent"),
     sexual_person_sibling        = str_detect(sexual_incident_person, "A brother or sister"),

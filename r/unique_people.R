@@ -10,7 +10,7 @@ library(tidyverse)
 unique_people <- function(df) {
   # Add new columns
   df_part <- df %>%
-    group_by(unique_id_par) %>%
+    group_by(unique_id) %>%
     mutate(
       # Column that shows the number of times each person occurs
       count = n()
@@ -18,7 +18,7 @@ unique_people <- function(df) {
     group_by(x_created_timestamp) %>%
     arrange() %>%
     ungroup() %>%
-    group_by(unique_id_par) %>%
+    group_by(unique_id) %>%
     mutate(
       # Column that gives each visit a number that represents the chronological order
       visit_no = row_number()
@@ -32,10 +32,10 @@ unique_people <- function(df) {
 
   df_unique_summary <- df_part %>%
     reframe(
-      Unique_people = length(unique_id_par[visit_no == 1]),
-      People_with_only_one_visit = length(unique_id_par[count == 1]),
-      People_with_multiple_visits = length(unique(unique_id_par[count > 1])),
-      Total_number_of_rows = length(unique_id_par)
+      Unique_people = length(unique_id[visit_no == 1]),
+      People_with_only_one_visit = length(unique_id[count == 1]),
+      People_with_multiple_visits = length(unique(unique_id[count > 1])),
+      Total_number_of_rows = length(unique_id)
     ) %>%
     t() %>%
     as.data.frame() %>%

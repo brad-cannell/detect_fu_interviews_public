@@ -8,6 +8,7 @@ library(codebookr)
 library(dplyr, warn.conflicts = FALSE)
 library(haven)
 library(readr)
+library(here)
 source("../r/variable_descriptions.R")
 ```
 
@@ -16,9 +17,13 @@ source("../r/variable_descriptions.R")
 Using the CodebookR package, we will create a data dictionary for follow-up interview data for the DETECT project pertaining to home inspection and the clutter image rating scale
 
 # Load cleaned data
+
 ```{r}
-#| warning: false
-clutter_scale <- read_rds("../data/cleaned_rds_files/clutter_scale_import.rds")
+clutter_scale_path <- here::here("data", "cleaned_rds_files", "clutter_scale_import.rds")
+```
+
+```{r}
+clutter_scale <- readr::read_rds(clutter_scale_path)
 ```
 
 # Set column attributes
@@ -213,10 +218,14 @@ cls_desc <- var_descriptions(clutter_scale)
 ```
 
 ## Save as rds file
+
 ```{r}
-write_rds(cls_desc, "../codebooks/variable_descriptions/clutter_scale_var_desc.rds")
+cls_desc_path <- here::here("codebooks", "variable_descriptions", "clutter_scale_var_desc.rds")
 ```
 
+```{r}
+readr::write_rds(cls_desc, cls_desc_path)
+```
 
 # Exclude summary stats for certain variables in word doc
 
@@ -242,5 +251,10 @@ clutter_scale_codebook <- codebook(
 ```
 
 ```{r}
-print(clutter_scale_codebook, "../codebooks/clutter_scale_codebook.docx")
+clutter_scale_codebook_path <- here::here("codebooks", "clutter_scale_codebook.docx")
 ```
+
+```{r}
+print(clutter_scale_codebook, clutter_scale_codebook_path)
+```
+

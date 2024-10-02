@@ -1,4 +1,5 @@
 # Create a function that produces the count and proportion for each unique ID grouped by a given variable
+# Required packages: tidyverse/ tidyr
 
 unique_case <- function(df, ID, group) {
   # Compute overall count of unique IDs
