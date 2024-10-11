@@ -197,9 +197,7 @@ cities <- cities |>
 For fixes that required potential use of PHI, we utilized a CSV file.
 
 ```{r}
-pointfix_path <- here::here(
-  "data","DETECT Shared with APS","aps_fuzzy-prep-clean_point-fixes.csv"
-  )
+pointfix_path <- here::here("data","aps_fuzzy-prep-clean_point-fixes.csv")
 
 informative_df_import("point_fixes", pointfix_path)
 
@@ -9636,6 +9634,683 @@ aps <- aps |>
   # Remove temporary columns
   dplyr::select(-c(client_msc))
 ```
+
+##### (FTM) Farm to Market
+
+There were several observations identified in prior examination and standardization which referenced farm to market. While roads are formally standardized to "FM" according to [USPS standards](https://pe.usps.com/text/pub28/28apf.htm), we chose to standardize to "FTM" to reduce non-significant string distances and any ambiguity in targetting these entries. We identified the following values as likely referencing "farm to market road" in addressing: farm, market, ftm, and fm.
+
+There were 10,187 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address,'(farm|market|ftm|fm)'))
+
+format(nrow(checking), big.mark=',')
+# [1] "10,187"
+```
+
+We divided our processing into four primary "chunks":
+1. Broad checks for matches for "farm dr", "farm st", "farmhouse rd", or any street name with "farmer" anywhere in the value; secondary check in this section for "ftm" anywhere in the value
+2. Any street name that did not start with a number
+3. Matches for "fm"
+4. Any remaining potential match observations, such as "spelled out" variants ("farm market road', "farm to market", etc)
+
+###### Broad catch checks: “(farmer|farm dr|farm st|farmhouse rd)” and "ftm" (101 rows)
+
+We first verified several values that appeared to be valid non-"farm to market" street names. This included streets with the word "farmers", "farm dr", "farm st", and "farmhouse drive."
+
+We had 101 observations that were caught by our regular expression check. On examining all 101 values, we determined that only one represented a potential farm to market road; unfortunately, this observation did not include a full street address and was thus unable to be resolved. The remaining 100 values were non-"farm to market" street names, and would thus be excluded from any standardization.
+
+```{r}
+subset <- checking |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      "(farmer|farm dr|farm st|farmhouse rd)"
+    )
+  )
+
+format(nrow(subset), big.mark=',')
+# [1] "101"
+```
+
+We also checked for values which contained our target standardization of "FTM". There were 18 observations which met this standard, 9 of which were farm to market roads which had already received our modification. The remaining 9 observations appeared to be valid street names containing words with "ftm" within a word. No changes were necessary for these values.
+
+```{r}
+subset <- checking |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address, "ftm")
+  )
+
+format(nrow(subset), big.mark=',')
+# [1] "18"
+```
+
+###### Non-numeric first character (23 rows)
+
+We then verified the values that did not start with a number.
+
+We had 23 observations that satisfied our conditions. Unfortunately, all 23 of these observations did appear to be valid farm to market roads, though they lacked the house number prefix required to be a valid address. As such, they were unable to be resolved and would thus be excluded from detailed modifications.
+
+```{r}
+subset <- checking |>
+  # Exclude prior "chunk"
+  dplyr::filter(
+    !stringr::str_detect(
+      client_street_address,
+      "(farmer|farm dr|farm st|farmhouse rd|ftm)"
+    )
+  ) |>
+  # Define this "chunk"
+  dplyr::filter(
+    stringr::str_detect(client_street_address, "^[^0-9]")
+  )
+
+format(nrow(subset), big.mark=',')
+# [1] "23"
+```
+
+We standardized any mention of a farm to market road in this subset to "ftm", to resolve the entries in our processing pathway. We also re-created the "checking" subset, to ensure the data was accurate to our procesing.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% subset$case_id &
+        stringr::str_detect(client_street_address, "(farm rd|fm )"),
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% subset$case_id &
+        stringr::str_detect(client_street_address, "(farm rd|fm )"),
+      stringr::str_replace(client_street_address, "(farm rd|fm)", "ftm"),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+
+# Re-create our "checking" subset for accurate data
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address,'(farm|market|ftm|fm)'))
+```
+
+
+###### "FM" (9,083 rows)
+
+We next verified values which directly contained the USPS standard abbreviation of "FM". However, at 9,083 matches, this was a prohibitively large subset to manually examine each potential observation.
+
+```{r}
+subset <- checking |>
+  # Exclude prior "chunk"
+  dplyr::filter(
+    !(stringr::str_detect(
+        client_street_address,
+        "(farmer|farm dr|farm st|farmhouse rd|ftm)"
+      ) | stringr::str_detect(client_street_address, "^[^0-9]")
+    )
+  ) |>
+  # Define this "chunk"
+  dplyr::filter(
+    stringr::str_detect(client_street_address, "fm")
+  )
+
+format(nrow(subset), big.mark=',')
+# [1] "9,083"
+```
+
+In exploration, we were able to identify several broad patterns we could eliminate from a more complete examination and point-modification set. Five (5) patterns validated as plausible valid farm to market addresses:
+- "^[0-9]+ fm [0-9]+$" (5,202 rows)
+- "^[0-9]+ [nwse] fm [0-9]+$" (1,004 rows)
+- "^[0-9]+ fm [nwse] [0-9]+$" (1 row)
+- "^[0-9]+ fm [0-9]+ [nwse]$" (997 rows)
+- "^[0-9]+ [nwse] fm [0-9]+ [nswe]$" (24 rows)
+
+We combined all of these values into a single regular expression:
+1. "^[0-9]+ [nwse]{0,2}[ ]{0,1}fm[ ]{0,1}[nwse]{0,2} [0-9]+[ ]{0,1}[nwse]{0,2}$"
+
+This expression caught an additional observation, which was verified to be valid without further modification (total of 7,229 rows validated).
+
+We additionally identified one (1) pattern that led only to unresolvable farm to market addresses (pattern 2), and one (1) pattern led only to non-farm to market addresses which had "fm" in a word of the street name (pattern 3):
+  
+2. "fm$" (3 rows)
+3. "fm[^0-9 -]" (236 rows)
+
+This reduced our subset to 1,615 rows.
+
+```{r}
+elim_regexes <- c(
+  "^[0-9]+ [nwse]{0,2}[ ]{0,1}fm[ ]{0,1}[nwse]{0,2} [0-9]+[ ]{0,1}[nwse]{0,2}$",
+  "fm$",
+  "fm[^0-9 -]"
+  )
+
+subset <- checking |>
+  # Exclude prior "chunk"
+  dplyr::filter(
+    !(stringr::str_detect(
+        client_street_address,
+        "(farmer|farm dr|farm st|farmhouse rd|ftm)"
+      ) | stringr::str_detect(client_street_address, "^[^0-9]")
+    )
+  ) |>
+  # Define this "chunk"
+  dplyr::filter(
+    stringr::str_detect(client_street_address, "fm")
+  ) |>
+  # Remove matches to the verified patterns
+  dplyr::filter(
+     !(stringr::str_detect(client_street_address, elim_regexes[1]) |
+       stringr::str_detect(client_street_address, elim_regexes[2]) |
+       stringr::str_detect(client_street_address, elim_regexes[3])
+     )
+  )
+
+format(nrow(subset), big.mark=',')
+# [1] "1,615"
+```
+
+We first checked for variants that were similar to our elimination regular expressions, but mixed any letters into the numerical components; we found values which required stripping a letter-based unit value. We also identified the values which would otherwise match our primary regular expression but contained "rd" or "road" at the end of the string, corrected by removing this extraneous information (1,101 rows). We performed our modifications, and then re-processed our subset selection (which would trim these newly cleaned values from further examination).
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% subset$case_id &
+        (stringr::str_detect(
+          client_street_address, "^[0-9a-z]+ [nwse] fm [0-9a-z]+$"
+          )|
+         stringr::str_detect(
+           client_street_address, "^[0-9a-z]+ fm [0-9a-z]+ [nwse]$"
+           )|
+          stringr::str_detect(
+            client_street_address, "^[0-9]+ fm [0-9]+( rd| road)?$"
+          ) |
+           stringr::str_detect(
+             client_street_address, 
+             paste0(
+               "^[0-9]+ [nwse]{0,2}[ ]{0,1}fm[ ]{0,1}[nwse]{0,2} ",
+               "[0-9]+[ ]{0,1}[nwse]{0,2}(rd|road| rd| road)$")
+             )
+         ),
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    # Unit vals in obs caught by adding letters to elimination patterns 2 or 4
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% subset$case_id &
+        (stringr::str_detect(
+          client_street_address, "^[0-9a-z]+ [nwse] fm [0-9a-z]+$"
+          )|
+         stringr::str_detect(
+           client_street_address, "^[0-9a-z]+ fm [0-9a-z]+ [nwse]$"
+           )
+         ),
+      stringr::str_match(client_street_address, "^[0-9]+?([a-z]+) ")[,2],
+      client_street_address_scnd1_val
+    ),
+    client_street_address = ifelse(
+      case_id %in% subset$case_id &
+        (stringr::str_detect(
+          client_street_address, "^[0-9a-z]+ [nwse] fm [0-9a-z]+$"
+          )|
+         stringr::str_detect(
+           client_street_address, "^[0-9a-z]+ fm [0-9a-z]+ [nwse]$"
+           )
+         ),
+      stringr::str_remove(
+        client_street_address,
+        stringr::str_match(client_street_address, "^[0-9]+?([a-z]+) ")[,2]),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% subset$case_id &
+        stringr::str_detect(
+           client_street_address, 
+           paste0(
+             "^[0-9]+ [nwse]{0,2}[ ]{0,1}fm[ ]{0,1}[nwse]{0,2} ",
+             "[0-9]+[ ]{0,1}[nwse]{0,2}(rd|road| rd| road)$")
+           ),
+      stringr::str_remove(client_street_address,"(rd|road| rd| road)$"),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address,'(farm|market|ftm|fm)'))
+
+subset <- checking |>
+  # Exclude prior "chunk"
+  dplyr::filter(
+    !(stringr::str_detect(
+        client_street_address,
+        "(farmer|farm dr|farm st|farmhouse rd|ftm)"
+      ) | stringr::str_detect(client_street_address, "^[^0-9]")
+    )
+  ) |>
+  # Define this "chunk"
+  dplyr::filter(
+    stringr::str_detect(client_street_address, "fm")
+  ) |>
+  # Remove the verified patterns
+  dplyr::filter(
+     !(stringr::str_detect(client_street_address, elim_regexes[1]) |
+       stringr::str_detect(client_street_address, elim_regexes[2]) |
+       stringr::str_detect(client_street_address, elim_regexes[3])
+     )
+  )
+
+format(nrow(subset), big.mark=',')
+# [1] "509"
+```
+
+We had 509 remaining observations, which we examined through further use of regular expressions. These pieces are defined as follows:
+
+1. Any street address where "fm" had neither a space nor hyphen separating it from another value, which was corrected through adding a white space (10 rows)
+2. Any street address where "fm" had a hyphen on either side, which was corrected by replacing with a white space (11 rows)
+3. Values with road specifiers, which were mostly valid but did receive minor point fixes, targeted with "(loop|spur|bypass|old|rr)" (42 rows)
+4. Values with "road", targeted with "(road|rd| road| rd)". The "road" values were removed, though some observations received additional point fixes (386 rows).
+  -   We examined rows that *ended* in this "road" value, targeted with "fm(road|rd| road| rd)$" (1 row)
+  -   We examined rows that started with a combination of letters and numbers (excluding those with only numbers in the first "chunk") (9 rows)
+  -   We examined rows that had a letter *after* "fm", excluding those that ended with a "road" variant (14 rows)
+  -   We examined rows that had a letter *before* "fm", excluding those that had a combination of letters and numbers in the chunk immediately preceeding "fm" (3 rows)
+  -   We then examined any remaining "road" matches
+5. We examined any rows that ended in letters, that were not part of prior fixes
+6. We then examined the few remaining values.
+  
+We applied our fixes, standardized any potentially valid mention of a farm to market road to "ftm", and standardized our white spaces. We then re-created our "checking" subset to ensure it contained accurate, updated data.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to notes if any changes are being made
+    client_msc = ifelse(
+      case_id %in% subset$case_id,
+        client_street_address,
+        client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    # Resolve addresses with unit issues
+      client_street_address_scnd1_val = ifelse(
+        case_id %in% subset$case_id,
+          dplyr::case_when(
+            stringr::str_detect(
+              client_street_address, 
+              "^[0-9a-z]{3,4} fm [0-9]+(rd|road| rd| road)$"
+              ) ~
+              stringr::str_match(
+                client_street_address, 
+                "^[0-9]+([a-z]) fm")[,2],
+            stringr::str_detect(client_street_address, "0 road ") ~
+              stringr::str_match(client_street_address, " ([0-9a-z]+)$")[,2],
+            stringr::str_detect(client_street_address, "e trl ") ~ 
+              stringr::str_match(client_street_address, "([0-9a-z]+)$")[,2],
+            stringr::str_detect(client_street_address, " cabin ") ~ 
+              stringr::str_match(client_street_address, "([0-9a-z]+)$")[,2],
+          TRUE ~ client_street_address_scnd1_val
+          ),
+        client_street_address_scnd1_val
+      ),
+    client_street_address_scnd1_type = ifelse(
+      case_id %in% subset$case_id &
+        stringr::str_detect(client_street_address, "e trl "),
+      "trlr",
+      client_street_address_scnd1_type
+    ),
+    client_street_address = ifelse(
+        case_id %in% subset$case_id,
+          dplyr::case_when(
+            # Separating "fm" adjacent to other entries (no hypen or space)
+            stringr::str_detect(client_street_address, "[^ -]fm") ~ 
+              stringr::str_replace(client_street_address, "fm", " fm"),
+            stringr::str_detect(client_street_address, "fm[^ -]") ~ 
+              stringr::str_replace(client_street_address, "fm", "fm "),
+            # Converting hyphens on "fm" to white spaces
+            stringr::str_detect(client_street_address, "fm-") ~ 
+              stringr::str_replace(client_street_address, "fm-", "fm "),
+            # House numbers with unit issues
+            stringr::str_detect(
+              client_street_address, 
+              "^[0-9a-z]{3,4} fm [0-9]+(rd|road| rd| road)$"
+              ) ~ stringr::str_remove(
+                client_street_address, 
+                stringr::str_match(
+                  client_street_address,
+                  "^[0-9]+([a-z]) fm")[,2]
+            ),
+            stringr::str_detect(client_street_address, "e trl ") ~ 
+              stringr::str_remove(client_street_address, "( trl .+?)$"),
+            stringr::str_detect(client_street_address, " cabin ") ~ 
+              stringr::str_remove(client_street_address, "( cabin .+?)$"),
+            stringr::str_detect(client_street_address, " spot") ~ 
+              stringr::str_remove(client_street_address, " spot"),
+          # Rename non-fm street
+          stringr::str_detect(
+            client_street_address, 
+            "^(.+?) fm [a-z] ([a-z]+)" 
+            ) ~
+            paste0(
+              stringr::str_match(
+                client_street_address, 
+                "^(.+?) fm [a-z] ([a-z]+)"
+                )[,2],
+              " sme",
+              stringr::str_match(
+                client_street_address, 
+                "^(.+?) fm [a-z] ([a-z]+)"
+                )[,3]
+              ),
+          # Reorder an unusual address
+          stringr::str_detect(
+            client_street_address, 
+            "([0-9]+) fm ([a-z]+) ([0-9]+) rd$") ~
+            paste(
+              stringr::str_match(
+                client_street_address, 
+                "([0-9]+) fm ([a-z]+) ([0-9]+) rd$"
+                )[,2],
+              stringr::str_match(
+                client_street_address, 
+                "([0-9]+) fm ([a-z]+) ([0-9]+) rd$"
+                )[,3],
+              "fm",
+              stringr::str_match(
+                client_street_address, 
+                "([0-9]+) fm ([a-z]+) ([0-9]+) rd$"
+                )[,4]
+              ),
+          # Remove "Bypass Rd" from street name
+          stringr::str_detect(client_street_address, "bypass rd") ~ 
+              stringr::str_remove(client_street_address, " bypass rd"),
+          # Remove unit number
+          stringr::str_detect(client_street_address, "0 road ") ~ 
+              stringr::str_remove("9393 fm 1960 road 216", " ([0-9a-z]+)$"),
+          # Adjust location of a cardinal direction
+          str_detect(client_street_address, "n[0-9]+") ~ 
+            paste0(
+              str_match(client_street_address, "^(.+? )fm n(.+?)$")[,2],
+              "n fm ",
+              str_match(client_street_address, "^(.+? )fm n(.+?)$")[,3]
+            ),
+          TRUE ~ client_street_address
+          ),
+        client_street_address
+    ),
+    # Remove road or rd from street addresses
+    client_street_address = ifelse(
+      case_id %in% subset$case_id &
+        stringr::str_detect(client_street_address, "(road|rd| road| rd)"),
+      stringr::str_remove(client_street_address, "(road|rd| road| rd)"),
+      client_street_address
+    ),
+    # Standardize "fm" to "ftm" in subset entries
+    client_street_address = ifelse(
+      case_id %in% subset$case_id &
+        stringr::str_detect(client_street_address, " fm "),
+      stringr::str_replace(client_street_address, " fm ", " ftm "),
+      client_street_address
+    ),
+    # Standardize "fm" to "ftm" in exclusion regex entries
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        (stringr::str_detect(client_street_address, elim_regexes[1]) |
+           stringr::str_detect(client_street_address, elim_regexes[2]) |
+           stringr::str_detect(client_street_address, elim_regexes[3])
+         ) &
+        !(stringr::str_detect(client_street_address, "[^ -]fm")|
+            stringr::str_detect(client_street_address, "fm[^ -]")
+        ),
+      stringr::str_replace(client_street_address, " fm", " ftm"),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  dplyr::mutate(
+    # Consolidate multiple white spaces into a single white space  
+    client_street_address = 
+      stringr::str_replace_all(client_street_address, "( {2,})", " "),
+    # Trim leading and trailing white spaces
+    client_street_address = 
+      stringr::str_trim(client_street_address, side = 'both')
+  ) |> 
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+
+# Re-create our "checking" subset for accurate data
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address,'(farm|market|ftm|fm)'))
+```
+
+We confirmed that the remaining 236 observations that matched for any "fm" values were not valid mentions of a farm to market road.
+
+```{r}
+subset <- checking |>
+  # Exclude prior "chunk"
+  dplyr::filter(
+    !(stringr::str_detect(
+        client_street_address,
+        "(farmer|farm dr|farm st|farmhouse rd|ftm)"
+        ) | 
+        stringr::str_detect(client_street_address, "^[^0-9]")
+      )
+    ) |>
+      dplyr::filter(stringr::str_detect(client_street_address, "fm")
+  )
+
+format(nrow(subset), big.mark=',')
+# [1] "236"
+```
+
+We cleared our elimination regular expression list for memory management.
+
+```{r}
+rm(elim_regexes)
+```
+
+
+###### Remaining observations (962 rows)
+
+We then examined the remaining 962 observations, excluding the prior processed "chunks." 
+
+```{r}
+subset <- checking |>
+  # Exclude prior "chunk"
+  dplyr::filter(
+    !(stringr::str_detect(
+        client_street_address,
+        "(farmer|farm dr|farm st|farmhouse rd|ftm)"
+        ) | stringr::str_detect(client_street_address, "^[^0-9]") |
+        stringr::str_detect(client_street_address, "fm")
+    )
+  ) 
+
+format(nrow(subset), big.mark=',')
+# [1] "962"
+```
+
+The vast majority of these observations were valid non-farm to market roads. We had a single observation that required removal of invalid text at the end of the street address. We otherwise cleaned and standardized the 272 farm to market observations.
+
+```{r}
+fm_regex <- paste0(
+  "(farm market road|farm market|farm to market road|",
+  "farm to market|farm road|farm rd)")
+
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% subset$case_id &
+        (stringr::str_detect(
+              client_street_address, 
+              paste0(" (north|south|east|west|n|s|e|w) ",fm_regex)
+            ) | 
+           (stringr::str_detect(client_street_address,fm_regex) & 
+           !stringr::str_detect(client_street_address, "[^0-9] farm")
+           )
+         ), 
+      client_street_address, 
+      client_msc),
+    # Fix invalid text at end of street address
+    client_street_address = ifelse(
+      case_id %in% subset$case_id & 
+        stringr::str_detect(
+          client_street_address, " [0-9]{2}( [a-z]+ [a-z]+)$"
+          ),
+        stringr::str_remove(
+          client_street_address,
+          stringr::str_match(
+            client_street_address, 
+            " [0-9]{2}( [a-z]+ [a-z]+)$"
+            )[,2]
+          ),
+      client_street_address
+    ), 
+    # Catch and standardize all "farm to market" variants
+    client_street_address = ifelse(
+      case_id %in% subset$case_id,
+      dplyr::case_when(
+        stringr::str_detect(
+          client_street_address, 
+          paste0(" (north|south|east|west|n|s|e|w) ",fm_regex)
+          ) ~ 
+          stringr::str_replace(
+              client_street_address,
+              stringr::str_match(client_street_address, fm_regex)[,2],
+              "ftm"
+            ),
+        (stringr::str_detect(client_street_address,fm_regex) & 
+           !stringr::str_detect(client_street_address, "[^0-9] farm")) ~
+          stringr::str_replace(
+              client_street_address,
+              stringr::str_match(client_street_address, fm_regex)[,2],
+              "ftm"
+            ),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    ),
+    # Remove "road" or "rd" from farm to market roads
+    client_street_address = ifelse(
+      case_id %in% subset$case_id &
+        stringr::str_detect(client_street_address, " ftm ") &
+        stringr::str_detect(client_street_address, "(road|rd)"),
+      stringr::str_remove(client_street_address,"(road|rd)"),
+      client_street_address
+    ),
+    # Consolidate multiple white spaces into a single white space
+    client_street_address = 
+      stringr::str_replace_all(client_street_address, "( {2,})", " "),
+    # Trim leading and trailing white spaces
+    client_street_address = 
+      stringr::str_trim(client_street_address, side = 'both')
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+We removed our `fm_regex` value for memory management.
+
+```{r}
+rm(fm_regex)
+```
+
 
 
 # 💾
