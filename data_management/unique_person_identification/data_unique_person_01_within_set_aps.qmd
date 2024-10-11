@@ -9476,16 +9476,16 @@ aps <- aps |>
     )
   ) |>
   dplyr::mutate(
-    # Resolve point-mutation set
+    # Resolve point-mutation set 
     client_street_address_name = ifelse(
       case_id %in% checking$case_id &
         client_street_address %in% point_fixes$original_value,
         dplyr::case_when(
           client_street_address == point_fixes$original_value[1] ~ 
             point_fixes$name[1],
-          TRUE ~ client_street_address
+          TRUE ~ client_street_address_name
         ),
-        client_street_address
+        client_street_address_name
       ),
     client_street_address = ifelse(
       case_id %in% checking$case_id &
@@ -9589,6 +9589,7 @@ aps <- aps |>
     )
   ) |>
   dplyr::mutate(
+    # Correct point-fix address names
     client_street_address_name = ifelse(
       case_id %in% checking$case_id &
         client_street_address %in% point_fixes$original_value,
@@ -9597,9 +9598,9 @@ aps <- aps |>
             point_fixes$name[1],
           client_street_address == point_fixes$original_value[2] ~ 
             point_fixes$name[2],
-          TRUE ~ client_street_address
+          TRUE ~ client_street_address_name
         ),
-        client_street_address
+        client_street_address_name
       ),
     client_street_address = ifelse(
       case_id %in% checking$case_id &
@@ -9637,7 +9638,7 @@ aps <- aps |>
 
 ##### (FTM) Farm to Market
 
-There were several observations identified in prior examination and standardization which referenced farm to market. While roads are formally standardized to "FM" according to [USPS standards](https://pe.usps.com/text/pub28/28apf.htm), we chose to standardize to "FTM" to reduce non-significant string distances and any ambiguity in targetting these entries. We identified the following values as likely referencing "farm to market road" in addressing: farm, market, ftm, and fm.
+There were several observations identified in prior examination and standardization which referenced farm to market. While these roads are formally standardized to "FM" according to [USPS standards](https://pe.usps.com/text/pub28/28apf.htm), we chose to standardize to "FTM" to reduce non-significant string distances and any ambiguity in targeting these entries. We identified the following values as likely referencing "farm to market road" in addressing: farm, market, ftm, and fm.
 
 There were 10,187 rows remaining with street address values containing one of our chosen components.
 
