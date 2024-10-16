@@ -9479,20 +9479,20 @@ aps <- aps |>
     # Resolve point-mutation set 
     client_street_address_name = ifelse(
       case_id %in% checking$case_id &
-        client_street_address %in% point_fixes$original_value,
+        client_street_address %in% point_fixes$original_street_addr,
         dplyr::case_when(
-          client_street_address == point_fixes$original_value[1] ~ 
-            point_fixes$name[1],
+          client_street_address == point_fixes$original_street_addr[1] ~ 
+            point_fixes$addr_name[1],
           TRUE ~ client_street_address_name
         ),
         client_street_address_name
       ),
     client_street_address = ifelse(
       case_id %in% checking$case_id &
-        client_street_address %in% point_fixes$original_value,
+        client_street_address %in% point_fixes$original_street_addr,
         dplyr::case_when(
-          client_street_address == point_fixes$original_value[1] ~ 
-            point_fixes$address[1],
+          client_street_address == point_fixes$original_street_addr[1] ~ 
+            point_fixes$street_addr[1],
           TRUE ~ client_street_address
         ),
         client_street_address
@@ -9592,24 +9592,24 @@ aps <- aps |>
     # Correct point-fix address names
     client_street_address_name = ifelse(
       case_id %in% checking$case_id &
-        client_street_address %in% point_fixes$original_value,
+        client_street_address %in% point_fixes$original_street_addr,
         dplyr::case_when(
-          client_street_address == point_fixes$original_value[1] ~ 
-            point_fixes$name[1],
-          client_street_address == point_fixes$original_value[2] ~ 
-            point_fixes$name[2],
+          client_street_address == point_fixes$original_street_addr[1] ~ 
+            point_fixes$addr_name[1],
+          client_street_address == point_fixes$original_street_addr[2] ~ 
+            point_fixes$addr_name[2],
           TRUE ~ client_street_address_name
         ),
         client_street_address_name
       ),
     client_street_address = ifelse(
       case_id %in% checking$case_id &
-        client_street_address %in% point_fixes$original_value,
+        client_street_address %in% point_fixes$original_street_addr,
         dplyr::case_when(
-          client_street_address == point_fixes$original_value[1] ~ 
-            point_fixes$address[1],
-          client_street_address == point_fixes$original_value[2] ~ 
-            point_fixes$address[2],
+          client_street_address == point_fixes$original_street_addr[1] ~ 
+            point_fixes$street_addr[1],
+          client_street_address == point_fixes$original_street_addr[2] ~ 
+            point_fixes$street_addr[2],
           TRUE ~ client_street_address
         ),
         client_street_address
@@ -10312,11 +10312,230 @@ We removed our `fm_regex` value for memory management.
 rm(fm_regex)
 ```
 
+##### (PR) Private Road, to (pvtr)
 
+There were several observations identified in prior examination and standardization which referenced private roads. While these roads are not formally listed in [USPS standards](https://pe.usps.com/text/pub28/28apf.htm) for street address abbreviations, we chose to standardize to "pvtr" to reduce non-significant string distances and any ambiguity in targeting these entries. We identified the following values as likely referencing "private road" in addressing: "(priv|pvt)". We also included a specific subset of matches for 'pr'.
+
+There were 1,455 rows remaining with street address values containing one of our chosen components, after excluding a single observation with a non-USA address.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address,'(priv|pvt)') |
+      # Narrow down possible "pr" matches
+      (str_detect(client_street_address, 'pr') &
+        (str_detect(client_street_address, 'pr$') |
+          str_detect(client_street_address, ' (cpr|gpr|prc|prv|pr[0-9])') |
+          str_detect(client_street_address, '^pr') |
+          str_detect(client_street_address, ' pr ')
+        )
+       )
+    ) |>
+  dplyr::filter(is.na(client_country))
+
+format(nrow(checking), big.mark=',')
+# [1] "1,455"
+```
+
+Values which followed the expected "[house number] private road [road number]" pattern, expressed in a regular expression as "^[0-9]+ (private road|private rd|pr) [0-9]+$", were assumed to be potentially valid. As such, the 1,271 rows which met this standard were standardized without additional examination.
+
+Of the remaining 184 rows, we made several point-fixes. There were two observations that had the street numbers pulled as secondary address unit values, due to the street number including a pound (#) symbol; these were rejoined. Other observations had unit numbers in the form of letters in the house number, spacing issues connecting the "pr" directly to the numbers without any gap, had unusual extra letters, or had "private" together with a street name that was not actually a private road. We performed our point fixes and standardized our values.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id &
+        !stringr::str_detect(
+          client_street_address, 
+          '(road dr|way pvt|va jr|te dr|et ln|ex ln)$'
+          ),
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        !stringr::str_detect(
+          client_street_address, 
+          '(road dr|way pvt|va jr|te dr|et ln|ex ln)$'
+          ),
+      dplyr::case_when(
+        # Adding truncated part of address name
+        stringr::str_detect(client_street_address, 'aro$') ~ 
+          paste(client_street_address, 'solis st'),
+        # Fixing spacing error
+        stringr::str_detect(client_street_address, 'pr[0-9]') ~ 
+          stringr::str_replace(client_street_address, 'pr', 'pr '),
+        # Reclaiming incorrectly trimmed "secondary unit" values
+        stringr::str_detect(
+          client_street_address, 
+          '4[0-9] (private rd|pr)$'
+          ) ~ paste(client_street_address, client_street_address_scnd1_val),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id &
+        !stringr::str_detect(
+          client_street_address, 
+          '(road dr|way pvt|va jr|te dr|et ln|ex ln)$'
+          ),
+      dplyr::case_when(
+        # Removing secondary values that have been reclaimed
+        stringr::str_detect(
+          client_street_address, 
+          paste0(
+            '4[0-9] (private rd|pr) ',
+             client_street_address_scnd1_val,
+            '$'
+            )
+          ) ~ NA_character_,
+        # Extracting secondary values from addresses
+        stringr::str_detect(client_street_address, '^[0-9]+[a-j] p') ~
+          stringr::str_match(client_street_address, '^[0-9]+([a-j]) p')[,2],
+        stringr::str_detect(client_street_address, 'd 22[0-9]+[a-z]$') ~
+          stringr::str_match(client_street_address, 'd 22[0-9]+([a-z])$')[,2],
+        TRUE ~ client_street_address_scnd1_val
+      ), 
+      client_street_address_scnd1_val
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        !stringr::str_detect(
+          client_street_address, 
+          '(road dr|way pvt|va jr|te dr|et ln|ex ln)$'
+          ),
+      dplyr::case_when(
+        # Simple Standardizations
+        stringr::str_detect(
+          client_street_address, 
+          "^[0-9]+ (private road|private rd|pr) [0-9]+$"
+          ) ~
+          stringr::str_replace(
+            client_street_address, 
+            "(private road|private rd|pr)", 
+            "pvtr"
+            ),
+        # Converting a PR to CR
+        stringr::str_detect(client_street_address, '0 pvt rd') ~ 
+          stringr::str_replace(client_street_address, 'pvt rd', 'cr'),
+        # Removing "private road" from values where it is unnecessary
+        stringr::str_detect(client_street_address, '(ickor|stes)') ~ 
+          stringr::str_replace(client_street_address, " private", ""),
+        # Replace odd extra letters around "pr" entries
+        stringr::str_detect(client_street_address, '(gpr|cpr|prv)') ~ 
+          stringr::str_replace(client_street_address, '(gpr|cpr|prv)', 'pvtr'),
+        # Point-fix of a specific odd extra letter
+        stringr::str_detect(client_street_address, '(prc )') ~ 
+          stringr::str_replace(client_street_address, '(prc )', 'pvtr c'),
+        # Additional point-fix of an odd extra letter
+        stringr::str_detect(client_street_address, '^([0-9]+)n') ~
+          stringr::str_replace(
+            client_street_address, 
+            stringr::str_match('135n private road 1512', '^([0-9]+)n')[,1],
+            stringr::str_match('135n private road 1512', '^([0-9]+)n')[,2]
+            ),
+        # Broader street name changes - first with our point-fix data set
+        client_street_address == point_fixes$original_street_addr[3] ~
+          point_fixes$street_addr[3],
+        # Then with R code
+        stringr::str_detect(client_street_address, 'f pr$') ~
+          stringr::str_replace(client_street_address, 'pr$', 'prairie'),
+        # Observations where "private" possibly refers to a person - "pvt"
+        stringr::str_detect(
+          client_street_address, 
+          paste0(
+            '(ron rd|sie|aro|lis st|ley lane|kin rd|nn rd|ino rd|an rd',
+            '|kin road|el rd|age cir|nt road|nt rd)$'
+            )
+          ) ~ stringr::str_replace(client_street_address, 'private', 'pvt'),
+        # Removing shifted secondary unit values from addresses
+        stringr::str_detect(client_street_address, '^[0-9]+[a-j] p') ~
+          stringr::str_remove(client_street_address,
+            stringr::str_match(client_street_address, '^[0-9]+([a-j]) p')[,2]),
+        stringr::str_detect(client_street_address, 'd 22[0-9]+[a-z]$') ~
+          stringr::str_remove(
+            client_street_address,
+            paste0(stringr::str_match(
+              client_street_address, 'd 22[0-9]+([a-z])$')[,2], 
+              "$"
+              )
+            ),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+    # Standardize final entries
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        !stringr::str_detect(
+          client_street_address, 
+          '(road dr|way pvt|va jr|te dr|et ln|ex ln)$') &
+        !stringr::str_detect(
+        client_street_address, 
+        '(county road|country road)'),
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, '(private|privat)') ~
+          stringr::str_replace(
+            client_street_address,
+            '(private road|private rd|privat road)', 
+            'pvrt'),
+        stringr::str_detect(client_street_address, '^pr ') ~
+          stringr::str_replace(
+            client_street_address,
+            '^pr', 
+            'prvt'),
+        stringr::str_detect(client_street_address, ' pr$') ~
+          stringr::str_replace(
+            client_street_address,
+            'pr$', 
+            'prvt'),
+        stringr::str_detect(client_street_address, ' pr ') ~
+          stringr::str_replace(
+            client_street_address,
+            ' pr ', 
+            ' prvt '),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
 
 # 💾
 
 ```{r}
-
 ```
+
 
