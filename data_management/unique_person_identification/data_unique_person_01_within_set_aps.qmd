@@ -10533,6 +10533,857 @@ aps <- aps |>
   dplyr::select(-c(client_msc))
 ```
 
+##### (RR) Rural Road/Route, Ranch Road/Route, and Route
+
+There were several observations identified in prior examination and standardization which referenced routes/roads, both ranch and rural. As these roads are formally standardized to "RTE" or fully spelled out according to [USPS standards](https://pe.usps.com/text/pub28/28apf.htm), we chose to standardize to "RTE" to reduce non-significant string distances and any ambiguity in targeting these entries. We identified the following values as likely referencing "rural routes" in addressing: ranch, road, route, rr. We eliminated any entries which had a letter immediately before or after one of our targeted words without a white space or other division, due to the large number of words that include our search terms (such as "branch").
+
+There were 1,430 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address,'[^a-z](ranch|rural|road|route|rr|rte)[^a-z]'))
+
+format(nrow(checking), big.mark=',')
+# [1] "1,430"
+```
+
+We identified two observations that required point-fixes. Otherwise, we standardized all "ranch road" entries to "rr" and all "route" entries to "rte".
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% case_id & (
+        stringr::str_detect(client_street_address, ' trl ') |
+          stringr::str_detect(client_street_address, ' park') |
+          stringr::str_detect(client_street_address, '(ranch road|ranch rd)')|
+          stringr::str_detect(client_street_address, '(route|rte)')
+      ),
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+     client_street_address_scnd1_type = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, ' trl '),
+      'trlr',
+      client_street_address_scnd1_type
+    ),
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        (stringr::str_detect(client_street_address, ' park') &
+           stringr::str_detect(client_street_address, '[0-9][a-z]$')) ~
+          stringr::str_match(client_street_address, ' ([0-9a-z]+)$')[,2],
+        stringr::str_detect(client_street_address, ' trl ') ~
+          stringr::str_match(client_street_address, 'trl ([0-9a-z]+)')[,2],
+      TRUE ~ client_street_address_scnd1_val
+      ),
+      client_street_address_scnd1_val
+    ),
+     client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        (stringr::str_detect(client_street_address, ' park') &
+           stringr::str_detect(client_street_address, '[0-9][a-z]$')) ~
+          stringr::str_remove(
+            client_street_address,
+            stringr::str_match(client_street_address, '( [0-9a-z]+)$')[,2]
+          ),
+        stringr::str_detect(client_street_address, ' trl ') ~
+          stringr::str_remove(client_street_address, ' trl (.+?)$'),
+        stringr::str_detect(client_street_address, '(route|rte)') ~
+          stringr::str_replace(client_street_address, '(route|rte)', 'rte'),
+        stringr::str_detect(client_street_address, '(ranch road|ranch rd)') ~
+          stringr::str_replace(
+            client_street_address, 
+            '(ranch road|ranch rd)',
+            'rr'),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+##### Highways/Freeways/Interstates, etc.
+
+There were several observations identified in prior examination and standardization which referenced highways, freeways, and interstates. While these roads are standardized by fully spelling them out under [USPS standards](https://pe.usps.com/text/pub28/28apf.htm), we chose to standardize to standard abbreviations of "hwy", "fwy", and "ih" to reduce non-significant string distances and any ambiguity in targeting these entries. 
+
+We additionally targeted several other common components of highways for trimmed standardization, such as "expressway", "business", "access", "bypass", and "frontage". 
+
+###### Highways
+
+We identified several misspellings of highway during prior checks. We included them in our standardization catches.
+
+There were 8,172 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(highway|highaway|highwya|highwaty)'
+      )
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "8,172"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(highway|highaway|highwya|highwaty)',
+          'hwy'
+          ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+
+###### Freeways
+
+We had identified no major misspelling trends for freeway in prior cleaning or in exploration.
+
+There were 41 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(freeway)'
+      )
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "41"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(freeway)',
+          'fwy'
+          ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+###### Interstates
+
+We identified interstate and "ih-" as common indications for interstate highways.
+
+There were 1,477 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(interstate|ih[h0-9 -])'
+      )
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "1,477"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(interstate|ih[h0-9 -])',
+          'ih '
+          ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+###### Expressway
+
+We identified a few common misspellings as indicators for expressways
+
+There were 269 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(expwy|express[a-z]+)'
+      )
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "269"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(expwy|express[a-z]+)',
+          'expwy'
+          ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+###### Business Roads
+
+We identified a few common misspellings as indicators for business roads. There was also a common variant that indicated the street name was not a highway, but a named road.
+
+There were 374 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(client_street_address,'(busi)') &
+      !stringr::str_detect(client_street_address, 'business center')
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "374"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(busi[a-z]+)',
+          'busn'
+          ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+###### Access Roads
+
+Access Road had no prior identified misspellings, nor were any found in exploration.
+
+There were 78 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(access road|access rd|access r|access)'
+      )
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "78"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(access road|access rd|access r|access)',
+          'accs'
+          ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+###### Bypass Roads
+
+Bypass Roads had no prior identified misspellings, nor were any found in exploration.
+
+There were 16 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(byp[a-z]+)'
+      )
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "16"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(byp[a-z]+)',
+          'byp'
+          ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+`
+###### Frontage Road
+
+We identified a few common misspellings as indicators for frontage roads.
+
+There were 99 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(frontage|fronta[a-z]+)'
+      )
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "99"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(fronta[a-z]+|fronta[a-z]+ road|fronta[a-z]+ rd|fronta[a-z]+ r)',
+          'frtg'
+          ),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(
+          client_street_address, 
+          '(frtg road|frtg rd|frtg r)'
+          ),
+      stringr::str_replace(
+        client_street_address,
+        '(frtg road|frtg rd|frtg r)',
+        'frtg'
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+###### Service Road
+
+Service roads did not have any previously identified unusual variants, nor were any identified in exploration.
+
+There were 42 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(service road|service rd)'
+      )
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "42"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+        stringr::str_replace(
+          client_street_address,
+          '(service road|service rd)',
+          'svc'
+          ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+##### Cardinal Directions
+
+There remained several common elements of street addresses which could be standardized. However, our final bulk standardization came for cardinal directions, which we trimmed to a single letter.
+
+There were 11,048 rows remaining with street address values containing one of our chosen components.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    stringr::str_detect(
+      client_street_address,
+      '(northeast|northwest|southeast|southwest|east|west|north|south) '
+      ) |
+      stringr::str_detect(
+        client_street_address,
+        ' (northeast|northwest|southeast|southwest|east|west|north|south)')
+    )
+
+format(nrow(checking), big.mark=',')
+# [1] "11,048"
+```
+
+We made our modifications.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, 'northwest[ -]') ~
+          stringr::str_replace(client_street_address, 'northwest[ -]', 'nw '),
+        stringr::str_detect(client_street_address, 'northeast[ -]') ~
+          stringr::str_replace(client_street_address, 'northeast[ -]', 'ne '),
+        stringr::str_detect(client_street_address, 'southwest[ -]') ~
+          stringr::str_replace(client_street_address, 'southwest[ -]', 'sw '),
+        stringr::str_detect(client_street_address, 'southeast[ -]') ~
+          stringr::str_replace(client_street_address, 'southeast[ -]', 'se '),
+        stringr::str_detect(client_street_address, 'north[ -]') ~
+          stringr::str_replace(client_street_address, 'north[ -]', 'n '),
+        stringr::str_detect(client_street_address, 'south[ -]') ~
+          stringr::str_replace(client_street_address, 'south[ -]', 's '),
+        stringr::str_detect(client_street_address, 'east[ -]') ~
+          stringr::str_replace(client_street_address, 'east[ -]', 'e '),
+        stringr::str_detect(client_street_address, 'west[ -]') ~
+          stringr::str_replace(client_street_address, 'west[ -]', 'w '),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, 'northwest[ -]') ~
+          stringr::str_replace(client_street_address, 'northwest[ -]', 'nw '),
+        stringr::str_detect(client_street_address, 'northeast[ -]') ~
+          stringr::str_replace(client_street_address, 'northeast[ -]', 'ne '),
+        stringr::str_detect(client_street_address, 'southwest[ -]') ~
+          stringr::str_replace(client_street_address, 'southwest[ -]', 'sw '),
+        stringr::str_detect(client_street_address, 'southeast[ -]') ~
+          stringr::str_replace(client_street_address, 'southeast[ -]', 'se '),
+        stringr::str_detect(client_street_address, 'north[ -]') ~
+          stringr::str_replace(client_street_address, 'north[ -]', 'n '),
+        stringr::str_detect(client_street_address, 'south[ -]') ~
+          stringr::str_replace(client_street_address, 'south[ -]', 's '),
+        stringr::str_detect(client_street_address, 'east[ -]') ~
+          stringr::str_replace(client_street_address, 'east[ -]', 'e '),
+        stringr::str_detect(client_street_address, 'west[ -]') ~
+          stringr::str_replace(client_street_address, 'west[ -]', 'w '),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+      ),
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, '[ -]northwest') ~
+          stringr::str_replace(client_street_address, '[ -]northwest', ' nw'),
+        stringr::str_detect(client_street_address, '[ -]northeast') ~
+          stringr::str_replace(client_street_address, '[ -]northeast', ' ne'),
+        stringr::str_detect(client_street_address, '[ -]southwest') ~
+          stringr::str_replace(client_street_address, '[ -]southwest', ' sw'),
+        stringr::str_detect(client_street_address, '[ -]southeast') ~
+          stringr::str_replace(client_street_address, '[ -]southeast', ' se'),
+        stringr::str_detect(client_street_address, '[ -]north') ~
+          stringr::str_replace(client_street_address, '[ -]north', ' n'),
+        stringr::str_detect(client_street_address, '[ -]south') ~
+          stringr::str_replace(client_street_address, '[ -]south', ' s'),
+        stringr::str_detect(client_street_address, '[ -]east') ~
+          stringr::str_replace(client_street_address, '[ -]east', ' e'),
+        stringr::str_detect(client_street_address, '[ -]west') ~
+          stringr::str_replace(client_street_address, '[ -]west', ' w'),
+        TRUE ~ client_street_address
+      ),
+      client_street_address
+    ),
+    )|>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+
 # 💾
 
 ```{r}
