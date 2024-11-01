@@ -7,18 +7,9 @@ format: html
 
 # ⭐️ Overview
 
-The APS records data set was divided into 5 separate, interconnected excel files. These files (WILL BE) documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`.
+The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`.
 
-
-## Data Wrangling
-
--   Placeholder
-
-    -   Placeholder
-
-## Data Cleaning
-
--   Placeholder
+This file performs cleaning of the APS client identifier data in anticipation of fuzzy matching. The most significant modifications were made to street address values, as this field appeared to have been used as a "comment box". 
 
 # 📦 Load Packages and Functions
 
@@ -68,7 +59,7 @@ aps <- aps |>
   janitor::clean_names()
 
 # Warning: Expecting numeric in B144102 / R144102C2: got 'blank'
-# 2024-09-19: APS data imported with 568,562 rows and 11 columns.
+# 2024-11-01: APS data imported with 568,562 rows and 11 columns.
 # Data last modified on OneDrive: 2024-03-21 18:35:52
 ```
 
@@ -95,9 +86,13 @@ informative_df_import(
 
 usps_zip <- usps_zip |>
   # Remove rows with duplicated rows
-  dplyr::distinct()
+  dplyr::distinct() |>
+  dplyr::mutate(
+    city = tolower(city),
+    state = tolower(state)
+  )
 
- # 2024-09-19: USPS ZIP data imported with 44,153 rows and 4 columns.
+ # 2024-11-01: USPS ZIP data imported with 44,153 rows and 4 columns.
  # Data last modified on OneDrive: 2024-05-06 14:48:02 
 ```
 
@@ -162,39 +157,36 @@ county_path <- here::here(
   "data", "verification_data", "txhhs_ph_regions.csv"
   )
 
-informative_df_import("county_list", county_path)
+informative_df_import("county_list", county_path, show_col_types = F)
 
 # Convert to 1 dimensional vector listing county names, values standardized
 # into lowercase
 
 county_list <- unique(tolower(county_list$county_name))
 
- # 2024-09-19: COUNTY LIST data imported with 254 rows and 5 columns.
+ # 2024-11-01: COUNTY LIST data imported with 254 rows and 5 columns.
  # Data last modified on OneDrive: 2024-05-24 15:36:26 
-```
-
-## Municipality Data
-
-We had previously extracted a table listing Texas Cities and their counties, obtained from a PDF of [Texas Department of Transportation Records for Cities and Towns](https://ftp.txdot.gov/pub/txdot-info/tpp/county_maps/cities_towns.pdf).
-
-```{r}
-city_path <- here::here(
-  "data", "verification_data", "txdot_cities_towns.csv"
-  )
-
-informative_df_import("cities", city_path, show_col_types = FALSE)
-
-cities <- cities |>
-  # Convert all values to lowercase
-  dplyr::mutate(dplyr::across(dplyr::everything(), ~tolower(.x)))
-
- # 2024-09-19: CITIES data imported with 3,328 rows and 2 columns.
- # Data last modified on OneDrive: 2024-05-24 15:31:22 
 ```
 
 ## Point-Fixes
 
 For fixes that required potential use of PHI, we utilized a CSV file.
+
+```{r}
+unresolvable_path <- here::here("data","aps_caseids_unresolvables.csv")
+
+informative_df_import("unresolvables", unresolvable_path, show_col_types = F)
+
+unresolvables <- unresolvables |>
+  janitor::clean_names()
+
+ # 2024-11-01: UNRESOLVABLES data imported with 368 rows and 1 columns.
+ # Data last modified on OneDrive: 2024-11-01 16:35:44 
+```
+
+## Unresolvable Case IDs
+
+Generated during the course of this file, we made a list of Case IDs associated with unresolvable entries. 
 
 ```{r}
 pointfix_path <- here::here("data","aps_fuzzy-prep-clean_point-fixes.csv")
@@ -204,8 +196,8 @@ informative_df_import("point_fixes", pointfix_path, show_col_types = F)
 point_fixes <- point_fixes |>
   janitor::clean_names()
 
- # 2024-09-28: POINT FIXES data imported with 2 rows and 3 columns.
- # Data last modified on OneDrive: 2024-09-28 18:19:31  
+ # 2024-11-01: POINT FIXES data imported with 31 rows and 3 columns.
+ # Data last modified on OneDrive: 2024-11-01 15:32:15   
 ```
 
 # Initial Data Structure
@@ -3488,8 +3480,16 @@ aps <- aps |>
   # Remove values for cities in target regex from street address
     client_street_address = ifelse(
       case_id %in% checking$case_id &
-        stringr::str_detect(client_street_address, target_regex),
+        stringr::str_detect(client_street_address, target_regex) &
+        !stringr::str_detect(client_street_address, 'ld rd, h'),
       stringr::str_match(client_street_address, target_regex)[,2],
+      client_street_address
+    ),
+  # Catch entry where city also appears in street name
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'ld rd, h'),
+      stringr::str_remove(client_street_address, '(, .+?)$'),
       client_street_address
     ),
   # Remove values for city of 'houston' from street address
@@ -4417,23 +4417,31 @@ aps <- aps |>
         stringr::str_match(
           client_street_address,
           '((?:duplex|number|plot|slot)(?:[ ,\\.#]+)([^,#]+?))$'
-          )[,1]
+          )[,2]
         ),
-      # Otherwise, try to match alternative expression
-      ifelse(
-        case_id %in% checking$case_id &
-        stringr::str_detect(
-          client_street_address, 
-          '((?:[ ,\\.#]+)([^\\(\\),#]+?))$'
-          ),
-        stringr::str_remove(
-          client_street_address,
-          stringr::str_match(
+      # For entries separated by commas in a unique way
+      ifelse(case_id %in% checking$case_id & 
+               (
+                 stringr::str_detect(client_street_address, '^, [0-9]')|
+                 stringr::str_detect(client_street_address, '^[0-9]+ , [a-z]')
+                 ),
+             stringr::str_remove(client_street_address, ', '),
+        # Otherwise, try to match alternative expression
+        ifelse(
+          case_id %in% checking$case_id &
+          stringr::str_detect(
             client_street_address, 
             '((?:[ ,\\.#]+)([^\\(\\),#]+?))$'
-            )[,1]
-          ),
-      client_street_address
+            ),
+          stringr::str_remove(
+            client_street_address,
+            stringr::str_match(
+              client_street_address, 
+              '((?:[ ,\\.#]+)([^\\(\\),#]+?))$'
+              )[,2]
+            ),
+        client_street_address
+        )
       )
     )
   ) |>
@@ -9208,7 +9216,7 @@ format(nrow(checking), big.mark=',')
 
 We chose to standardize all "County Road" variants to "cr". This was done to avoid non-significant string distances, as "county road" would simultaneously inflate the non-significant distances between "123 county road 98" and "123 cr 98", but also suppress the significant distances between "123 county road 98" and "123 county road 76".
 
-We first carefully copied modified values into our subset-specific notes column. We excluded any unresolvable entries (which would not receive further modification) and a single street name which was not actually a county road (but would be caught in the regular expression to standardize these roads).
+We first carefully copied modified values into our subset-specific notes column. We excluded a single street name which was not actually a county road (but would be caught in the regular expression to standardize these roads).
 
 ```{r}
 aps <- aps |>
@@ -9220,23 +9228,17 @@ aps <- aps |>
     # Add to notes if any modifications are being made
     client_msc = ifelse(
       case_id %in% checking$case_id & !(
-      (
-        !stringr::str_starts(
-          client_street_address, "[0-9]+"
-          ) &
-        !stringr::str_starts(
+        stringr::str_starts(
           client_street_address,
           'pr'
           )
-        ) |
-      stringr::str_detect(client_street_address, '(hwy 7|cr nw|street 60)')
       ) & 
-        # Exclude specific street name which is being excluded from standardization
-        !stringr::str_detect(client_street_address, '(old county|old country)'),
-      client_street_address,
-      client_msc
+      # Exclude specific street name
+      !stringr::str_detect(client_street_address, '(old county|old country)'),
+    client_street_address,
+    client_msc
     )
-  )
+  ) 
   
 
 ```
@@ -9368,23 +9370,13 @@ aps <- aps |>
     ),
     client_street_address = ifelse(
       case_id %in% checking$case_id & !(
-      (
-        !stringr::str_starts(
-          client_street_address, "[0-9]+"
-          ) &
-        !stringr::str_starts(
+        stringr::str_starts(
           client_street_address,
           'pr'
           )
-        ) |
-      stringr::str_detect(client_street_address, '(hwy 7|cr nw|street 60)')
       ) & 
-        # Exclude specific street names which are being excluded from 
-        # standardization
-        !stringr::str_detect(
-          client_street_address, 
-          '(old county|old country|lake co rd)'
-          ),
+      # Exclude specific street name
+      !stringr::str_detect(client_street_address, '(old county|old country)'),
       stringr::str_replace(client_street_address, cr_regex, ' cr '),
       client_street_address
       )
@@ -11733,7 +11725,7 @@ aps <- aps |>
 
 ##### Format Violations
 
-We then turned towards street addresses which did not meet expected formatting. First, we looked at the 520 entries which lacked a numeral, without being a missing value.
+We then turned towards street addresses which did not meet expected formatting. First, we looked at the 519 entries which lacked a numeral, without being a missing value.
 
 ```{r}
 checking <- aps |>
@@ -11743,12 +11735,329 @@ checking <- aps |>
   )
 
 format(nrow(checking), big.mark=',')
-# [1] "520"
+# [1] "519"
 ```
 
-# 💾
+There was a single value that could be fixed without use of PHI (as it was converting a word to a numeral). The remaining values which could be corrected had a strong match, such as an exact business name match. The remainder were unable to be resolved.
+
+We applied our corrections.
 
 ```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id &
+        (
+          stringr::str_starts(client_street_address, "ten")|
+            (client_street_address %in% point_fixes$original_street_addr)
+          ),
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_starts(client_street_address, "ten"),
+      stringr::str_replace(client_street_address, "ten", "10"),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+
+for (i in seq(5,25)){
+  # Point fix location names
+  aps[
+    !is.na(aps$client_street_address) &
+    aps$client_street_address == point_fixes$original_street_addr[i],
+    ]$client_street_address_name <- point_fixes$addr_name[i]
+  # Point fix actual addresses
+  aps[
+    !is.na(aps$client_street_address) &
+    aps$client_street_address == point_fixes$original_street_addr[i],
+    ]$client_street_address <- point_fixes$street_addr[i]
+}
 ```
 
+Next, we looked at the 5 entries which lacked a letter, without being a missing value.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    !is.na(client_street_address) &
+    !stringr::str_detect(client_street_address, '[a-z]')
+  )
+
+format(nrow(checking), big.mark=',')
+# [1] "5"
+```
+
+None of these values were valid. They did not have any meaningful information to allow correction, nor would it be meaningful for matching. As such, we removed these values.
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id,
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    client_street_address = ifelse(
+      case_id %in% checking$case_id,
+      NA_character_,
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc))
+```
+
+We examined the 736 entries that did not start with a number.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(
+    !is.na(client_street_address) &
+    !stringr::str_detect(client_street_address, '^[0-9]')
+  )
+
+format(nrow(checking), big.mark=',')
+# [1] "736"
+```
+
+While the vast majority of these entries had been determined to be unresolvable, a few required point-fixes.
+
+We made our modifications
+
+```{r}
+aps <- aps |>
+  # Initiate subset-specific notes columns
+  dplyr::mutate(
+    client_msc = NA_character_ 
+  ) |> 
+  dplyr::mutate(
+    # Copy to Notes if modifications made
+    client_msc = ifelse(
+      case_id %in% checking$case_id &
+        (stringr::str_detect(
+          client_street_address,
+          paste0(
+            '(tx |at [0-9]|u[0-9]+ |y [0-9]+ [0-9]{2}',
+            '|r[0-9]+ n|auto zone|laquinta inn)'
+            )
+          ) | (client_street_address %in% point_fixes$original_street_addr)
+         ),
+      client_street_address,
+      client_msc
+    )
+  ) |>
+  dplyr::mutate(
+    # Value with secondary address component
+    client_street_address_scnd1_val = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, 'y [0-9]+ [0-9]{2}'),
+      stringr::str_match(client_street_address, '([0-9]+)$')[,2],
+      client_street_address_scnd1_val
+    ),
+    # Values with Business Names
+    client_street_address_name = ifelse(
+      case_id %in% checking$case_id &
+        stringr::str_detect(client_street_address, '(auto zone|laquinta inn)'),
+      dplyr::case_when(
+        stringr::str_detect(client_street_address, 'auto zone') ~ 'auto zone',
+        stringr::str_detect(client_street_address, 'laquinta inn') ~ 
+          'la quinta inn',
+        TRUE ~ client_street_address_name
+      ),
+      client_street_address_name
+    ),
+    
+    client_street_address = ifelse(
+      case_id %in% checking$case_id &
+      stringr::str_detect(
+        client_street_address,
+        paste0(
+          '(tx |at [0-9]|u[0-9]+ |y [0-9]+ [0-9]{2}',
+          '|r[0-9]+ n|auto zone|laquinta inn)'
+          )
+        ),
+       dplyr::case_when(
+         # Value with secondary address component
+      stringr::str_detect(client_street_address, 'y [0-9]+ [0-9]{2}') ~
+        stringr::str_remove(client_street_address,
+           stringr::str_match(client_street_address, '( [0-9]+)$')[,2]
+           ),
+      # Clean up an otherwise unresolvable entry
+      stringr::str_detect(client_street_address, 'tx ') ~ 
+        stringr::str_match(client_street_address, '^(tx.+?)tx')[,2],
+      # Remove prefix values
+      stringr::str_detect(client_street_address, 'at [0-9]') ~ 
+        stringr::str_remove(client_street_address, 'at '),
+      stringr::str_detect(client_street_address, 'u[0-9]+ ') ~ 
+        stringr::str_remove(client_street_address, 'u'), 
+      stringr::str_detect(client_street_address, 'r[0-9]+ n') ~ 
+        stringr::str_remove(client_street_address, 'r'),
+      # Remove business names
+      stringr::str_detect(client_street_address, 'auto zone') ~ 
+        stringr::str_remove(client_street_address, 'auto zone '),
+      stringr::str_detect(client_street_address, 'laquinta inn') ~ 
+        stringr::str_remove(client_street_address, 'laquinta inn '),
+      TRUE ~ client_street_address
+      ),
+      client_street_address
+    )
+  ) |>
+  dplyr::mutate(
+  # Shift notes data into overall client notes field
+    client_notes = ifelse(
+      # If client_notes has no text, just add client_msc (if not empty)
+      is.na(client_notes),
+      ifelse(!is.na(client_msc),
+        paste("Street Addr:", client_msc),
+        client_notes),
+      # Otherwise, paste if client_notes exists to avoid pasting "NA" in 
+      # anything
+      ifelse(
+        !is.na(client_msc),
+        paste(client_notes, "; Street Addr:", client_msc),
+        client_notes
+      )
+    )
+  ) |>
+  # Remove temporary columns
+  dplyr::select(-c(client_msc)) 
+
+for (i in seq(26,31)){
+  # Point fix location names
+  aps[
+    !is.na(aps$client_street_address) &
+    aps$client_street_address == point_fixes$original_street_addr[i],
+    ]$client_street_address_name <- point_fixes$addr_name[i]
+  # Point fix actual addresses
+  aps[
+    !is.na(aps$client_street_address) &
+    aps$client_street_address == point_fixes$original_street_addr[i],
+    ]$client_street_address <- point_fixes$street_addr[i]
+}
+```
+
+## Date of Birth
+
+Dates of Birth were already date-time objects. We separated year, month, and day components.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    client_dob_year = as.numeric(lubridate::year(client_date_of_birth)),
+    client_dob_month = as.numeric(lubridate::month(client_date_of_birth)),
+    client_dob_day = as.numeric(lubridate::day(client_date_of_birth))
+  )
+```
+
+## Flagging Unresolvables
+
+Finally, we flagged our unresolvable entries, as they may benefit from additional checks during match reviews.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    flag_unresolvable = ifelse(
+      case_id %in% unresolvables$case_id, TRUE, FALSE
+    )
+  )
+```
+
+## Final Standardization
+
+We then performed final standardization of white spaces, including enforcing that empty strings were converted to missing values.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(dplyr::across(c(
+                    'client_street_address', 'client_city', 'client_state', 
+                    'client_county', 'client_street_address_name',
+                    'client_street_address_scnd1_val', 
+                    'client_street_address_scnd1_type',
+                    'client_street_address_scnd2_val', 
+                    'client_street_address_scnd2_type'
+                    ), 
+                    ~stringr::str_replace_all(.x, "( {2,})", " ")
+                  )) |>
+  dplyr::mutate(dplyr::across(c(
+                    'client_street_address', 'client_city', 'client_state', 
+                    'client_county', 'client_street_address_name',
+                    'client_street_address_scnd1_val', 
+                    'client_street_address_scnd1_type',
+                    'client_street_address_scnd2_val', 
+                    'client_street_address_scnd2_type'
+                    ), 
+                    ~ifelse(.x == "", NA_character_, .x)
+                  ))
+```
+
+
+# 💾 Save and Export Data
+
+We exported our data, for further use.
+
+```{r}
+saveRDS(
+  aps,
+  here::here("data","cleaned_rds_files","unique_subject_ids", "aps_clean.rds")
+)
+
+```
+
+# 🧹 Clean up
+
+```{r}
+rm(list=ls())
+```
 
