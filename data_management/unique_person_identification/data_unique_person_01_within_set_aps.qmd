@@ -12050,7 +12050,9 @@ We exported our data, for further use.
 ```{r}
 saveRDS(
   aps,
-  here::here("data","cleaned_rds_files","unique_subject_ids", "aps_clean.rds")
+  here::here(
+    "data", "cleaned_rds_files", "unique_subject_ids", "aps", "aps_clean.rds"
+    )
 )
 
 ```
