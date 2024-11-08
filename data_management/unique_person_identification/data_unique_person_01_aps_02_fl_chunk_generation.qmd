@@ -27,59 +27,44 @@ Variables for matching were determined to be:
 
 -   Gender: unfortunately, there was no variable indicating sex or gender of subjects in our data set. As such, no variable could be selected or used for blocking and/or exact matching.
 
--   Patient Name: First Name, Last Name (`client_first_name`, `client_last_name`)
+-   Subject Name: First Name, Last Name (`client_first_name`, `client_last_name`)
 
     -   Many middle name values were missing in the original data set, or were otherwise widely inconsistent. Some entries utilized a single initial, an apparent nickname and/or pseudonym, or demonstrated multiple names as is practice in certain cultures. Isolation to first and last name was selected to produce the most consistent results.
     -   Partial matching was utilized for name values. This increased true-matches between observations with human-recognizeable similar names, which otherwise had significant transpositions or typos.
 
--   Patient Date of Birth: Year, Month, Day (`client_dob_year`,`client_dob_month`,`client_dob_day`)
+-   Subject Date of Birth: Year, Month, Day (`client_dob_year`,`client_dob_month`,`client_dob_day`)
 
-    -   This weighting allowed for slight typos in one field of date of birth to have limited influence, while entirely different dates of birth had increasingly significant influence. As our concern was to account for differences made by typographical errors and/or practices to account for missing information (such as a practice of utilizing "January 1" for month and date if only birth year is known or assumed), splitting date of birth not only assisted in providing adequate weight (balanced for the two values for name, and [PLACEHOLDER] values for address), but also limited artificial distances that would have been created through using direct date numerical differences (i.e., weighting "1955-01-01" vs "1954-01-01" and "1930-12-05" vs "1930-11-05" equal as single-digit differences, rather than giving the year difference 12x the significance). This was most useful for familial relations with similar names and addresses, such as married couples cohabitating.
+    -   This weighting allowed for slight typos in one field of date of birth to have limited influence, while entirely different dates of birth had increasingly significant influence. As our concern was to account for differences made by typographical errors and/or practices to account for missing information (such as a practice of utilizing "January 1" for month and date if only birth year is known or assumed), splitting date of birth not only assisted in providing adequate weight (balanced for the two values for name, and two values for address), but also limited artificial distances that would have been created through using direct date numerical differences (i.e., weighting "1955-01-01" vs "1954-01-01" and "1930-12-05" vs "1930-11-05" equal as single-digit differences, rather than giving the year difference ~12x the significance). This was most useful for familial relations with similar names and addresses, such as married couples cohabitating.
 
--   Patient Address: Street Name (`pt_address_street`)
+-   Subject Address: Street Address, ZIP Code (`client_street_address`, `client_zip_code`),
 
     -   Using all values for address overly weighted values
-    -   Zip code proved to be too broad of a category
+    -   ZIP Code was useful for this data set, whereas it was found to be too broad in prior sets that were limited to a single state
     -   While neighbors may live on the same street, they are not likely to also have similar names or dates of birth
     -   Partial matching was utilized for Street Address values. This increased true-matches between observations with human-recognizeable similar values, which otherwise had significant transpositions or typos.
-    -   Using a single value avoided overly-weighting address for familial relations with similar names and addresses, and subjects which resided at the same multi-residence location (such as an apartment complex, senior living community, or nursing home)
+    -   Using only two values avoided overly-weighting address for familial relations with similar names and addresses, and subjects which resided at the same multi-residence location (such as an apartment complex, senior living community, or nursing home)
 
--   Partial Matching was utilized for Patient Name and Patient Address
+-   Partial Matching was utilized for Subject Name and Subject Address
 
     -   As mentioned in both name and address result listings, this choice increased true-matches between observations with human-recognizeable similar values, which had significant transpositions or typos.
 
--   A threshold of [PLACEHOLDER] was established for "true matches", and a threshold of [PLACEHOLDER] was established for "false matches"
+-   A threshold of 0.80 was established for "true matches", and a threshold of 0.10 was established for "false matches"
 
-    -   Matches between [PLACEHOLDER] and [PLACEHOLDER] (approximately [PLACEHOLDER] potential matching pairs) would benefit from manual verification and assignment
+    -   Matches between 0.10 and 0.80 (approximately 63 potential matching pairs, or 0.027% of the benchmarking chunk) would benefit from manual verification and assignment,
 
--   Our final fastLink output was produced with a lower threshold posterior probability of [PLACEHOLDER] for matches.
+-   Our final fastLink output was produced with a lower threshold posterior probability of 0.10 for matches.
 
-    -   There were 568,616 observations in the original data set, with 378,419 unique IDs originally assigned by the source (`case_id`). [PLACEHOLDER] observations (per `aps_row` values) were lost from the fuzzy-matching process.
-
-        -   Of these, 440 observations contained one of the 209 values of `case_id` that appeared more than once (i.e., a case with more than one row, despite the use of `case_id` as a unique key value in the original data set). However, this was explained due to prior processing: rows that contained multiple values for an identifier were separated in prior processing and cleaning. As such, these rows were not considered a significant concern for processing.
-
-        -   A total of [PLACEHOLDER] observations were flagged for manual cleaning and review
-        
-            -   174 values of `case_id` were found to be associated with more than one `client_id`, despite the Many-to-One relationship that was expected. These values were flagged to ensure manual review.
-
-            -   The [PLACEHOLDER] observations that either had duplicated `aps_row` values or were part of a group with one of these duplicated observations were flagged for manual review
-
-            -   [PLACEHOLDER] previously flagged observations, and an additional [PLACEHOLDER] observations, were within the [PLACEHOLDER] - [PLACEHOLDER] manual verification threshold and flagged for manual review
+    -   There were 568,616 observations in the original data set, with 378,419 unique IDs originally assigned by the source (`case_id`). The data's size required it be divided into five chunks (20%), which were created through random sampling.
 
 -   Data was exported and saved to achieve consistency, as fastLink output returns slight variations in results with each execution even with identical input. Declaration of a consistent random seed value at the start of each fastLink was utilized to minimize these differences to increase reproducibility.
 
     -   The fastLink output
 
-        -   `fl_out` --\> [PLACEHOLDER]
+        -   `fl_out` --\> 'data/cleaned_rds_files/unique_subject_ids/aps/aps_fl_chunk_#.rds', with # values from 1 through 5.
 
-    -   The stacked pairs with posterior probabilities
+    -   The aps data, with new flags and modifications
 
-        -   `test_stack` --\> [PLACEHOLDER]
-
-    -   Originally Assigned Group ID modified data set
-
-        -   `test_id` --\> [PLACEHOLDER]
-        
+        -   `aps` --\> 'data/cleaned_rds_files/unique_subject_ids/aps/aps_02_prepped_for_fl.rds'
 
 # 📦 Load Packages and Functions
 
@@ -142,9 +127,10 @@ informative_df_import(
     "aps", aps_path, overwrite = T
   )
 
-# 2024-11-04: APS data imported with 568,616 rows and 23 columns.
+# 2024-11-08: APS data imported with 568,616 rows and 23 columns.
 # Data last modified on OneDrive: 2024-11-01 16:59:03
 ```
+
 ## Flag of Invalid Many-to-Many for Client-Case Relationship
 
 As all cases should only be associated with a single client, we flagged all observations that contained one of the 174 observations with a `case_id` value that was associated with more than one `client_id`.
@@ -172,7 +158,7 @@ rm(multiple_client_ids)
 # 174
 ```
 
-## Conversion of Patient ZIP Code to Numeric
+## Conversion of Subject ZIP Code to Numeric
 
 Subject Zip Code data, was coded as character to preserve leading zeros and formatting. For the purposes of numeric matching with fastLink, it was converted to a numeric.
 
@@ -235,7 +221,7 @@ As there were 378,418 unique client_id values and 568,385 unique case_id values 
 
 ## Initial Attempt
 
-Initial attempts to link records matched based on 9 identifying variables: Subject Name (First and Last), Patient DOB (Year, Month, and Day), and Patient Address (Street Address, City, State, and Zip).
+Initial attempts to link records matched based on 9 identifying variables: Subject Name (First and Last), Subject DOB (Year, Month, and Day), and Subject Address (Street Address, City, State, and Zip).
 
 ```{r}
 ## Defining Target Variables
@@ -1595,7 +1581,7 @@ None of these pairs appeared to be true matches.
 
 #### Summary (0.10 - 0.80)
 
-There were 63 pairs (58 pairs) with reverse probabilities within the range of 0.10 - 0.80, which would require manual verification of proper pairing and ID. Despite how wide this range was, only 0.027% of potential pairs were likely to benefit from manual verification.
+There were 63 pairs (58 unique IDs) with reverse probabilities within the range of 0.10 - 0.80, which would require manual verification of proper pairing and ID. Despite how wide this range was, only 0.027% of potential pairs were likely to benefit from manual verification.
 
 ```{r}
 ## ==========================================================================
