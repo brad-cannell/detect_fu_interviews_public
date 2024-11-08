@@ -1,0 +1,1847 @@
+---
+title: "Within-Set Selection of APS Identifiers and Initial Fuzzy-Matching"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## APS Data Background
+
+The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`. 
+
+This APS data file was cleaned/prepped for processing prior to fuzzy-matching in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_within_set_aps.qmd).
+
+## This File
+
+This file performs selection of the identifiers that were be used to perform within-set fuzzy matching of the APS data utilizing the [fastLink package](https://cran.r-project.org/web/packages/fastLink/index.html). This was done to assess performance quality and other needs, including the potential need to divide the large data set due to computational  capacity limitations.
+
+Variables utilized in fastLink adjusted the weighting of each difference in entries. As such, we evaluated potential combinations of variables to generate a range of posterior probabilities that would be useful in creating Unique Subject IDs, with a reasonably sized useful range of posterior probabilities for manual verification and threshold setting. Additionally, due to the size of the data, assessment of computational performance was beneficial in determining if the data would have to be "chunked" and matched iteratively, which would increase the complexity of the task.
+
+Once the identifiers and process methods were selected, the initial fuzzy-matching was performed. Review and refinement of this output was performed in a separate file.
+
+### Result Summary
+
+Variables for matching were determined to be:
+
+-   Gender: unfortunately, there was no variable indicating sex or gender of subjects in our data set. As such, no variable could be selected or used for blocking and/or exact matching.
+
+-   Patient Name: First Name, Last Name (`client_first_name`, `client_last_name`)
+
+    -   Many middle name values were missing in the original data set, or were otherwise widely inconsistent. Some entries utilized a single initial, an apparent nickname and/or pseudonym, or demonstrated multiple names as is practice in certain cultures. Isolation to first and last name was selected to produce the most consistent results.
+    -   Partial matching was utilized for name values. This increased true-matches between observations with human-recognizeable similar names, which otherwise had significant transpositions or typos.
+
+-   Patient Date of Birth: Year, Month, Day (`client_dob_year`,`client_dob_month`,`client_dob_day`)
+
+    -   This weighting allowed for slight typos in one field of date of birth to have limited influence, while entirely different dates of birth had increasingly significant influence. As our concern was to account for differences made by typographical errors and/or practices to account for missing information (such as a practice of utilizing "January 1" for month and date if only birth year is known or assumed), splitting date of birth not only assisted in providing adequate weight (balanced for the two values for name, and [PLACEHOLDER] values for address), but also limited artificial distances that would have been created through using direct date numerical differences (i.e., weighting "1955-01-01" vs "1954-01-01" and "1930-12-05" vs "1930-11-05" equal as single-digit differences, rather than giving the year difference 12x the significance). This was most useful for familial relations with similar names and addresses, such as married couples cohabitating.
+
+-   Patient Address: Street Name (`pt_address_street`)
+
+    -   Using all values for address overly weighted values
+    -   Zip code proved to be too broad of a category
+    -   While neighbors may live on the same street, they are not likely to also have similar names or dates of birth
+    -   Partial matching was utilized for Street Address values. This increased true-matches between observations with human-recognizeable similar values, which otherwise had significant transpositions or typos.
+    -   Using a single value avoided overly-weighting address for familial relations with similar names and addresses, and subjects which resided at the same multi-residence location (such as an apartment complex, senior living community, or nursing home)
+
+-   Partial Matching was utilized for Patient Name and Patient Address
+
+    -   As mentioned in both name and address result listings, this choice increased true-matches between observations with human-recognizeable similar values, which had significant transpositions or typos.
+
+-   A threshold of [PLACEHOLDER] was established for "true matches", and a threshold of [PLACEHOLDER] was established for "false matches"
+
+    -   Matches between [PLACEHOLDER] and [PLACEHOLDER] (approximately [PLACEHOLDER] potential matching pairs) would benefit from manual verification and assignment
+
+-   Our final fastLink output was produced with a lower threshold posterior probability of [PLACEHOLDER] for matches.
+
+    -   There were 568,616 observations in the original data set, with 378,419 unique IDs originally assigned by the source (`case_id`). [PLACEHOLDER] observations (per `aps_row` values) were lost from the fuzzy-matching process.
+
+        -   Of these, 440 observations contained one of the 209 values of `case_id` that appeared more than once (i.e., a case with more than one row, despite the use of `case_id` as a unique key value in the original data set). However, this was explained due to prior processing: rows that contained multiple values for an identifier were separated in prior processing and cleaning. As such, these rows were not considered a significant concern for processing.
+
+        -   A total of [PLACEHOLDER] observations were flagged for manual cleaning and review
+        
+            -   174 values of `case_id` were found to be associated with more than one `client_id`, despite the Many-to-One relationship that was expected. These values were flagged to ensure manual review.
+
+            -   The [PLACEHOLDER] observations that either had duplicated `aps_row` values or were part of a group with one of these duplicated observations were flagged for manual review
+
+            -   [PLACEHOLDER] previously flagged observations, and an additional [PLACEHOLDER] observations, were within the [PLACEHOLDER] - [PLACEHOLDER] manual verification threshold and flagged for manual review
+
+-   Data was exported and saved to achieve consistency, as fastLink output returns slight variations in results with each execution even with identical input. Declaration of a consistent random seed value at the start of each fastLink was utilized to minimize these differences to increase reproducibility.
+
+    -   The fastLink output
+
+        -   `fl_out` --\> [PLACEHOLDER]
+
+    -   The stacked pairs with posterior probabilities
+
+        -   `test_stack` --\> [PLACEHOLDER]
+
+    -   Originally Assigned Group ID modified data set
+
+        -   `test_id` --\> [PLACEHOLDER]
+        
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r, warning = FALSE}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(fastLink)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   fastLink version 0.6.1
+-   janitor version 2.2.0
+
+## Functions
+
+```{r}
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+# Function that creates a modified version of table output, allowing
+# simplified manual review of unique values in a given column or set of
+# columns
+source(here::here("r", "get_unique_value_summary.R"))
+
+# Function that facilitates using fastlink to match a single data set
+# without limiting the returned data
+source(here::here("r", "single_df_fastlink.R"))
+       
+# Function that generates stacked pairs of the original data based on
+# fastLink's probabilistic matching
+source(here::here("r", "get_pair_data.R"))
+
+# Function that adds a potential Unique Subject ID to pairs
+source(here::here("r", "stack_ids.R"))
+```
+
+# 📥 Load Data
+
+## APS Identifier Data
+
+APS client data was originally in XLSX format. It had been cleaned and exported to an RDS file with 568,616 rows and 23 columns.
+
+```{r}
+aps_path <- here::here(
+  "data","cleaned_rds_files", "unique_subject_ids", "aps", "aps_clean.rds"
+  )
+
+informative_df_import(
+    "aps", aps_path, overwrite = T
+  )
+
+# 2024-11-04: APS data imported with 568,616 rows and 23 columns.
+# Data last modified on OneDrive: 2024-11-01 16:59:03
+```
+## Flag of Invalid Many-to-Many for Client-Case Relationship
+
+As all cases should only be associated with a single client, we flagged all observations that contained one of the 174 observations with a `case_id` value that was associated with more than one `client_id`.
+
+```{r}
+multiple_client_ids <- unique(pull(
+  aps |>
+    dplyr::select(case_id, client_id) |>
+    dplyr::distinct() |>
+    dplyr::mutate(flag = ifelse( 
+      (duplicated(case_id)|duplicated(case_id, fromLast = TRUE)),T, F)
+      ) |>
+  dplyr::filter(flag) |>
+  dplyr::select(case_id)
+  ))
+
+aps <- aps |>
+  dplyr::mutate(flag_mult_clients = ifelse(
+    case_id %in% multiple_client_ids, T, F
+  ))
+
+length(multiple_client_ids)
+rm(multiple_client_ids)
+
+# 174
+```
+
+## Conversion of Patient ZIP Code to Numeric
+
+Subject Zip Code data, was coded as character to preserve leading zeros and formatting. For the purposes of numeric matching with fastLink, it was converted to a numeric.
+
+```{r}
+aps$client_zip_code <- as.numeric(aps$client_zip_code)
+```
+
+## Addition of Row ID value
+
+We added a column indicating row number for the observations in the APS data, ensuring we would be able to trace back to the exact row if we required additional information in our review.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    aps_row = dplyr::row_number()
+  )
+```
+
+## List of Flagged Row Numbers
+
+To ensure proper application of flags in anticipation of parallel comparison (i.e., two columns indicating each of the paired rows into a single row), we generated vectors for flagged rows.
+
+```{r}
+flag_unresolvable <- pull(
+  aps |>
+    filter(flag_unresolvable) |>
+    select(aps_row)
+)
+
+flag_mult_clients <- pull(
+  aps |>
+    filter(flag_mult_clients) |>
+    select(aps_row)
+)
+```
+
+
+## Packing of Data
+
+We packed the APS data with additional values, for simplicity as we explored potential fastLink outputs. The assignment of the list of ID variables would be made within each iteration of fuzzy-matching.
+
+```{r}
+aps_pack <- list()
+aps_pack$df <- aps
+aps_pack$suffix <- 'aps'
+```
+
+## Random Seed
+
+As fastLink utilized some randomness in its processing, we set a random seed, to be declared again at the start of any cell that utilized fastLink, to attempt to maximize reproducibility.
+
+```{r}
+doc_seed <- 42
+set.seed(doc_seed)
+```
+
+# Determination of Variables
+
+As there were 378,418 unique client_id values and 568,385 unique case_id values in our data set, we expected to have at least 568,385 pairs with perfect matches (as each row is compared to each row, so each row should at minimum be a perfect match with itself).
+
+## Initial Attempt
+
+Initial attempts to link records matched based on 9 identifying variables: Subject Name (First and Last), Patient DOB (Year, Month, and Day), and Patient Address (Street Address, City, State, and Zip).
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  "client_first_name", "client_last_name", "client_street_address",
+  "client_city", "client_state"
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+## Defining packed identifiers
+aps_pack$ids <- c(
+  'aps_row', str_vars, num_vars, 'case_id', 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flags'
+  )
+```
+
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## fastLink
+fl_out <- single_df_fastLink(aps, str_vars, num_vars)
+```
+
+This initial attempt to process using these variables for the entire data set was abandoned, as progress stalled after 30 minutes.
+
+A secondary attempt, to evaluate the variables, was made on a subset of the APS data. We utilized random sampling to select 25% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.25
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(subset, str_vars, num_vars)
+```
+
+However, this attempt to use these variables for 25% of the data set was abandoned, as progress again stalled after 30 minutes.
+
+A third attempt, to evaluate the variables, was made on a subset of the APS data. We utilized random sampling to select 10% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.10
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(subset, str_vars, num_vars)
+```
+
+Unfortunately, this attempt to use these variables for 10% of the data set was abandoned, as progress again stalled after 30 minutes.
+
+A fourth and final attempt to evaluate the variables was made on a subset of the APS data. We utilized random sampling to select 5% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.05
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(subset, str_vars, num_vars)
+```
+
+While calculations managed to complete, the posterior probabilities generated in pairings were likely to demonstrate significant errors as the EM algorithm was unable to converge despite 5000 iterations. With this concern in mind, we generated our stacked pairs and IDs to evaluate the output.
+
+```{r}
+test_stack <- get_pair_data(
+  subset_pack, subset_pack, c(str_vars, num_vars), fl_out
+  )
+
+test_id <- stack_ids(subset_pack, subset_pack, test_stack)
+```
+
+### Output Summary
+
+In addition to the relatively prodigious processing time (\> 45 minutes), this produced a large number of potential pairs (48,672 pairs, with 28,430 rows in the data chunk).
+
+Posterior probabilities ranged from 0.8572264579997 to 1.0. 26,898 entries had posterior probabilities of 1.0, indicating a perfect match.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Any rows without a posterior probability?
+format(sum(is.na(test_stack$posterior_probability)), big.mark=',')
+
+# How many unique pairs?
+format(nrow(test_stack), big.mark=',')
+
+# How many rows in the original data set that was processed?
+format(nrow(subset), big.mark = ',')
+
+# How many pairs with a posterior probability of 1 (perfect match)?
+format(sum(test_stack$posterior_probability == 1), big.mark=',')
+
+# Get summary stats for the posterior probabilities, with min and max as focus
+format(summary(test_stack$posterior_probability), big.mark=',')
+```
+
+Cursory examination for observations with posteriors just below 1.0 included a large number of mismatches and duplicates. Many mismatches included transposed names, relatively common first or last names, individuals that appeared to be family members such as siblings and spouses, and individuals residing at in a multi-residence location such as apartment complexes, senior living facilities, and nursing homes. Similarly, pairs at lower values of posterior probability indicated a large number of actual matches intermixed with false matches.
+
+A total of 492,438 observations were generated in the ID-containing data set. There were 48,672 unique subject IDs created.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the ID generation set?
+format(nrow(test_id), big.mark=',')
+
+# How many unique subject ID values were created?
+format(length(unique(test_id$id)), big.mark=',')
+```
+
+### Duplicate Checking
+
+We found 408,954 observations with repeat `aps_row` numbers for the "first" member of the pair (excluding observations where the `aps_row` for both rows in the pair were identical).
+
+```{r}
+duplicates <- test_id |>
+  filter(
+    aps_row_a != aps_row_b & (
+      duplicated(aps_row_a) | duplicated(aps_row_a, fromLast = T)
+      )
+    )
+
+format(nrow(duplicates), big.mark = ",")
+```
+
+We found no duplicates that were missing a aps_row value, and we lost 12,654 observations based on aps_row numbers.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows have a missing value for one of the row numbers?
+format(
+  sum(is.na(duplicates$aps_row_a)|is.na(duplicates$aps_row_b)), 
+  big.mark = ","
+  )
+
+# Are there an equal number of unique row values as rows in the original set?
+# (i.e., were any observations lost?)
+length(unique(c(duplicates$aps_row_a,duplicates$aps_row_b))) == nrow(subset)
+
+# How many observations were lost? (if any)
+format(length(setdiff(
+  subset$aps_row, 
+  unique(c(duplicates$aps_row_a,duplicates$aps_row_b))
+  )), big.mark = ',')
+```
+
+We flagged all observations with a matching `aps_row` or `id` from the duplicated observations for a manual review. We found 481,331 observations, the vast majority of the pair ID data set, that were flagged for this reason.
+
+```{r}
+test_id$flag <- FALSE
+
+test_id <- test_id |>
+  mutate(flag = dplyr::case_when(
+    id %in% duplicates$id ~ TRUE,
+    (
+      (aps_row_a %in% duplicates$aps_row_a)|
+        (aps_row_b %in% duplicates$aps_row_a)
+      ) ~ TRUE,
+    (
+      (aps_row_a %in% duplicates$aps_row_b)|
+        (aps_row_b %in% duplicates$aps_row_b)
+      ) ~ TRUE,
+    TRUE ~ flag
+  ))
+
+get_unique_value_summary(test_id,"flag")
+```
+
+In checking these values, we saw that many of them appeared to be caused by a prodigious number of false matches, similar to the cursory examination.
+
+```{r}
+checking <- test_id |>
+  dplyr::filter(flag) |>
+  dplyr::group_by(id) |>
+  dplyr::arrange(posterior_probability)
+```
+
+## Reduction of Breadth for Address Fields
+
+Initial attempts for linkage revealed that address values were disproportionately significant, likely due to the number of address fields used in matching. This appeared to cause individuals that lived within the same multi-residence facility (including senior living facilities, nursing homes, and apartment complexes) to have high posterior probabilities, despite significantly different Names and Dates of Birth. For this attempt at refining the process, all address fields except zip code were excluded.
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  "client_first_name", "client_last_name"
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+## Defining packed identifiers
+aps_pack$ids <- c(
+  'aps_row', str_vars, num_vars, 'case_id', 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flags'
+  )
+```
+
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## fastLink
+fl_out <- single_df_fastLink(aps, str_vars, num_vars)
+```
+
+This initial attempt to process using these variables for the entire data set was abandoned, as progress stalled after 45 minutes.
+
+A secondary attempt, to evaluate the variables, was made on a subset of the APS data. We utilized random sampling to select 25% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.25
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(subset, str_vars, num_vars)
+```
+
+However, this attempt to use these variables for 25% of the data set was abandoned, as progress again stalled after 45 minutes.
+
+A third attempt, to evaluate the variables, was made on a subset of the APS data. We utilized random sampling to select 10% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.10
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(subset, str_vars, num_vars)
+```
+
+Calculations managed to complete within 45 minutes without stalls or failure to achieve convergence. We generated our stacked pairs and IDs to evaluate the output.
+
+```{r}
+test_stack <- get_pair_data(
+  subset_pack, subset_pack, c(str_vars, num_vars), fl_out
+  )
+
+test_id <- stack_ids(subset_pack, subset_pack, test_stack)
+```
+
+### Output Summary
+
+While this processing continued to have a relatively prodigious processing time (\> 30 minutes), it produced a far more reasonable number of potential pairs (58,680 pairs, with 56,861 rows in the data chunk).
+
+Posterior probabilities ranged from 0.8595499752115 to 0.9999992882492. There were no entries that had posterior probabilities of 1.0, indicating a perfect match, despite the fact the data set was matching internally and thus should have had such values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Any rows without a posterior probability?
+format(sum(is.na(test_stack$posterior_probability)), big.mark=',')
+
+# How many unique pairs?
+format(nrow(test_stack), big.mark=',')
+
+# How many rows in the original data set that was processed?
+format(nrow(subset), big.mark = ',')
+
+# How many pairs with a posterior probability of 1 (perfect match)?
+format(sum(test_stack$posterior_probability == 1), big.mark=',')
+
+# Get summary stats for the posterior probabilities, with min and max as focus
+format(summary(test_stack$posterior_probability), big.mark=',')
+```
+
+A total of 95,522 observations were generated in the ID-containing data set. There were 58,680 unique subject IDs created.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the ID generation set?
+format(nrow(test_id), big.mark=',')
+
+# How many unique subject ID values were created?
+format(length(unique(test_id$id)), big.mark=',')
+```
+
+### Duplicate Checking
+
+We found 30,423 observations with repeat `aps_row` numbers for the "first" member of the pair (excluding observations where the `aps_row` for both rows in the pair were identical).
+
+```{r}
+duplicates <- test_id |>
+  filter(
+    aps_row_a != aps_row_b & (
+      duplicated(aps_row_a) | duplicated(aps_row_a, fromLast = T)
+      )
+    )
+
+format(nrow(duplicates), big.mark = ",")
+# [1] "30,423"
+```
+
+We found no duplicates that were missing a aps_row value, and we lost 49,409 observations based on aps_row numbers.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows have a missing value for one of the row numbers?
+format(
+  sum(is.na(duplicates$aps_row_a)|is.na(duplicates$aps_row_b)), 
+  big.mark = ","
+  )
+
+# Are there an equal number of unique row values as rows in the original set?
+# (i.e., were any observations lost?)
+length(unique(c(duplicates$aps_row_a,duplicates$aps_row_b))) == nrow(subset)
+
+# How many observations were lost? (if any)
+format(length(setdiff(
+  subset$aps_row, 
+  unique(c(duplicates$aps_row_a,duplicates$aps_row_b))
+  )), big.mark = ',')
+```
+
+We flagged all observations with a matching `aps_row` or `id` from the duplicated observations for a manual review. We found 49,209 observations, approximately half of the pair ID data set, that were flagged for this reason.
+
+```{r}
+test_id$flag <- FALSE
+
+test_id <- test_id |>
+  mutate(flag = dplyr::case_when(
+    id %in% duplicates$id ~ TRUE,
+    (
+      (aps_row_a %in% duplicates$aps_row_a)|
+        (aps_row_b %in% duplicates$aps_row_a)
+      ) ~ TRUE,
+    (
+      (aps_row_a %in% duplicates$aps_row_b)|
+        (aps_row_b %in% duplicates$aps_row_b)
+      ) ~ TRUE,
+    TRUE ~ flag
+  ))
+
+get_unique_value_summary(test_id,"flag")
+```
+
+In checking these values, we saw that many of them appeared to be caused by a prodigious number of false matches. This appeared to be due to entries which had missingness in name fields (and thus were limited in their contributions under fastLink's algorithms), resulting in matches based on similar values for zip code and birth date.
+
+```{r}
+checking <- test_id |>
+  dplyr::filter(flag) |>
+  dplyr::group_by(id) |>
+  dplyr::arrange(posterior_probability)
+```
+
+## Reintroduction of Street Address
+
+To account for matching shortfalls in the prior variable selection, we reintroduced the street address value as a match parameter, in effort to make any address-based matches more robust.
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  "client_first_name", "client_last_name", 'client_street_address'
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+## Defining packed identifiers
+aps_pack$ids <- c(
+  'aps_row', str_vars, num_vars, 'case_id', 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flags'
+  )
+```
+
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## fastLink
+fl_out <- single_df_fastLink(aps, str_vars, num_vars)
+```
+
+This initial attempt to process using these variables for the entire data set was abandoned, as progress stalled after 45 minutes.
+
+A secondary attempt, to evaluate the variables, was made on a subset of the APS data. We utilized random sampling to select 25% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.25
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(subset, str_vars, num_vars)
+```
+
+However, this attempt to use these variables for 25% of the data set was abandoned, as progress again stalled after 45 minutes.
+
+A third attempt, to evaluate the variables, was made on a subset of the APS data. We utilized random sampling to select 10% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.10
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(subset, str_vars, num_vars)
+```
+
+Calculations managed to complete within 45 minutes without stalls or failure to achieve convergence. We generated our stacked pairs and IDs to evaluate the output.
+
+```{r}
+test_stack <- get_pair_data(
+  subset_pack, subset_pack, c(str_vars, num_vars), fl_out
+  )
+
+test_id <- stack_ids(subset_pack, subset_pack, test_stack)
+```
+
+### Output Summary
+
+While this processing continued to have a relatively prodigious processing time (\> 30 minutes), it produced a far more reasonable number of potential pairs than using all possible variables, and less than when using only zip code for address (85,585 pairs, with 56,861 rows in the data chunk).
+
+Posterior probabilities ranged from 0.8582950942725 to 0.9999999999766. There were no entries that had posterior probabilities of 1.0, indicating a perfect match, despite the fact the data set was matching internally and thus should have had such values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Any rows without a posterior probability?
+format(sum(is.na(test_stack$posterior_probability)), big.mark=',')
+
+# How many unique pairs?
+format(nrow(test_stack), big.mark=',')
+
+# How many rows in the original data set that was processed?
+format(nrow(subset), big.mark = ',')
+
+# How many pairs with a posterior probability of 1 (perfect match)?
+format(sum(test_stack$posterior_probability == 1), big.mark=',')
+
+# Get summary stats for the posterior probabilities, with min and max as focus
+format(summary(test_stack$posterior_probability), big.mark=',')
+```
+
+A total of 1,317,197 observations were generated in the ID-containing data set. There were 85,585 unique subject IDs created.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the ID generation set?
+format(nrow(test_id), big.mark=',')
+
+# How many unique subject ID values were created?
+format(length(unique(test_id$id)), big.mark=',')
+```
+
+### Duplicate Checking
+
+We found 1,139,345 observations with repeat `aps_row` numbers for the "first" member of the pair (excluding observations where the `aps_row` for both rows in the pair were identical).
+
+```{r}
+duplicates <- test_id |>
+  filter(
+    aps_row_a != aps_row_b & (
+      duplicated(aps_row_a) | duplicated(aps_row_a, fromLast = T)
+      )
+    )
+
+format(nrow(duplicates), big.mark = ",")
+#[1] "1,139,345"
+```
+
+We found no duplicates that were missing a aps_row value, and we lost 35,834 observations based on aps_row numbers.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows have a missing value for one of the row numbers?
+format(
+  sum(is.na(duplicates$aps_row_a)|is.na(duplicates$aps_row_b)), 
+  big.mark = ","
+  )
+
+# Are there an equal number of unique row values as rows in the original set?
+# (i.e., were any observations lost?)
+length(unique(c(duplicates$aps_row_a,duplicates$aps_row_b))) == nrow(subset)
+
+# How many observations were lost? (if any)
+format(length(setdiff(
+  subset$aps_row, 
+  unique(c(duplicates$aps_row_a,duplicates$aps_row_b))
+  )), big.mark = ',')
+```
+
+We flagged all observations with a matching `aps_row` or `id` from the duplicated observations for a manual review. We found 1,284,462 observations, the vast majority of the pair ID data set, that were flagged for this reason.
+
+```{r}
+test_id$flag <- FALSE
+
+test_id <- test_id |>
+  mutate(flag = dplyr::case_when(
+    id %in% duplicates$id ~ TRUE,
+    (
+      (aps_row_a %in% duplicates$aps_row_a)|
+        (aps_row_b %in% duplicates$aps_row_a)
+      ) ~ TRUE,
+    (
+      (aps_row_a %in% duplicates$aps_row_b)|
+        (aps_row_b %in% duplicates$aps_row_b)
+      ) ~ TRUE,
+    TRUE ~ flag
+  ))
+
+get_unique_value_summary(test_id,"flag")
+```
+
+In checking these values, the lower range appeared to have a mix of false and true matches.. This appeared to be due to entries which had missingness in some fields (and thus were limited in their contributions under fastLink's algorithms), resulting in matches based on similar values for the present values. However, this overall appeared to produce a balanced result.
+
+```{r}
+checking <- test_id |>
+  dplyr::filter(flag) |>
+  dplyr::group_by(id) |>
+  dplyr::arrange(posterior_probability)
+```
+
+## Introduction of Partial Matching
+
+In similar prior tasks, partial matching was found to be valuable to balance the effects of both missingness and trends in string distance differences, such as highly shortened nicknames (e.g. "Josephine" to "Jo"). We thus tested using partial matching on all string variables.
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  "client_first_name", "client_last_name", 'client_street_address'
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+## Defining packed identifiers
+aps_pack$ids <- c(
+  'aps_row', str_vars, num_vars, 'case_id', 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flags'
+  )
+```
+
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## fastLink
+fl_out <- single_df_fastLink(
+  aps, str_vars, num_vars, partial.match = str_vars
+  )
+```
+
+This initial attempt to process using these variables for the entire data set was abandoned, as progress stalled after 45 minutes.
+
+A secondary attempt, to evaluate the variables, was made on a subset of the APS data. We utilized random sampling to select 25% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.25
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(
+  subset, str_vars, num_vars, partial.match = str_vars
+  )
+```
+
+However, this attempt to use these variables for 25% of the data set was abandoned, as progress again stalled after 45 minutes.
+
+A third attempt, to evaluate the variables, was made on a subset of the APS data. We utilized random sampling to select 10% of our original data set to attempt processing again.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.10
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(
+  subset, str_vars, num_vars, partial.match = str_vars
+  )
+```
+
+Calculations managed to complete within 45 minutes without stalls or failure to achieve convergence. We generated our stacked pairs and IDs to evaluate the output.
+
+```{r}
+test_stack <- get_pair_data(
+  subset_pack, subset_pack, c(str_vars, num_vars), fl_out
+  )
+
+test_id <- stack_ids(subset_pack, subset_pack, test_stack)
+```
+
+### Output Summary
+
+While this processing continued to have a relatively prodigious processing time (\> 30 minutes), it notably produced significantly fewer pairs than processing the same variables without partial matching (58,690 pairs, with 56,861 rows in the data chunk).
+
+Posterior probabilities ranged from 0.8591992468568 to 0.9999999999966. There were no entries that had posterior probabilities of 1.0, indicating a perfect match, despite the fact the data set was matching internally and thus should have had such values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Any rows without a posterior probability?
+format(sum(is.na(test_stack$posterior_probability)), big.mark=',')
+
+# How many unique pairs?
+format(nrow(test_stack), big.mark=',')
+
+# How many rows in the original data set that was processed?
+format(nrow(subset), big.mark = ',')
+
+# How many pairs with a posterior probability of 1 (perfect match)?
+format(sum(test_stack$posterior_probability == 1), big.mark=',')
+
+# Get summary stats for the posterior probabilities, with min and max as focus
+format(summary(test_stack$posterior_probability), big.mark=',')
+```
+
+A total of 94,702 observations were generated in the ID-containing data set. There were 58,690 unique subject IDs created.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the ID generation set?
+format(nrow(test_id), big.mark=',')
+
+# How many unique subject ID values were created?
+format(length(unique(test_id$id)), big.mark=',')
+```
+
+### Duplicate Checking
+
+We found 29,669 observations with repeat `aps_row` numbers for the "first" member of the pair (excluding observations where the `aps_row` for both rows in the pair were identical).
+
+```{r}
+duplicates <- test_id |>
+  filter(
+    aps_row_a != aps_row_b & (
+      duplicated(aps_row_a) | duplicated(aps_row_a, fromLast = T)
+      )
+    )
+
+format(nrow(duplicates), big.mark = ",")
+#[1] "29,669"
+```
+
+We found no duplicates that were missing a aps_row value, and we lost 49,375 observations based on aps_row numbers.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows have a missing value for one of the row numbers?
+format(
+  sum(is.na(duplicates$aps_row_a)|is.na(duplicates$aps_row_b)), 
+  big.mark = ","
+  )
+
+# Are there an equal number of unique row values as rows in the original set?
+# (i.e., were any observations lost?)
+length(unique(c(duplicates$aps_row_a,duplicates$aps_row_b))) == nrow(subset)
+
+# How many observations were lost? (if any)
+format(length(setdiff(
+  subset$aps_row, 
+  unique(c(duplicates$aps_row_a,duplicates$aps_row_b))
+  )), big.mark = ',')
+```
+
+We flagged all observations with a matching `aps_row` or `id` from the duplicated observations for a manual review. We found 48,399 observations, approximately half of the pair ID data set, that were flagged for this reason.
+
+```{r}
+test_id$flag <- FALSE
+
+test_id <- test_id |>
+  mutate(flag = dplyr::case_when(
+    id %in% duplicates$id ~ TRUE,
+    (
+      (aps_row_a %in% duplicates$aps_row_a)|
+        (aps_row_b %in% duplicates$aps_row_a)
+      ) ~ TRUE,
+    (
+      (aps_row_a %in% duplicates$aps_row_b)|
+        (aps_row_b %in% duplicates$aps_row_b)
+      ) ~ TRUE,
+    TRUE ~ flag
+  ))
+
+get_unique_value_summary(test_id,"flag")
+```
+
+In checking these values, these matches appeared to be fairly trustworthy, even at the lower range of posterior probabilities included. Few values in the lower range appeared to possibly be false or questionable matches, largely between individuals with relatively common names. This appeared to be due to entries which had missingness in some fields (and thus were limited in their contributions under fastLink's algorithms), resulting in matches based on similar values for the present values. However, this overall appeared to produce our highest-quality result thus far.
+
+```{r}
+checking <- test_id |>
+  dplyr::filter(flag) |>
+  dplyr::group_by(id) |>
+  dplyr::arrange(posterior_probability)
+```
+
+# Determination of Posterior Probabilities 
+
+To review the range of posterior probabilities that would provide a maximal return for manual review, we had to examine our results in greater detail, across a broader range than the default lower threshold.
+
+##fastLink
+
+We utilized fastLink and requested all matches with posterior probabilities greater than 0.001 for a 10% subset of our data set.
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  "client_first_name", "client_last_name", 'client_street_address'
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+## Defining packed identifiers
+aps_pack$ids <- c(
+  'aps_row', str_vars, num_vars, 'case_id', 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flags'
+  )
+```
+
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.10
+
+flags <- sample(c(
+      rep(TRUE,nrow(aps)*sample_ratio), 
+      rep(FALSE,nrow(aps)*(1-sample_ratio))
+      ), replace = FALSE
+    )
+
+### Add an additional flag if the vector is a value short, due to rounding
+if (length(flags) == nrow(aps) - 1) {
+  flags <- c(flags, F)
+}
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(
+  subset, str_vars, num_vars, partial.match = str_vars, return.all = TRUE
+  )
+```
+
+We used the fastLink output to generate our stacked pairs for inspection, and a version of the data set with unique IDs based on these matches.
+
+```{r}
+test_stack <- get_pair_data(
+  subset_pack, subset_pack, c(str_vars, num_vars), fl_out
+  )
+
+test_id <- stack_ids(subset_pack, subset_pack, test_stack)
+```
+
+## Output Summary
+
+While this processing continued to have a relatively prodigious processing time (\> 30 minutes), it notably produced significantly similar results to initial test of partial matching (62,203 pairs, with 56,861 rows in the data chunk).
+
+Posterior probabilities ranged from 0.001019122243628 to 0.999999999996575. There were no entries that had posterior probabilities of 1.0, indicating a perfect match, despite the fact the data set was matching internally and thus should have had such values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Any rows without a posterior probability?
+format(sum(is.na(test_stack$posterior_probability)), big.mark=',')
+
+# How many unique pairs?
+format(nrow(test_stack), big.mark=',')
+
+# How many rows in the original data set that was processed?
+format(nrow(subset), big.mark = ',')
+
+# How many pairs with a posterior probability of 1 (perfect match)?
+format(sum(test_stack$posterior_probability == 1), big.mark=',')
+
+# Get summary stats for the posterior probabilities, with min and max as focus
+format(summary(test_stack$posterior_probability), big.mark=',')
+```
+
+A total of 229,689 observations were generated in the ID-containing data set. There were 62,203 unique subject IDs created.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the ID generation set?
+format(nrow(test_id), big.mark=',')
+
+# How many unique subject ID values were created?
+format(length(unique(test_id$id)), big.mark=',')
+```
+
+### Evaluation of Posterior Probability Ranges
+
+#### 0.90 - 0.95
+
+The 170 pairs (142 IDs) with posteriors between 0.90 - 0.95 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.90,0.95)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+All pairs appeared to be valid.
+
+#### 0.80 - 0.85
+
+The 4 pairs (4 IDs)with posteriors between 0.80 - 0.85 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.80,0.85)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+All pairs observed appear to be true matches.
+
+#### 0.75 - 0.80
+
+The 30 pairs (30 IDs) with posteriors between 0.75 - 0.80 were examined
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.75,0.80)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+Pairs within this range appeared to be a mix of true matches, false matches, and questionable matches. Questionable matches were primarily due to missingness patterns in data combined with common names and similar date of birth components.
+
+#### 0.70 - 0.75
+
+There were no pairs with a posterior probability between 0.70 and 0.75.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.70,0.75)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.65 - 0.70
+
+The 3 pairs (3 IDs) with posteriors between 0.65 - 0.70 were examined
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.65,0.70)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+All matches in this set appeared to be valid, representing a subject with an unusual name, fully matched date of birth, but different address values likely indicating a subject that moved.
+
+#### 0.60 - 0.65
+
+The 3 pairs (3 IDs) with posteriors between 0.60 - 0.65 were examined
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.60,0.65)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+All matches in this set appeared to be valid, representing a subject with a multi-component last name, fully matched date of birth, but different address values likely indicating a subject that moved.
+
+#### 0.55 - 0.60
+
+There were no pairs with a posterior probability between 0.55 - 0.60.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.55,0.60)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.50 - 0.55
+
+The 21 pairs (16 IDs) with posteriors between 0.50 - 0.55 were examined
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.50,0.55)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+These pairs appeared to be a mix of true, false, and questionable matches.
+
+#### 0.45 - 0.50
+
+There were no pairs with a posterior probability between 0.45 - 0.50.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.45,0.50)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.40 - 0.45
+
+There were no pairs with a posterior probability between 0.40 - 0.45
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.40,0.45)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.35 - 0.40
+
+There were no pairs with a posterior probability between 0.35 - 0.40
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.35,0.40)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.30 - 0.35
+
+There were no pairs with a posterior probability between 0.30 - 0.35
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.30,0.35)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.25 - 0.30
+
+There were no pairs with a posterior probability between 0.25 - 0.30
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.25,0.30)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.20 - 0.25
+
+There were no pairs with a posterior probability between 0.20 - 0.25
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.20,0.25)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.15 - 0.20
+
+There were no pairs with a posterior probability between 0.15 - 0.20
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.15,0.20)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+#### 0.10 - 0.15
+
+The 6 pairs (6 IDs) with posteriors between 0.10 - 0.15 were examined
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.10,0.15)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+These pairs included a mix of true and false matches. True matches were due to alternatives in hyphenation of a last name (unique name for subject), identical date of birth, but differing address reflecting a move. False matches appeared to be between cohabitating siblings or spouses.
+
+#### 0.05 - 0.10
+
+The 390 pairs (287 IDs) with posteriors between 0.05 - 0.10 were examined
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.05,0.10)))
+
+nrow(checking)
+length(unique(checking$id))
+```
+
+None of these pairs appeared to be true matches. 
+
+#### Summary (0.10 - 0.80)
+
+There were 63 pairs (58 pairs) with reverse probabilities within the range of 0.10 - 0.80, which would require manual verification of proper pairing and ID. Despite how wide this range was, only 0.027% of potential pairs were likely to benefit from manual verification.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.10,0.80)))
+
+nrow(checking)
+length(unique(checking$id))
+paste0(format(nrow(checking)*100 / nrow(test_id), digits = 4),"%")
+```
+
+# Determination of Chunk Sizing
+
+As our data set was fairly large, and previous examination had been forced to utilized chunking to avoid stalls, we sought to identify the largest possible chunk size to minimize the need for iterative cross-matching of chunks to create a unified set. As we stalled at 25% (4 chunks) and were successful at 10% (10 chunks), we already had a potential range. Processing would be performed with a return lower value threshold of 0.10, as determined through our posterior probability exploration. 
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  "client_first_name", "client_last_name", 'client_street_address'
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+## Defining packed identifiers
+aps_pack$ids <- c(
+  'aps_row', str_vars, num_vars, 'case_id', 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flags'
+  )
+```
+
+We first attempted processing 20% of the data set, which would result in 5 chunks for full processing.
+
+```{r, eval = F}
+# Set seed
+set.seed(doc_seed)
+
+## Generating subset
+sample_ratio <- 0.20
+
+flags <- sample(c(1,2,3,4,5), nrow(aps), replace=T, prob = rep(0.2,5))
+
+aps$flags <- flags
+
+subset <- aps |>
+  dplyr::filter(flags == 1)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_1'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(
+  subset, str_vars, num_vars, partial.match = str_vars, threshold.match = 0.10
+  )
+```
+
+This processing was successful, though this processing took over 1 hour to complete. A bottleneck was clear at the final stage of processing, which required 100% of CPU capacity. Due to this limitation, this was determined to be the maximal chunk size. This chunk would be utilized as the first of our five chunks for later processing.
+
+## Processing of Chunks
+
+We processed our chunks, starting with exporting the first chunk created in testing.
+
+### Chunk 1
+
+#### 💾 Save and Export Data
+
+We exported our data, for further use.
+
+```{r}
+saveRDS(
+  fl_out,
+  here::here(
+    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "aps_fl_chunk_1.rds"
+    )
+)
+
+```
+
+### Chunk 2
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+subset <- aps |>
+  dplyr::filter(flags == 2)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_2'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(
+  subset, str_vars, num_vars, partial.match = str_vars, threshold.match = 0.10
+  )
+```
+
+#### 💾 Save and Export Data
+
+We exported our data, for further use.
+
+```{r}
+saveRDS(
+  fl_out,
+  here::here(
+    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "aps_fl_chunk_2.rds"
+    )
+)
+
+```
+
+### Chunk 3
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+subset <- aps |>
+  dplyr::filter(flags == 3)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_3'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(
+  subset, str_vars, num_vars, partial.match = str_vars, threshold.match = 0.10
+  )
+```
+
+#### 💾 Save and Export Data
+
+We exported our data, for further use.
+
+```{r}
+saveRDS(
+  fl_out,
+  here::here(
+    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "aps_fl_chunk_3.rds"
+    )
+)
+
+```
+
+### Chunk 4
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+subset <- aps |>
+  dplyr::filter(flags == 4)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_4'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(
+  subset, str_vars, num_vars, partial.match = str_vars, threshold.match = 0.10
+  )
+```
+
+#### 💾 Save and Export Data
+
+We exported our data, for further use.
+
+```{r}
+saveRDS(
+  fl_out,
+  here::here(
+    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "aps_fl_chunk_4.rds"
+    )
+)
+
+```
+
+### Chunk 5
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+subset <- aps |>
+  dplyr::filter(flags == 5)
+
+## Packing Subset
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_5'
+subset_pack$ids <- aps_pack$ids
+
+## fastLink
+fl_out <- single_df_fastLink(
+  subset, str_vars, num_vars, partial.match = str_vars, threshold.match = 0.10
+  )
+```
+
+#### 💾 Save and Export Data
+
+We exported our data, for further use.
+
+```{r}
+saveRDS(
+  fl_out,
+  here::here(
+    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "aps_fl_chunk_5.rds"
+    )
+)
+
+```
+
+## 💾 Save and Export Data
+
+We exported our aps data, including row numbers, chunk assignments, and flags, in case it was required later.
+
+```{r}
+saveRDS(
+  aps,
+  here::here(
+    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "aps_02_prepped_for_fl.rds"
+    )
+)
+
+```
+
+# 🧹 Clean up
+
+```{r}
+rm(list=ls())
+```
