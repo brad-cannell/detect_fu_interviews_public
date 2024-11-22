@@ -142,7 +142,7 @@ APS client data was originally in XLSX format. It had been cleaned and exported 
 ```{r}
 aps_path <- here::here(
   "data","cleaned_rds_files", "unique_subject_ids", "aps", 
-  "aps_02_prepped_for_fl.rds"
+  "aps_01_prepped_for_fl.rds"
   )
 
 informative_df_import(
@@ -165,7 +165,7 @@ purrr::walk(
       paste0("aps_chunk_", x), 
       paste0(
         here::here("data","cleaned_rds_files", "unique_subject_ids", "aps"), 
-        "/aps_fl_chunk_",
+        "/aps_01_fl_chunk_",
         x, 
         ".rds"
         ), overwrite = T
@@ -251,7 +251,7 @@ aps_chunk_1_ids <- stack_ids(subset_pack, subset_pack, aps_chunk_1_pairs)
 
 ### Review of Initial ID Assignments
 
-There were 206,791 pairs in the First APS Within-Set Matching Chunk, generated from 167,916 APS observations. There were no pairs were missing values for `aps_row` variables. Additionally, there were no APS observations that were not found in the pair data, likely due to failure to find a match. There were 174,457 unique IDs (1 - 174,457) assigned in this preliminary processing, with no pairs missing an ID assignment.
+There were 168,615 observations in the First APS Within-Set Matching Chunk ID set, generated from 167,916 APS observations. There were no pairs were missing values for `aps_row` variables. Additionally, there were no APS observations that were not found in the pair data, likely due to failure to find a match. There were 162,062 unique IDs (1 - 162,062) assigned in this preliminary processing, with no pairs missing an ID assignment.
 
 ```{r}
 ## ==========================================================================
@@ -259,21 +259,19 @@ There were 206,791 pairs in the First APS Within-Set Matching Chunk, generated f
 ## file to perform a standardized set of data checks in one block.
 ## ==========================================================================
 
-# How many pairs in this chunk?
+# How many observations in the ID set?
 format(nrow(aps_chunk_1_ids), big.mark = ',')
 
 # How many rows are in the subset used to generate this chunk?
 format(nrow(subset), big.mark = ',')
 
 # Are there any pairs missing a value for row?
-format(sum(is.na(aps_chunk_1_ids$aps_row_a)), big.mark = ',')
-format(sum(is.na(aps_chunk_1_ids$aps_row_b)), big.mark = ',')
+format(sum(is.na(aps_chunk_1_ids$aps_row)), big.mark = ',')
 
 # How many rows in the original APS data for this chunk are missing from the
 # ID/Pair generated set (likely due to no matches)
 format(length(setdiff(
-  subset$aps_row, 
-  unique(c(aps_chunk_1_ids$aps_row_a, aps_chunk_1_ids$aps_row_b))
+  subset$aps_row, unique(aps_chunk_1_ids$aps_row)
   )), big.mark = ",")
 
 # How many unique IDs were generated?
@@ -453,6 +451,8 @@ length(drop_pairs_c1)
 # [1] 56
 ```
 
+#### Name Failures
+
 ##### Last Name (Weak Matches)
 
 We examined remaining pairs with weakly matching last name values (Gamma == 1). Many of the last name values in the rows of pairs in this section appeared to differ primarily due to small typos.
@@ -565,7 +565,8 @@ checking_cols <- checking |>
   dplyr::filter(client_first_name_gamma == 1) |>
   # Omit previous check groups
   dplyr::filter(!(
-    client_zip_code_gamma == 0 | client_street_address_gamma < 2 | client_last_name_gamma < 2
+    client_zip_code_gamma == 0 | client_street_address_gamma < 2 | 
+      client_last_name_gamma < 2
     ))
 
 # Number of rows in this subset
@@ -588,7 +589,8 @@ checking_cols <- checking |>
   dplyr::filter(client_first_name_gamma == 0) |>
   # Omit previous check groups
   dplyr::filter(!(
-    client_zip_code_gamma == 0 | client_street_address_gamma < 2 | client_last_name_gamma < 2
+    client_zip_code_gamma == 0 | client_street_address_gamma < 2 | 
+      client_last_name_gamma < 2
     ))
 
 # Number of rows in this subset
@@ -606,9 +608,433 @@ paste0(
 # [1] "Min: 0.45822; Max: 0.63838"
 ```
 
+There were 4 of the 1,327 pairs found to be a true match. As such, we added the remaining 1,323 pair ids to our drop list.
+
+```{r}
+keep_pairs <- c(
+  20912, 31233, 31533, 72886 
+  )
+
+drop_pairs_c1 <- unique(c(
+  drop_pairs_c1, 
+  setdiff(checking_cols$pair, keep_pairs)
+  ))
+
+format(length(drop_pairs_c1), big.mark = ',')
+# [1] "1,928"
+```
+
+#### Remaining Pairs
+
+There were no remaining pairs to examine.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(client_first_name_gamma == 0) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    client_zip_code_gamma == 0 | client_street_address_gamma < 2 | 
+      client_last_name_gamma < 2 | client_first_name_gamma < 2
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# [1] "0"
+```
+
+We verified that we had a total of 60 pairs kept from this subset.
+
+```{r}
+nrow(
+  checking |>
+    dplyr::filter(!(pair %in% drop_pairs_c1))
+  ) == 60
+# [1] TRUE
+```
+
+#### Regenerating ID Assignments
+
+We reduced our Chunk 1 pairs, excluding all pairs in the manual verification range that we determined were false matches. We used this reduced set to re-generate ID assignments.
+
+```{r}
+aps_chunk_1_pairs <- aps_chunk_1_pairs |>
+  dplyr::filter(!(pair %in% drop_pairs_c1))
+
+aps_chunk_1_ids <- stack_ids(subset_pack, subset_pack, aps_chunk_1_pairs)
+```
+
+There were 168,143 observations in the First APS Within-Set Matching Chunk ID set, generated from 167,916 APS observations. There were no pairs were missing values for `aps_row` variables. Additionally, there were no APS observations that were not found in the pair data, likely due to failure to find a match. There were 163,668 unique IDs (1 - 163,668) assigned in this preliminary processing, with no pairs missing an ID assignment.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many observations in the ID set?
+format(nrow(aps_chunk_1_ids), big.mark = ',')
+
+# How many rows are in the subset used to generate this chunk?
+format(nrow(subset), big.mark = ',')
+
+# Are there any pairs missing a value for row?
+format(sum(is.na(aps_chunk_1_ids$aps_row)), big.mark = ',')
+
+# How many rows in the original APS data for this chunk are missing from the
+# ID/Pair generated set (likely due to no matches)
+format(length(setdiff(
+  subset$aps_row, unique(aps_chunk_1_ids$aps_row)
+  )), big.mark = ",")
+
+# How many unique IDs were generated?
+format(length(unique(aps_chunk_1_ids$id)), big.mark = ',')
+
+# Are there any pairs missing an ID value?
+format(sum(is.na(aps_chunk_1_ids$id)), big.mark = ',')
+```
+
+### Cleaning IDs
+
+#### Row in more than one ID
+
+We identified 163 rows which were paired in more than one ID value.
+
+```{r}
+multi_id_rows <- pull(
+  aps_chunk_1_ids |>
+    dplyr::filter(duplicated(aps_row) | duplicated(aps_row, fromLast = T)
+    ) |>
+    dplyr::select(aps_row) |>
+    dplyr::distinct()
+)
+
+format(length(unique((multi_id_rows))), big.mark = ',')
+# [1] "163"
+```
+
+We isolated the 163 that represented either a row associated with more than one ID assignment, or one of the 160 ID assignments impacted by one of these rows for manual review. This left us with 390 observations to manually review.
+
+```{r}
+multi_id_row_ids <- pull(
+    aps_chunk_1_ids |>
+    dplyr::filter(
+      aps_row %in% multi_id_rows
+      ) |>
+    dplyr::select(id)
+  )
+
+checking <- aps_chunk_1_ids |>
+  dplyr::filter(
+    id %in% multi_id_row_ids | aps_row %in% multi_id_rows
+    )
+
+format(nrow(checking), big.mark = ',')
+# [1] "390"
+```
+
+After manual review, we identified 111 IDs that could be dropped. One group 419) required manual creation to consolidate two observations together that were not otherwise in an existing ID.
+
+```{r}
+dropping_ids <- c(
+  419, 50136, 1064, 30728, 9843, 13497, 1482, 19576, 2141, 9729, 9838, 2335, 
+  2923, 2924, 9842, 29311, 27850, 3912, 33273, 9841, 83002, 6106, 9834, 6423, 
+  52237, 6425, 6839, 9836, 22095, 102251, 106402, 63074, 63075, 14532, 103285, 
+  15390, 106545, 15959, 17531, 17535, 19577, 99355, 52572, 68301, 25514, 
+  25515, 28121, 47185, 36254, 36255, 39635, 47791, 44831, 108430, 45614, 
+  144636, 46040, 60027, 47036, 79312, 48695, 85883, 99757, 106403, 107904, 
+  107905, 57065, 118720, 128286, 57448, 57451, 62955, 96802, 67998, 135387, 
+  63702, 63703, 67041, 122487, 67907, 67909, 68186, 68187, 107081, 107524, 
+  77620, 91841, 92486, 96801, 94096, 113415, 94393, 135112, 103249, 135110, 
+  106432, 129856, 108814, 115998, 135111, 109604, 115996, 114101, 115999, 
+  132703, 132704, 117331, 153364, 153365, 129651, 142539
+  )
+
+# Drop the listed IDs, and remove the list of rows in the ID
+aps_chunk_1_ids <- aps_chunk_1_ids |>
+  dplyr::filter(!(id %in% dropping_ids)) |>
+  dplyr::filter(-match_rows)
+
+# Subset rows that were not previously assigned an ID value
+unassigned_rows <- subset_pack$df |>
+  dplyr::filter(!(aps_row %in% aps_chunk_1_ids$aps_row))
+
+# Assign from the dropped ID values. Reserve 419 for the manually created
+# pair ID
+unassigned_rows <- unassigned_rows |>
+  dplyr::mutate(
+    id = setdiff(
+      seq(1,163668),
+      c(aps_chunk_1_ids$id, 419)
+      )[1:nrow(unassigned_rows)]
+  ) |>
+  dplyr::mutate(
+    id = ifelse(aps_row %in% c(260019, 347303), 419, id)
+  )
+
+# Combine the chunk back together
+aps_chunk_1_ids <- dplyr::bind_rows(
+  aps_chunk_1_ids, unassigned_rows
+  )
+```
+
+#### Flagged Rows
+
+We identified 204 rows which were flagged for any reason, which included 202 ID values. In total, we isolated 296 observations for manual review.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+flagged_rows <- pull(
+  aps_chunk_1_ids |>
+    dplyr::filter(flag_issues | flag_unresolvable | flag_mult_clients) |>
+    dplyr::select(aps_row)
+  )
+
+flagged_ids <- pull(
+  aps_chunk_1_ids |>
+    dplyr::filter(
+      flag_issues | flag_unresolvable | flag_mult_clients | 
+        (aps_row %in% flagged_rows)
+      ) |>
+    dplyr::select(id)
+  )
+
+checking <- aps_chunk_1_ids |>
+  dplyr::filter(id %in% flagged_ids)
+
+# Number of flagged rows?
+format(length(unique((flagged_rows))), big.mark = ',')
+
+# Number of impacted IDs?
+format(length(unique((flagged_ids))), big.mark = ',')
+
+# Total observations to review?
+format(nrow(checking), big.mark = ',')
+
+# [1] "204"
+# [1] "202"
+# [1] "296"
+```
+
+No necessary changes were identified from the review. We further checked that our ID assignment did not create more than one ID for a given `client_id`, which would have indicated failed matches.
+
+```{r}
+nrow(
+  aps_chunk_1_ids |>
+    dplyr::group_by(client_id) |>
+    dplyr::summarise(n_ids = dplyr::n_distinct(id)) |>
+    dplyr::filter(n_ids > 1)
+) == 0
+
+# [1] TRUE
+```
+
+This concluded the cleaning and examination of Chunk 1.
+
+### 💾 Save and Export Data
+
+We exported this subset of our data.
+
+```{r}
+saveRDS(
+  aps_chunk_1_ids,
+  here::here(
+    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "aps_02_ids_chunk_1.rds"
+    )
+)
+```
+
+### 🧹 Clean up
+
+```{r}
+rm(aps_chunk_1_ids)
+rm(aps_chunk_1_pairs)
+rm(aps_chunk_1)
+rm(drop_pairs_c1)
+```
+
+## Chunk 2
+
+We converted our second chunk into our desired stacked pair data.
+
+```{r}
+# Get APS subset for this chunk
+subset <- aps |>
+  dplyr::filter(chunks == 2)
+
+subset_pack <- list()
+subset_pack$df <- subset
+subset_pack$suffix <- 'aps_2'
+subset_pack$ids <- pack_id_vars
+
+aps_chunk_2_pairs <- get_pair_data(
+  subset_pack, subset_pack, match_vars, aps_chunk_2
+  )
+
+aps_chunk_2_ids <- stack_ids(subset_pack, subset_pack, aps_chunk_2_pairs)
+```
+
+### Review of Initial ID Assignments
+
+There were 167,916 observations in the First APS Within-Set Matching Chunk ID set, generated from 167,827 APS observations. There were no pairs were missing values for `aps_row` variables. Additionally, there were no APS observations that were not found in the pair data, likely due to failure to find a match. There were 163,558 unique IDs (1 - 163,558) assigned in this preliminary processing, with no pairs missing an ID assignment.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many observations in the ID set?
+format(nrow(aps_chunk_1_ids), big.mark = ',')
+
+# How many rows are in the subset used to generate this chunk?
+format(nrow(subset), big.mark = ',')
+
+# Are there any pairs missing a value for row?
+format(sum(is.na(aps_chunk_1_ids$aps_row)), big.mark = ',')
+
+# How many rows in the original APS data for this chunk are missing from the
+# ID/Pair generated set (likely due to no matches)
+format(length(setdiff(
+  subset$aps_row, unique(aps_chunk_1_ids$aps_row)
+  )), big.mark = ",")
+
+# How many unique IDs were generated?
+format(length(unique(aps_chunk_1_ids$id)), big.mark = ',')
+
+# Are there any pairs missing an ID value?
+format(sum(is.na(aps_chunk_1_ids$id)), big.mark = ',')
+```
+
+### Within Posterior Probability Range
+
+We examined all pairs within the manual review posterior probability range of 0.20 - 0.70. This resulted in manual review of 1,937 pairs.
+
+```{r}
+checking <- aps_chunk_2_pairs |>
+  dplyr::filter(
+    dplyr::between(posterior_probability, posteriors[1], posteriors[2])
+    )
+
+format(nrow(checking), big.mark = ',')
+# [1] 1,937
+```
+
+We found no pairs within this range demonstrated identical values for `client_id`.
+
+```{r}
+format(nrow(
+  checking |> 
+    dplyr::filter(client_id_a == client_id_b)
+  ),
+  big.mark = ',')
+
+# [1] "0"
+```
+
+In examining our gamma values for our matching variables, we found several trends:
+
+-   The vast majority (1,728) failed to match at all on first name (gamma = 0)
+-   The vast majority (1,447) failed to match on birth year (gamma = 0)
+-   The vast majority (1,061) failed to match on birth day (gamma = 0)
+-   The vast majority (1,371) significantly matched on last name (gamma = 2)
+-   The vast majority (1,864) significantly matched on street address (gamma = 2)
+-   The vast majority (1,936) significantly matched on zip code (gamma = 2)
+-   The vast majority (1,428) significantly matched on birth month (gamma = 2)
+
+```{r, warning = F}
+get_unique_value_summary(
+  checking |>
+    dplyr::select(dplyr::all_of(gamma_cols))
+  )
+```
+
+We initiated our list of pairs to drop, which we would build during our processing.
+
+```{r}
+drop_pairs_c2 <- c()
+```
 
 
+#### Address Failures
 
+##### ZIP Code (Non-Matches)
 
+We first examined pair with non-matching ZIP Codes (Gamma == 0). The ZIP code values in the rows of these pairs appeared to only differ due to small typos.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(client_zip_code_gamma != 2)
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# [1] "1"
+# [1] "Min: 0.47959; Max: 0.47959"
+```
+
+This pair was deemed valid. As such, we did not add its value to the drop list.
+
+##### Street Address (Weak Matches)
+
+We examined remaining pairs with weakly matching street address values (Gamma == 1). The street address values of rows in these pairs appeared to primarily consist of minor differences in house number.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(client_street_address_gamma == 1) |>
+  # Omit previous check groups
+  dplyr::filter(client_zip_code_gamma != 0 )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# [1] "46"
+# [1] "Min: 0.28981; Max: 0.56301"
+```
+
+[#] of the 46 pairs was found to be a true match. As such, we added [these # pair ids] to our drop list.
+
+```{r}
+drop_pairs_c2 <- unique(c(drop_pairs_c2, checking_cols$pair))
+
+length(drop_pairs_c2)
+# [1] placeholder
+```
 
 # Bottom Placeholder
