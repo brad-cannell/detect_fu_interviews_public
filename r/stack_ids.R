@@ -58,62 +58,111 @@ stack_ids <- function(dfA_pack, dfB_pack, paired_matches){
     dplyr::mutate(BmatchesA = list(dfB_row)) |>
     dplyr::ungroup()
   
-  # Reduce to unique sets of matching rows
-  # i.e. 1,2,3 is the same as 3,2,1
-  matches <- matches |> 
-    dplyr::mutate(dfA_matchesB = purrr::map_chr(
-      AmatchesB,
-      function(x) {
-        x = sort(x) # 1,2,3 is the same as 3,2,1
-        x = paste(x, collapse = ",") # Convert list to character string
-        x
-      })
-    ) |> 
-    dplyr::mutate(dfB_matchesA = purrr::map_chr(
-      BmatchesA,
-      function(x) {
-        x = sort(x) # 1,2,3 is the same as 3,2,1
-        x = paste(x, collapse = ",") # Convert list to character string
-        x
-      })
-    ) |> 
-    dplyr::select(dfA_matchesB, dfB_matchesA) |>
-    dplyr::distinct() # Reduce to 1 row per group of matches
+  # Process slightly differently if identical input data frames
+  if (dfA_pack$ids[1] == dfB_pack$ids[1]) {
+    
+    # Reduce to unique sets of matching rows
+    # i.e. 1,2,3 is the same as 3,2,1
+    matches <- matches |>
+      dplyr::rowwise() |>
+      dplyr::mutate(match_rows = list(unique(c(AmatchesB, BmatchesA)))) |> 
+      dplyr::ungroup() |>
+      dplyr::mutate(match_rows = purrr::map_chr(
+        match_rows,
+        function(x) {
+          x = sort(x) # 1,2,3 is the same as 3,2,1
+          x = paste(x, collapse = ",") # Convert list to character string
+          x
+        })
+      ) |>
+      dplyr::select(match_rows) |>
+      dplyr::distinct() # Reduce to 1 row per group of matches
+    
+    
+    # Sequentially number each group of matches
+    # This will become the unique id
+    matches <- matches |>
+      dplyr::mutate(
+        id = row_number(),
+        dfA_row = purrr::map( # Turn back into list
+          match_rows,
+          ~ scan(text = ., what = 0L, sep = ",", quiet = TRUE)
+        )
+      ) |>
+      # Unnest the list into multiple rows
+      tidyr::unnest(dfA_row)
+    
+    # Join the unique ID into the primary subset data set for review
+    
+    out <- matches |>
+      dplyr::right_join(
+        dfA_pack$df,
+        by = c('dfA_row'=dfA_pack$ids[1])
+      ) 
+    
+    colnames(out)[3] <- dfA_pack$ids[1]
+  }
   
-  
-  # Sequentially number each group of matches
-  # This will become the unique id
-  matches <- matches |>
-    dplyr::mutate(
-      id = row_number(),
-      dfA_row = purrr::map( # Turn back into list
-        dfA_matchesB,
-        ~ scan(text = ., what = 0L, sep = ",", quiet = TRUE)
-      ),
-      dfB_row = purrr::map( # Turn back into list
-        dfB_matchesA,
-        ~ scan(text = ., what = 0L, sep = ",", quiet = TRUE)
+  # Otherwise use Dr. Cannell's initial processing with slight modification
+  if (dfA_pack$ids[1] != dfB_pack$ids[1]) {
+    
+    # Reduce to unique sets of matching rows
+    # i.e. 1,2,3 is the same as 3,2,1
+    matches <- matches |> 
+      dplyr::mutate(dfA_matchesB = purrr::map_chr(
+        AmatchesB,
+        function(x) {
+          x = sort(x) # 1,2,3 is the same as 3,2,1
+          x = paste(x, collapse = ",") # Convert list to character string
+          x
+        })
+      ) |> 
+      dplyr::mutate(dfB_matchesA = purrr::map_chr(
+        BmatchesA,
+        function(x) {
+          x = sort(x) # 1,2,3 is the same as 3,2,1
+          x = paste(x, collapse = ",") # Convert list to character string
+          x
+        })
+      ) |> 
+      dplyr::select(dfA_matchesB, dfB_matchesA) |>
+      dplyr::distinct() # Reduce to 1 row per group of matches
+    
+    
+    # Sequentially number each group of matches
+    # This will become the unique id
+    matches <- matches |>
+      dplyr::mutate(
+        id = row_number(),
+        dfA_row = purrr::map( # Turn back into list
+          dfA_matchesB,
+          ~ scan(text = ., what = 0L, sep = ",", quiet = TRUE)
+        ),
+        dfB_row = purrr::map( # Turn back into list
+          dfB_matchesA,
+          ~ scan(text = ., what = 0L, sep = ",", quiet = TRUE)
+        )
       )
-    )
-  
-  # Covert to data frame with the appropriate id number for each
-  # unique observation id combination from dfA and dfB
-  
-  matches <- matches |>
-    tidyr::unnest(cols=c(dfA_row)) |>
-    tidyr::unnest(cols=c(dfB_row)) |>
-    dplyr::select(id, dfA_row, dfB_row)
-  
-  # Join the unique ID into the paired matches set for review, based on
-  # the dfA unique observation ID
-  
-  out <- matches |>
-    dplyr::right_join(
-      paired_matches,
-      by = c('dfA_row'=dfA_id, 'dfB_row'=dfB_id)
-    )
-  
-  colnames(out)[2:3] <- id_vars
+    
+    # Covert to data frame with the appropriate id number for each
+    # unique observation id combination from dfA and dfB
+    
+    matches <- matches |>
+      tidyr::unnest(cols=c(dfA_row)) |>
+      tidyr::unnest(cols=c(dfB_row)) |>
+      dplyr::select(id, dfA_row, dfB_row)
+    
+    # Join the unique ID into the paired matches set for review, based on
+    # the dfA unique observation ID
+    
+    out <- matches |>
+      dplyr::right_join(
+        paired_matches,
+        by = c('dfA_row'=dfA_id, 'dfB_row'=dfB_id)
+      )
+    
+    colnames(out)[2:3] <- id_vars
+  }
   
   # Return revised paired matches with pair ID
   out
