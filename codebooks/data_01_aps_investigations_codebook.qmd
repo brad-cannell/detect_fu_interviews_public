@@ -10,8 +10,8 @@ library(dplyr, warn.conflicts = FALSE)
 library(haven)
 library(here)
 library(readr)
-source("../r/variable_descriptions.R")
 ```
+
 
 # Purpose of the program
 
@@ -24,6 +24,24 @@ aps_inv_path <- here::here("data", "cleaned_rds_files", "aps_investigations_impo
 
 ```{r}
 aps_inv <- readr::read_rds(aps_inv_path)
+```
+
+
+# Load custom functions
+
+```{r}
+source(here::here("r", "variable_descriptions.R"))
+source(here::here("r", "identify_codebook_variables_to_update.R"))
+```
+
+
+# Data variables check
+```{r}
+# Compare variables in this dataframe to the variables in the most recent 
+# version of the cleaned data 
+
+aps_inv_desc_path <- "aps_investigations_var_desc.rds"
+vars_to_update(aps_inv, aps_inv_desc_path)
 ```
 
 # Set column attributes
@@ -189,6 +207,7 @@ aps_inv <- aps_inv %>%
   )
 ```
 
+
 # Exclude summary stats for certain variables in word doc
 
 ```{r}
@@ -207,7 +226,6 @@ no_stats_vars <- colnames(no_stats)
 aps_inv_desc <- var_descriptions(aps_inv)
 ```
 
-
 ## Save as rds file
 
 ```{r}
@@ -217,6 +235,7 @@ aps_inv_desc_path <- here::here("codebooks", "variable_descriptions", "aps_inves
 ```{r}
 readr::write_rds(aps_inv_desc, aps_inv_desc_path)
 ```
+
 
 # Pass data frame to the codebook function
 ```{r}

@@ -11,6 +11,7 @@ In this file, we conduct a preliminary analysis of the self-reported EM section 
 
 I'm thinking that it might be best to keep all the follow-up data frames separate and just merge them as needed. If we do that, we will need to have a key linking MedStar ID's to unique person identifiers. For now, I'm just going to grab them from the `detect_fu_data_merged.rds` data.
 
+
 # Load packages
 
 ```{r}
@@ -19,91 +20,36 @@ I'm thinking that it might be best to keep all the follow-up data frames separat
 library(dplyr, warn.conflicts = FALSE)
 library(flextable)
 library(officer)
+library(here)
 ```
 
 
 # Load custom functions
 
 ```{r}
-source(here::here("R", "extract_df_from_merged_detect.R"))
-source(here::here("R", "n_percent_ci.R"))
+source(here::here("r", "n_percent_ci.R"))
 ```
 
 
 # Load data
 
 Load the cleaned self-report data frame into the environment. This data is created in `data_06_self_report_import.qmd`.
-
+Also load the participant - unique ID data.
 ```{r}
-self_rep_path <- here::here("data", "cleaned_rds_files", "self_report_import.rds")
-detect_fu_data_merged_path <- here::here("data", "cleaned_rds_files", "detect_fu_data_merged.rds")
+sr <- readRDS(here("data", "cleaned_rds_files", "self_report_import.rds"))
+participant <- readRDS(here("data", "unique_id_creation", "participant_unique_id.rds"))
 ```
 
 ```{r}
-sr <- readr::read_rds(self_rep_path)
-detect_fu_data_merged <- readr::read_rds(detect_fu_data_merged_path)
-```
+# Select the MedStar ID and unique ID variables.
+participant <- participant %>% select(unique_id, medstar_id)
 
-```{r}
-# Data check
-dim(sr) # 953 574
-```
-
-```{r}
-# Data check
-dim(detect_fu_data_merged) # 98200   799
-```
-
-
-# Data management 
-
-## Keep unique patient identifier
-
-🔴 In the future, I think I'd like to just load the MedStar IDs and unique patient identifiers as a separate RDS file. For now, I'm grabbing them from the `detect_fu_data_merged.rds` data.
-
-```{r}
-unique_id_par <- detect_fu_data_merged |> 
-  select(medstar_id, unique_id_par)
-```
-
-Merge the unique patient ID into the self-report data.
-
-# 🔴 Left off here 2024-04-16
-
-Get this merge working. Right now, it's creating multiple rows per MedStar ID.
-
-```{r}
-sr |> 
-  left_join(unique_id_par, by = "medstar_id")
-```
-
-
-# Recode missing data
-
-Replace "Don't know" and "Refused" values with NA
-
-## 🔴 Note for Ebie:
-
-Ebie, this isn't necessary if you use the new variables I created in `data_06_self_report_import.qmd`. I haven't uploaded them to SharePoint yet, but if you just rerun `data_06_self_report_import.qmd`, you will have the updated data on your computer.
-
-```{r}
-sr <- sr %>% mutate(
-  across(
-    .cols = matches("_[0-9]+cat_f"),
-    .fns = ~ case_when(
-      .x == "Refused" | .x == "Don't know" ~ NA,
-      TRUE                                 ~ .x
-    )
-  )
-)
+# Merge the unique ID column to the self report data set.
+sr <- sr %>% left_join(participant, by = "medstar_id")
 ```
 
 
 # Create an aggregate variable of any self-reported abuse
-
-## 🔴 Note for Ebie: 
-
-Ebie, please add two lines above, and one line below, level-1 headings. For all other headings, please add one line above and one line below. I'm changing them below.
 
 For each type of abuse, create a binary variable with yes/no categories for: 
 - Ever abuse
@@ -115,14 +61,15 @@ For each type of abuse, create a binary variable with yes/no categories for:
 The category will be "yes" if the value is "yes" for any of the variables related to ever abuse.
 
 ```{r}
-# Create empty data frame for aggregate variables
-sr_aggr <- sr %>% select(medstar_id, unique_id_par) %>% data.frame()
+# Initialize a data frame for aggregate variables
+sr_aggr <- sr %>% select(medstar_id, unique_id) %>% data.frame()
 
 # Function for creating aggregate columns
 aggr <- function(abuse_cols, cat_name, f_name){
   aggr_vars <- sr %>%
     mutate(
-      # Create a column that has a value of 1 if at least one of the ever physical abuse variables have a value of "yes".
+      # Create a column that has a value of 1 if at least one of the ever 
+      # physical abuse variables have a value of "yes".
       cat_name = case_when(
         if_any(all_of(abuse_cols), ~. == "Yes")  ~ 1,
         if_all(all_of(abuse_cols), ~. == "No")   ~ 0,
@@ -140,31 +87,40 @@ aggr <- function(abuse_cols, cat_name, f_name){
   # Merge with data frame of aggregate variables
   sr_aggr <- sr_aggr %>% left_join(., aggr_vars, by = "medstar_id")
 }
+
+sr_names <- cbind(names(sr))
 ```
 
 ### Physical abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-ever_phys_cols <- sr %>% select(physical_hit_4cat_f, physical_hurt_4cat_f, physical_restrain_4cat_f) %>% names()
+ever_phys_cols <- sr %>% select(physical_hit_2cat_f, physical_hurt_2cat_f, 
+                                physical_restrain_2cat_f) %>% names()
 
 # Apply function
 sr_aggr <- aggr(ever_phys_cols, ever_phys_2cat, ever_phys_2cat_f)
 ```
 
 ### Sexual abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-ever_sex_cols <- sr %>% select(sexual_harm_4cat_f, sexual_touched_4cat_f, sexual_forced_4cat_f, sexual_picture_4cat_f) %>% names()
+ever_sex_cols <- sr %>% select(sexual_harm_2cat_f, sexual_touched_2cat_f, 
+                               sexual_forced_2cat_f, sexual_picture_2cat_f) %>% 
+  names()
 
 # Apply function
 sr_aggr <- aggr(ever_sex_cols, ever_sex_2cat, ever_sex_2cat_f)
 ```
 
 ### Emotional abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
-ever_emo_cols <- sr %>% select(emotional_yelled_4cat_f, emotional_embarrassed_4cat_f, emotional_harassed_4cat_f,
-                               emotional_refused_4cat_f) %>% 
+ever_emo_cols <- sr %>% 
+  select(emotional_yelled_2cat_f, emotional_embarrassed_2cat_f, 
+         emotional_harassed_2cat_f, emotional_refused_2cat_f) %>% 
   names()
 
 # Apply function
@@ -173,48 +129,62 @@ sr_aggr <- aggr(ever_emo_cols, ever_emo_2cat, ever_emo_2cat_f)
 
 ### Financial exploitation
 
+The finance_person_permission question is: Does that person usually ask for your permission before deciding to spend your money or sell your property?
+
+  - A response of "No" will indicate potential abuse.
+  - A response of "Yes" will not indicate potential abuse.
 ```{r}
-# Create lists of financial abuse columns that will result in the aggregate column variable being "No" if all are "No".
-fin_person_cols <- sr %>% select(finance_person_forged_4cat_f, finance_person_tricked_4cat_f,
-                               finance_person_stolen_4cat_f) %>% 
+# Create lists of financial abuse columns that will result in the aggregate 
+# column variable being "No" if all are "No".
+fin_person_cols <- sr %>% select(finance_person_forged_2cat_f, 
+                                 finance_person_tricked_2cat_f,
+                               finance_person_stolen_2cat_f) %>% 
   names()
-fin_stranger_cols <- sr %>% select(finance_stranger_permission_4cat_f, finance_stranger_forged_4cat_f,
-                               finance_stranger_tricked_4cat_f) %>%
+fin_stranger_cols <- sr %>% select(finance_stranger_permission_2cat_f, 
+                                   finance_stranger_forged_2cat_f,
+                               finance_stranger_tricked_2cat_f) %>%
   names()
 
 
 sr <- sr %>%
   mutate(
-    # The values for columns used to calculate ever abuse involving a non-stranger will be "No" and not NA if the finance_help value is "No".
+    # Besides the finance_person_permission variable, responses for columns 
+    # used to calculate ever abuse involving a non-stranger will be re coded as 
+    # "No" instead of "NA" if the finance_help value is "No".
     across(
       .cols = all_of(fin_person_cols),
       .fns = ~ case_when(
-        finance_help_4cat_f == "No" & is.na(.x)                                ~ "No",
-        TRUE                                                                   ~ .x
+        finance_help_2cat_f == "No" & is.na(.x) ~ "No",
+        TRUE                                    ~ .x
       ),
       .names = "{col}_r"
     ),
-    # Re-code finance_person_permission column similarly considering the finance_help variable. 
-    finance_person_permission_4cat_f_r = case_when(
-      finance_help_4cat_f == "No" & is.na(finance_person_permission_4cat_f) ~ "Yes",
-      TRUE                                                                  ~ finance_person_permission_4cat_f
+    # The finance_person_permission variable will be re coded as "Yes" instead of 
+    # "NA" if the finance_help value is "No".
+    finance_person_permission_2cat_f_r = case_when(
+      finance_help_2cat_f == "No" & 
+        is.na(finance_person_permission_2cat_f) ~ "Yes",
+      TRUE                                    ~ finance_person_permission_2cat_f
     ),
-    # Additionally, Since the question is whether or not permission was asked rather than whether or not a form of abuse was experienced, values of "Yes" will be re-coded as "No" and vice versa.
-    finance_person_permission_4cat_f_r = case_when(
-      finance_person_permission_4cat_f_r == "No"  ~ "Yes",
-      finance_person_permission_4cat_f_r == "Yes" ~ "No",
+    # Additionally, Since the question is whether or not permission was asked 
+    # rather than whether or not a form of abuse was experienced, values of 
+    # "Yes" will be re-coded as "No" and vice versa.
+    finance_person_permission_2cat_f_r = case_when(
+      finance_person_permission_2cat_f_r == "No"  ~ "Yes",
+      finance_person_permission_2cat_f_r == "Yes" ~ "No",
       TRUE                                        ~ NA
     )    
   )
-
 
 aggr_vars <- sr %>%
   mutate(
    # Determine the aggregate "ever financial abuse" values
    ever_fin_2cat = case_when(
-     if_any(all_of(fin_stranger_cols), ~. == "Yes") | if_any(ends_with("_r"), ~. == "Yes") ~ 1,
-     if_all(all_of(fin_stranger_cols), ~. == "No") & if_all(ends_with("_r"), ~. == "No")   ~ 0,
-     TRUE                                                                                       ~ NA
+     if_any(all_of(fin_stranger_cols), ~. == "Yes") | 
+       if_any(ends_with("_r"), ~. == "Yes") ~ 1,
+     if_all(all_of(fin_stranger_cols), ~. == "No") & 
+       if_all(ends_with("_r"), ~. == "No")   ~ 0,
+     TRUE                                   ~ NA
    ),
    # Create factor variable for "ever financial abuse"
    ever_fin_2cat_f = factor(ever_fin_2cat,
@@ -222,6 +192,21 @@ aggr_vars <- sr %>%
                             labels = c("Yes", "No"))
   ) %>% select(ever_fin_2cat, ever_fin_2cat_f, medstar_id)
 
+# sr_check <- sr %>% select(medstar_id, finance_help_2cat_f,
+#                           finance_person_forged_2cat_f, 
+#                                  finance_person_tricked_2cat_f,
+#                                finance_person_stolen_2cat_f, 
+#                           finance_person_permission_2cat_f,
+#                                finance_stranger_permission_2cat_f, 
+#                                    finance_stranger_forged_2cat_f,
+#                                finance_stranger_tricked_2cat_f, 
+#                           (starts_with("finance") & ends_with("_r"))
+#                            )
+# fin_check <- aggr_vars %>% select(medstar_id, ever_fin_2cat, ever_fin_2cat_f) %>% 
+#   left_join(sr_check, by = "medstar_id")
+```
+
+```{r}
 # Add variables to aggregate variable dataframe
 sr_aggr <- sr_aggr %>% left_join(., aggr_vars, by = "medstar_id")
 
@@ -272,7 +257,7 @@ for(i in 1:6){
     ) %>% 
     rename_with(
       .cols   = ends_with("_pot"),
-      .fn     = ~ gsub("4cat_f_pot", "pot_2cat", .x)
+      .fn     = ~ gsub("2cat_f_pot", "pot_2cat", .x)
     ) %>% select(medstar_id, matches("_pot"))
   # Merge with data frame of aggregate variables
   sr_aggr <- sr_aggr %>% left_join(., pot_neg, by = "medstar_id")
@@ -296,6 +281,7 @@ sr_aggr %>% freqtables::freq_table(neglect_go_pot_2cat_f)
 ```
 
 #### Any potential negelct
+
 ```{r}
 sr_aggr <- sr_aggr %>%
   mutate(
@@ -319,7 +305,10 @@ If the value is "No" for any of the variables used in the ever variable determin
 # Create a nested list of the names of the variables used to determine ever, last time and 65 aggregate variables
 
 # Select finance_stranger ever columns and the recoded finance_person columns for use in analyseis of last time and over 65 variables
-ever_fin_cols <-sr %>% select(c(finance_stranger_permission_4cat_f, finance_stranger_forged_4cat_f, finance_stranger_tricked_4cat_f, ends_with("_r"))) %>% names() %>% cbind()
+ever_fin_cols <-sr %>% select(c(finance_stranger_permission_2cat_f, 
+                                finance_stranger_forged_2cat_f, 
+                                finance_stranger_tricked_2cat_f, 
+                                ends_with("_r"))) %>% names() %>% cbind()
 
 last_time_65_cols <- sr %>% select(matches("_65_[0-9]+cat_f"), matches("_last_time_[0-9]+cat_f")) %>% names()
 
@@ -350,6 +339,7 @@ for(i in 1:18){
 ## Abuse over 65
 
 ### Physical abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
 over_65_phys_cols <- sr %>% select(starts_with("physical") & matches("65_[0-9]+cat_f_rc$")) %>% names()
@@ -359,6 +349,7 @@ sr_aggr <- aggr(over_65_phys_cols, over_65_phys_2cat, over_65_phys_2cat_f)
 ```
 
 ### Sexual abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
 over_65_sex_cols <- sr %>% select(starts_with("sexual") & matches("65_[0-9]+cat_f_rc$")) %>% names()
@@ -368,6 +359,7 @@ sr_aggr <- aggr(over_65_sex_cols, over_65_sex_2cat, over_65_sex_2cat_f)
 ```
 
 ### Emotional abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
 over_65_emo_cols <- sr %>% select(starts_with("emotional") & matches("65_[0-9]+cat_f_rc$")) %>% names()
@@ -377,6 +369,7 @@ sr_aggr <- aggr(over_65_emo_cols, over_65_emo_2cat, over_65_emo_2cat_f)
 ```
 
 ### Financial exploitation
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
 over_65_fin_cols <- sr %>% select(starts_with("finance") & matches("65_[0-9]+cat_f_rc$")) %>% names()
@@ -386,6 +379,7 @@ sr_aggr <- aggr(over_65_fin_cols, over_65_fin_2cat, over_65_fin_2cat_f)
 ```
 
 ## Abuse in the past month
+
 The category will be "yes" if the value is:
   - Less than 1 month ago
   
@@ -405,10 +399,10 @@ sr <- sr %>%
     across(
       .cols = matches("last_time_[0-9]+cat_f_rc$"),
       .fns  = ~ case_when(
-        .x == "Less than 1 month ago"                             ~ "Yes",
+        .x == "Less than 1 month ago"                  ~ "Yes",
         .x == "Never experienced" | 
-          (.x != "Less than 1 month ago" & !is.na(.x))            ~ "No",
-        TRUE                                                      ~ NA
+          (.x != "Less than 1 month ago" & !is.na(.x)) ~ "No",
+        TRUE                                           ~ NA
       ),
       .names = "{col}_pm"
     )
@@ -422,6 +416,7 @@ sr <- sr %>%
 ```
 
 ### Physical abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
 pm_phys_cols <- sr %>% select(starts_with("physical") & ends_with("_pm")) %>% names()
@@ -431,6 +426,7 @@ sr_aggr <- aggr(pm_phys_cols, pm_phys_2cat, pm_phys_2cat_f)
 ```
 
 ### Sexual abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
 pm_sex_cols <- sr %>% select(starts_with("sexual") & ends_with("_pm")) %>% names()
@@ -440,6 +436,7 @@ sr_aggr <- aggr(pm_sex_cols, pm_sex_2cat, pm_sex_2cat_f)
 ```
 
 ### Emotional abuse
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
 pm_emo_cols <- sr %>% select(starts_with("emotional") & ends_with("_pm")) %>% 
@@ -450,6 +447,7 @@ sr_aggr <- aggr(pm_emo_cols, pm_emo_2cat, pm_emo_2cat_f)
 ```
 
 ### Financial exploitation
+
 ```{r}
 # Create list of columns that the aggregate variable will be determined by
 pm_fin_cols <- sr %>% select(starts_with("finance") & ends_with("_pm")) %>% 
@@ -460,6 +458,7 @@ sr_aggr <- aggr(pm_fin_cols, pm_fin_2cat, pm_fin_2cat_f)
 ```
 
 ### Any abuse
+
 ```{r}
 sr_aggr <- sr_aggr %>%
   mutate(
@@ -497,9 +496,17 @@ sr_aggr <- sr_aggr %>%
 ```
 
 
+# Save self report aggregate data as RDS
+
+```{r}
+saveRDS(sr_aggr, here::here("data", "self_report_aggregate_data.RDS"))
+```
+
+
 # Create summary flextable
 
 ## Descriptions
+
 ```{r}
 aggr_cols <- sr_aggr %>% select(ends_with("cat_f") & !starts_with("neglect_")) %>% names()
 
@@ -526,8 +533,6 @@ var <- aggr_cols
 
 aggr_desc <- data.frame(var, descriptions)
 ```
-
-
 
 ```{r}
 sum_aggr_list <- aggr_cols |>
@@ -613,7 +618,9 @@ sum_aggr_flex <- lapply(aggr_cols, cat_flextable, table_list = sum_aggr_table_li
 sum_aggr_flex
 ```
 
+
 # Print Word File
+
 ```{r}
 title_style <- fp_text_lite(font.size = 18, bold = TRUE)
 
@@ -623,7 +630,7 @@ aggr_doc <- read_docx()
 aggr_doc <- aggr_doc %>%
   
   # Add Heading
-  body_add_fpar(fpar(ftext("Self Report Aggregate Variable Tables", prop = title_style))) %>%
+  body_add_fpar(fpar(ftext("Self- Report Aggregate Variable Tables", prop = title_style))) %>%
   body_add_par("")
   
 
@@ -642,9 +649,7 @@ for(var_name in aggr_cols) {
     body_add_par("")
 }  
 
-  
-
 # print the word document
-print(aggr_doc, target = "./self_report_aggregate.docx")
+print(aggr_doc, target = here::here("exploratory", "self_report_aggregate.docx"))
 ```
 

@@ -1,0 +1,628 @@
+# Load packages
+```{r, warning=FALSE, echo=FALSE, output = FALSE}
+library(flextable)
+library(table1)
+library(dplyr)
+library(tibble)
+library(officer)
+library(tidyverse)
+library(here)
+library(purrr, include.only = "reduce")
+library(ggplot2)
+library(mice)
+library(expss, include.only = "apply_labels")
+library(ggplot2)
+```
+
+# Load cleaned data and custom functions
+
+```{r}
+#| warning: false
+# Load mice imputation output
+load(here::here("data", "ucla_ls_scale_mice_output.RData"))
+```
+
+```{r}
+# Variable labels
+all_labels <- read.csv(here::here("exploratory", "ucla_loneliness_scale",
+                                  "ucla_variable_labels.csv"))
+```
+
+<https://www.rdocumentation.org/packages/mice/versions/3.16.0/topics/mice>
+<https://datascienceplus.com/imputing-missing-data-with-r-mice-package/>
+<https://stefvanbuuren.name/fimd/sec-diagnostics.html>
+<file:///C:/Users/ebiek/OneDrive%20-%20UTHealth%20Houston/Cannell%20lab/mice_Multivariate%20Imputation%20by%20Chained%20Equations%20in%20R.pdf>
+
+As a general rule, imputations are not to be aggregated. Instead, one should pool the analysis estimates.
+<https://stackoverflow.com/questions/72578388/calculate-averages-of-imputed-data-in-mice>
+<https://stefvanbuuren.name/RECAPworkshop/Practicals/RECAP_Practical_II.html>
+<https://stackoverflow.com/questions/55926293/descriptive-data-with-mice-miceadds>
+<https://www.bookdown.org/rwnahhas/RMPH/mi-descriptives.html> The one!
+<https://bookdown.org/mwheymans/bookmi/data-analysis-after-multiple-imputation.html> also this!
+<https://stackoverflow.com/questions/75413995/pooling-counts-for-a-categorical-variable-ater-mi>
+<https://stefvanbuuren.name/fimd/sec-pooling.html> also this
+
+Pooling p-values
+<https://stackoverflow.com/questions/73323019/mice-paired-sample-t-test-and-cohens-d-estimation-using-imputed-datasets>
+<https://stats.stackexchange.com/questions/69130/how-to-get-pooled-p-values-on-tests-done-in-multiple-imputed-datasets>
+Pooled chi-square
+<https://nerler.github.io/EP16_Multiple_Imputation/slide/08_analysis_and_pooling.pdf>
+
+
+```{r}
+mice_out_df <- complete(mice_out,"long", include=TRUE) %>% 
+  rename(
+    impute = ".imp",
+    org_row_id = ".id"
+  )
+```
+
+
+# Create calculated/ derived variables
+
+```{r}
+mice_out_df_dum <- mice_out_df %>%
+  mutate(
+    # 7 category loneliness variable
+    ls_total_7cat_f = factor(ls_total),
+    # Binary loneliness variable
+    loneliness_det_2cat_f = case_when(
+      ls_total <= 5 ~ 0,
+      ls_total > 5  ~ 1
+    ),
+    loneliness_det_2cat_f = factor(loneliness_det_2cat_f,
+                                   levels = c(0,1),
+                                   labels = c("Not lonely", "Lonely")),
+    # Binary GDS variable 
+    depres_det_2cat_f = case_when(
+      gds_total < 5 ~ 0,
+      gds_total >= 5  ~ 1
+    ),
+    depres_det_2cat_f = factor(depres_det_2cat_f,
+                                   levels = c(0,1),
+                                   labels = c("Normal", "Depressed")),
+    # MOS Variables to labelled factors
+    across(
+      .cols = starts_with("outcomes_"),
+      .fns = ~factor(.x,
+                     levels = c(1,2,3,4,5),
+                     labels = c("All of the time", "Most of the time", 
+                                "Some of the time", "A little of the time",
+                                "None of the time")),
+      .names = "{col}_f"
+    ),
+    # Sociodemographic Information Variables
+    sode_race_eth_4cat_f = factor(
+      sode_race_eth_4cat,
+      levels = c(1:4),
+      labels = c("Hispanic, any race", "Black, non-Hispanic", 
+                 "White, non-Hispanic", 
+                 "Other race or multiple races, non-Hispanic")
+    ),
+    hispanic = ifelse(sode_race_eth_4cat_f == "Hispanic, any race", 1,0),
+    black = ifelse(sode_race_eth_4cat_f == "Black, non-Hispanic", 1,0),
+    white = ifelse(sode_race_eth_4cat_f == "White, non-Hispanic", 1,0),
+    other_race = ifelse(
+      sode_race_eth_4cat_f == "Other race or multiple races, non-Hispanic", 1,0
+      ),
+    across(
+      .cols = c(hispanic, black, white, other_race),
+      .fns = ~factor(.x,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+      )
+    ),
+    sogi_orientation_4cat_f = factor(
+      sogi_orientation_6cat,
+      levels = c(1:6),
+      labels = c("Straight/heterosexual", "Gay man", "Lesbian/gay woman", 
+                 "Bisexual", "Queer", "Other")
+    ),
+    straight = ifelse(sogi_orientation_4cat_f == "Straight/heterosexual", 1,0),
+    gay_man = ifelse(sogi_orientation_4cat_f == "Gay man", 1,0),
+    lesbian = ifelse(sogi_orientation_4cat_f == "Lesbian/gay woman", 1,0),
+    bisexual = ifelse(sogi_orientation_4cat_f == "Bisexual", 1,0),
+    other = ifelse(sogi_orientation_4cat_f == "Queer" | 
+                     sogi_orientation_4cat_f == "Other", 1,0),
+    across(
+      .cols = c(straight, gay_man, lesbian, bisexual, other),
+      .fns = ~factor(.x,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+      )
+    ),
+    sode_marital_6cat_f = factor(
+      sode_marital_6cat,
+      levels = c(1:6),
+      labels = c("Married", "Living as an unmarried or common law couple",
+                 "Separated", "Divorced", "Widowed", "Single, or never married")
+    ),
+    married = ifelse(sode_marital_6cat_f == "Married", 1,0),
+    common_law = ifelse(
+      sode_marital_6cat_f == "Living as an unmarried or common law couple", 1,0
+      ),
+    separated = ifelse(sode_marital_6cat_f == "Separated", 1,0),
+    divorced = ifelse(sode_marital_6cat_f == "Divorced", 1,0),
+    widowed = ifelse(sode_marital_6cat_f == "Widowed", 1,0),
+    single = ifelse(sode_marital_6cat_f == "Single, or never married", 1,0),
+    across(
+      .cols = c(married, common_law, separated, divorced, widowed, single),
+      .fns = ~factor(.x,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+      ) 
+    ),
+    sode_marital_2cat_f = case_when(
+      sode_marital_6cat_f == "Married" | 
+        sode_marital_6cat_f == "Living as an unmarried or common law couple"~ 1,
+      TRUE                                                                  ~ 0
+    ), 
+    sode_marital_2cat_f = factor(
+      sode_marital_2cat_f,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+    ),
+    live_alone_2cat_f = case_when(
+      sode_people_9cat == 1 ~ 1,
+      sode_people_9cat > 1  ~ 0
+    ),
+    live_alone_2cat_f = factor(
+      live_alone_2cat_f,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+    ),
+   sode_school_7cat_f = factor(
+     sode_school_7cat,
+     levels = c(1:7),
+     labels = c("Some high school (no diploma)", "High school graduate",
+                "Some college (no degree)", "Associate’s degree", 
+                "Bachelor’s degree (BA, AB, BS, etc.)", 
+                "Some graduate or professional school (no degree)",
+                "Graduate or professional school degree (MS, MA, MD, PhD, etc.)"
+                )
+   ),
+   some_high_school = ifelse(
+     sode_school_7cat_f == "Some high school (no diploma)", 1,0
+     ),
+   high_school = ifelse(sode_school_7cat_f == "High school graduate", 1,0),
+   some_college = ifelse(sode_school_7cat_f == "Some college (no degree)", 1,0),
+   associate = ifelse(sode_school_7cat_f == "Associate’s degree", 1,0),
+   bachelor = ifelse(
+     sode_school_7cat_f == "Bachelor’s degree (BA, AB, BS, etc.)", 1,0
+     ),
+   some_graduate = ifelse(
+     sode_school_7cat_f == "Some graduate or professional school (no degree)", 
+     1,0),
+   graduate = ifelse(
+     sode_school_7cat_f == 
+       "Graduate or professional school degree (MS, MA, MD, PhD, etc.)", 1,0),
+    across(
+      .cols = c(some_high_school, high_school, some_college, associate, bachelor,
+                some_graduate, graduate),
+      .fns = ~factor(.x,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+      )
+    ),
+   sode_employed_9cat_f = factor(
+     sode_employed_9cat,
+     levels = c(1:9),
+     labels = c("Employed full time", "Employed part time", "In the military",
+                "Unemployed", "Retired", "A student", "A homemaker", 
+                "Disabled or unable to work", "Something else")
+   ),
+   full_time = ifelse(sode_employed_9cat_f == "Employed full time", 1,0),
+   part_time = ifelse(sode_employed_9cat_f == "Employed part time", 1,0),
+   in_military = ifelse(sode_employed_9cat_f == "In the military", 1,0),
+   unemployed = ifelse(sode_employed_9cat_f == "Unemployed", 1,0),
+   retired = ifelse(sode_employed_9cat_f == "Retired", 1,0),
+   student = ifelse(sode_employed_9cat_f == "A student", 1,0),
+   homemaker = ifelse(sode_employed_9cat_f == "A homemaker", 1,0),
+   disabled = ifelse(sode_employed_9cat_f == "Disabled or unable to work", 1,0),
+   other = ifelse(sode_employed_9cat_f == "Something else", 1,0),
+   across(
+      .cols = c(full_time, part_time, in_military, unemployed, retired, student,
+                homemaker, disabled, other),
+      .fns = ~factor(.x,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+      )
+   ),
+   sode_income_7cat_f = factor(
+     sode_income_7cat,
+     levels = c(1:7),
+     labels = c("$10,000 or less", "Between $10,001 and $20,000", 
+                "Between $20,001 and $35,000", "Between $35,001 and $50,000",
+                "Between $50,001 and $75,000", "Between $75,001 and $100,000",
+                "More than $100,000")
+   ),
+   inc_10 = ifelse(sode_income_7cat_f == "$10,000 or less", 1,0),
+   inc_20 = ifelse(sode_income_7cat_f == "Between $10,001 and $20,000", 1,0),
+   inc_35 = ifelse(sode_income_7cat_f == "Between $20,001 and $35,000", 1,0),
+   inc_50 = ifelse(sode_income_7cat_f == "Between $35,001 and $50,000", 1,0),
+   inc_75 = ifelse(sode_income_7cat_f == "Between $50,001 and $75,000", 1,0),
+   inc_100 = ifelse(sode_income_7cat_f == "Between $75,001 and $100,000", 1,0),
+   inc_above_100 = ifelse(sode_income_7cat_f == "More than $100,000", 1,0),
+   across(
+      .cols = starts_with("inc_"),
+      .fns = ~factor(.x,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+      )
+   ),
+   sode_military_2cat_f = factor(
+     sode_military_2cat,
+     levels = c(1,2),
+     labels = c("Yes", "No")
+   ),
+   female = ifelse(sex_2cat_f == "Female", 1,0), 
+   male = ifelse(sex_2cat_f == "Male", 1,0),
+   across(
+      .cols = c(male, female),
+      .fns = ~factor(.x,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+      )
+   ),
+    age_4cat_f = case_when(
+      age >= 65 & age < 75 ~ "65-74",
+      age >= 75 & age < 85 ~ "75-84",
+      age >= 85 & age < 95 ~ "85-94",
+      age >= 95            ~ "95+"
+    ),
+    age_4cat_f = factor(age_4cat_f, 
+                        levels = c("65-74", "75-84", "85-94", "95+")
+                        ),
+   age_65_74 = ifelse(age >= 65 & age < 75, 1,0),
+   age_75_84 = ifelse(age >= 75 & age < 85, 1,0),
+   age_85_94 = ifelse(age >= 85 & age < 95, 1,0),
+   age_95 = ifelse(age >= 95, 1,0),
+   across(
+      .cols = c(age_65_74, age_75_84, age_85_94, age_95),
+      .fns = ~factor(.x,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+      )
+   ),
+   over_65_abuse_any_2cat_f = factor(
+     over_65_abuse_any_2cat,
+        levels = c(0,1),
+        labels = c("No", "Yes")
+   )
+  ) %>% select(-c(starts_with("outcomes_") & ends_with("cat"),
+                  ))
+ 
+```
+
+
+# Add variable labels
+
+```{r}
+add_labs <- function(label_df, df){
+  labels_named_vec <- setNames(label_df[["label"]], label_df[["var"]]) %>% as.list() 
+  result <- apply_labels(df, labels_named_vec)
+}
+```
+
+```{r, warning=FALSE}
+mice_out_df_dum <- add_labs(all_labels, mice_out_df_dum)
+```
+
+
+# List of variables for each data type
+
+```{r}
+# Loneliness scale variables
+ls_vars <- c(# "ls_lack_companionship_3cat_f", "ls_feel_left_out_3cat_f", 
+             # "ls_feel_isolated_3cat_f", 
+             "ls_total", "ls_total_7cat_f", "loneliness_det_2cat_f")
+
+# 3 Item Pain Assessment Scale
+peg_vars <- c("peg_total")
+
+# Geriatric Depression Scale
+gds_vars <- c("gds_total", "depres_det_2cat_f")
+
+# Medical Outcomes Study
+mos_vars <- c("outcomes_month_social_5cat_f", "outcomes_month_nervous_5cat_f",
+              "outcomes_month_calm_5cat_f", "outcomes_month_blue_5cat_f", 
+              "outcomes_month_happy_5cat_f")
+
+# Sociodemographic Information 
+
+## Race/ Ethnicity
+race_vars <- c(# "sode_race_eth_6cat", "sode_race_eth_4cat_f", 
+  "hispanic", "black", "white", "other")
+
+## Sexual orientation
+so_vars <- c(# "sogi_orientation_8cat", "sogi_orientation_4cat_f", 
+  "straight", "gay_man", "lesbian", "bisexual", "other")
+
+## Marital status
+mar_vars <- c(# "sode_marital_8cat", "sode_marital_6cat_f", 
+  "married", "common_law", "separated", "divorced", "widowed", "single", 
+              "sode_marital_2cat_f")
+
+## Household size
+house_vars <- c("sode_people_9cat", "live_alone_2cat_f")
+
+## Education status
+edu_vars <- c(# "sode_school_9cat", "sode_school_7cat_f", 
+  "some_high_school", "high_school", "some_college", "associate", "bachelor", 
+              "some_graduate", "graduate")
+
+## Employment status
+job_vars <- c(# "sode_employed_11cat", "sode_employed_9cat_f", 
+  "full_time", "part_time", "in_military", "unemployed", "retired", "student", 
+  "homemaker", "disabled")
+
+## Income
+income_vars <- c(# "sode_income_9cat", "sode_income_7cat_f", 
+  "inc_10", "inc_20", "inc_35", "inc_50", "inc_75", "inc_100", "inc_above_100")
+
+## Military status
+mil_vars <- c(# "sode_military_4cat", 
+  "sode_military_2cat_f")
+
+# Sex
+sex_vars <- c(# "sex_2cat", 
+  "sex_2cat_f" # , "female", "male"
+  )
+
+# Age
+age_vars <- c("age", 
+              # "age_4cat_f", 
+              "age_65_74", "age_75_84", "age_85_94", "age_95"
+)
+
+soc_vars <- c(race_vars, so_vars, mar_vars, house_vars, 
+                                     edu_vars, job_vars, income_vars, mil_vars,
+                                     sex_vars, age_vars)
+
+# Abuse Self Report
+sr_vars <- c(# "over_65_abuse_any_2cat", 
+             "over_65_abuse_any_2cat_f")
+
+all_pred_vars <- c(soc_vars, sr_vars, peg_vars, gds_vars, mos_vars)
+```
+
+
+# Descriptive Statistics Tables
+
+```{r}
+pvalue <- function(x, ...) {
+    # Construct vectors of data y, and groups (strata) g
+    y <- unlist(x)
+    g <- factor(rep(1:length(x), times=sapply(x, length)))
+    tryCatch(
+      {
+        if (is.numeric(y)) {
+          # For numeric variables, perform a standard 2-sample t-test
+          p <- t.test(y ~ g)$p.value
+          } else {
+            # For categorical variables, perform a chi-squared test of independence
+            p <- chisq.test(table(y, g))$p.value
+            }
+        # The initial empty string places the output on the line below the variable label.
+        c("", format.pval(p, digits=3, eps=0.001))
+        },
+      error=function(e) {
+        message('An Error Occurred')
+        print(e)
+        return(NA)
+        },
+      # If warning is produced with Chi-squared test, use fisher's test
+      warning=function(w) {
+        if(w$message == "Chi-squared approximation may be incorrect"){
+          p <- fisher.test(table(y, g))$p.value
+          c("", format.pval(p, digits=3, eps=0.001))
+        
+        }
+        }
+    )
+}
+```
+
+```{r}
+test <- function(x, ...) {
+    # Construct vectors of data y, and groups (strata) g
+    y <- unlist(x)
+    g <- factor(rep(1:length(x), times=sapply(x, length)))
+    tryCatch(
+      {
+        if (is.numeric(y)) {
+          test <- "T-test"
+          } else {
+            # For categorical variables, perform a chi-squared test of independence
+            p <- chisq.test(table(y, g))$p.value
+            test <- "Chi-squared test"
+            }
+        c("", test)
+        },
+      error=function(e) {
+        message('An Error Occurred')
+        print(e)
+        return(NA)
+        },
+      warning=function(w) {
+        if(w$message == "Chi-squared approximation may be incorrect"){
+          test <- "Fisher's exact test"
+          c("", test)
+        }
+        }
+    )
+}
+```
+
+
+Error due to variables with no values (0) <https://github.com/parklab/ShatterSeek/issues/9>
+Try to create output instead of error message <https://stackoverflow.com/questions/12193779/how-to-use-the-trycatch-function>
+
+```{r}
+create_formula <- function(predictors, target){
+  pt_formula <- ""
+  z <- length(predictors)
+  for (p in predictors){
+    if(p == predictors[[z]]){
+      formula_ip <- paste(noquote(p))
+    } else{
+      formula_ip <- paste(noquote(p), "+ ")
+    }
+    pt_formula <- paste0(pt_formula, formula_ip)
+  }
+  pt_formula <- as.formula(paste0("~ ", pt_formula, " | ", target))
+  pt_formula
+}
+```
+
+## Imputed sets
+
+```{r}
+original <- mice_out_df_dum %>% filter(impute == 0)
+impute_1 <- mice_out_df_dum %>% filter(impute == 1)
+impute_2 <- mice_out_df_dum %>% filter(impute == 2)
+impute_3 <- mice_out_df_dum %>% filter(impute == 3)
+impute_4 <- mice_out_df_dum %>% filter(impute == 4)
+impute_5 <- mice_out_df_dum %>% filter(impute == 5)
+```
+
+```{r}
+imp_list <- mice_out_df_dum %>% filter(impute != 0) %>%
+ group_split(impute, .keep = FALSE)
+```
+
+
+# Flextable formula
+
+```{r}
+desc_flex <- function(df){
+  table1(create_formula(all_pred_vars, "loneliness_det_2cat_f"),
+    data = df, overall = F , extra.col=list(`Test` = test, `P-value`= pvalue)
+    ) %>% t1flex(tablefn = c("qflextable", "flextable", "regulartable")) %>% 
+  font(fontname = "Arial", part = "all") %>%
+  fontsize(size = 10, part = "all") %>%
+  width(j = 1, width = 2) %>%
+  add_footer_lines("Individuals with UCLA loneliness scale total scores greater or equal to 5 are classified as lonely") %>%
+  fontsize(size = 9, part = "footer") %>%
+  italic(part = "footer")
+}
+```
+
+## Loneliness Data
+
+```{r}
+ls_tab <- table1(~ls_total + ls_total_7cat_f,
+       data = original
+    ) %>% 
+  t1flex(tablefn = c("qflextable", "flextable", "regulartable")) %>% 
+  font(fontname = "Arial", part = "all") %>%
+  fontsize(size = 10, part = "all") %>%
+  width(j = 1, width = 2) %>%
+  fontsize(size = 9, part = "footer") %>%
+  italic(part = "footer")
+```
+
+```{r}
+quintile_ls <- quantile(original$ls_total, prob=c(0.2,0.4,0.6,0.8, 1), type=1)
+
+ls_plot <- ggplot(original, aes(ls_total)) +
+  geom_histogram(binwidth = 1) +
+  xlab("3-Item UCLA Loneliness Scale Score Total") +
+  ylab("Count") +
+  geom_vline(aes(xintercept = quintile_ls[4])) +
+  geom_text(aes(x = quintile_ls[4], label = "\n4th quintile", y = 100), colour="blue", angle=90) +
+  theme(legend.position="none")
+
+ls_plot
+```
+
+## Original data
+
+```{r}
+original_tab <- desc_flex(original)
+```
+
+## Imputation 1
+
+```{r}
+imp1_tab <- desc_flex(impute_1)
+imp1_tab
+```
+
+## Imputation 2
+
+```{r}
+imp2_tab <- desc_flex(impute_2)
+```
+
+## Imputation 3
+
+```{r, warning=FALSE}
+imp3_tab <- desc_flex(impute_3)
+```
+
+## Imputation 4
+
+```{r}
+imp4_tab <- desc_flex(impute_4)
+```
+
+## Imputation 5
+
+```{r}
+imp5_tab <- desc_flex(impute_5)
+```
+
+
+# Create Word Document
+
+```{r, eval = FALSE}
+# Open word file as an object
+ucla_desc_tables_doc <- read_docx(here::here("exploratory", "officer_template.docx"))
+
+ucla_desc_tables_doc <- ucla_desc_tables_doc %>%
+  body_add_par("UCLA Loneliness Scale Descriptive Statistics", style = "Title") %>%
+  body_add_flextable(ls_tab, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_gg(ls_plot, height = 3.41, width = 4.09) %>%
+  body_add_par(value = "") %>%
+  body_add_par("Individuals with loneliness scale total scores of 5 or less were categorized as not lonely while those with scores of 6 or greater were categorized as lonely. Five versions of the data were produced using the R MICE package with different imputed values.", 
+               style = "Normal") %>%
+  
+  # Original data
+  body_add_par("Original Data with Missing Values", style = "heading 1") %>%
+  body_add_flextable(original_tab, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+  # Imputation 1
+  body_add_par("Imputation 1 Data", style = "heading 1") %>%
+  body_add_flextable(imp1_tab, align = "left") %>%
+  body_add_par(value = "") %>%  
+
+  # Imputation 2
+  body_add_par("Imputation 2 Data", style = "heading 1") %>%
+  body_add_flextable(imp2_tab, align = "left") %>%
+  body_add_par(value = "") %>%  
+  
+  # Imputation 3
+  body_add_par("Imputation 3 Data", style = "heading 1") %>%
+  body_add_flextable(imp3_tab, align = "left") %>%
+  body_add_par(value = "") %>%  
+  
+  # Imputation 4
+  body_add_par("Imputation 4 Data", style = "heading 1") %>%
+  body_add_flextable(imp4_tab, align = "left") %>%
+  body_add_par(value = "") %>%  
+
+  # Imputation 5
+  body_add_par("Imputation 5 Data", style = "heading 1") %>%
+  body_add_flextable(imp5_tab, align = "left") %>%
+  body_add_par(value = "")
+
+# print the word document
+print(ucla_desc_tables_doc, 
+      target = here::here("exploratory", "ucla_loneliness_scale", 
+                          "UCLA_loneliness_scale_descriptive_tables.docx"))
+```
+
+

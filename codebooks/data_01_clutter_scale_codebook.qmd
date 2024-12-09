@@ -26,6 +26,23 @@ clutter_scale_path <- here::here("data", "cleaned_rds_files", "clutter_scale_imp
 clutter_scale <- readr::read_rds(clutter_scale_path)
 ```
 
+# Load custom functions
+
+```{r}
+source(here::here("r", "variable_descriptions.R"))
+source(here::here("r", "identify_codebook_variables_to_update.R"))
+```
+
+
+# Data variables check
+```{r}
+# Compare variables in this dataframe to the variables in the most recent 
+# version of the cleaned data 
+
+clutter_scale_desc_path <- "clutter_scale_var_desc.rds"
+vars_to_update(clutter_scale, clutter_scale_desc_path)
+```
+
 # Set column attributes
 
 ```{r}

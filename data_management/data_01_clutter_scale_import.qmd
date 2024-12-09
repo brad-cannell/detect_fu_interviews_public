@@ -9,10 +9,11 @@ In this file, we import and do some initial cleaning of the Clutter Rating Scale
 
 # Load packages
 
-```{r}
+```{r, message= FALSE}
 library(dplyr, warn.conflicts = FALSE)
 library(readr)
 library(janitor)
+library(here)
 ```
 
 
@@ -21,12 +22,27 @@ library(janitor)
 Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki/Using-this-repository. 
 
 ```{r}
-clutter_scale <- read_csv("../data/filemaker_pro_exports/clutter_scale_import.csv")
+clutter_scale_path <- here::here("data", "filemaker_pro_exports", "clutter_scale_import.csv")
 ```
 
 ```{r}
+clutter_scale <- readr::read_csv(clutter_scale_path)
+rm(clutter_scale_path)
+```
+
+## Data check
+
+The initial number of rows and columns.
+
+```{r}
 # Data check
-dim(clutter_scale) # 893  23
+dims <- c(893, 23)
+if (nrow(clutter_scale) != dims[1] || ncol(clutter_scale) != dims[2]) {
+  stop(
+    "Expecting ", dims[1], " rows and ", dims[2], " columns in clutter_scale. Found ",
+    paste(dim(clutter_scale), collapse = ", "), " instead. Check into it."
+  )
+}
 ```
 
 
@@ -35,6 +51,8 @@ dim(clutter_scale) # 893  23
 We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
 
 ## Convert all variable names to snake case
+
+Here we will convert all variable names to snake case so that everything is uniform.
 
 ```{r}
 clutter_scale <- clean_names(clutter_scale)
@@ -49,7 +67,27 @@ clutter_scale <- clutter_scale |>
   filter(!stringr::str_detect(medstar_id, "debe8"))
 ```
 
-## Create recoded variables and factor variables to match levels in follow-up interview protocol
+```{r}
+# Data check
+dims <- c(892, 23)
+if (nrow(clutter_scale) != dims[1] || ncol(clutter_scale) != dims[2]) {
+  stop(
+    "Expecting ", dims[1], " rows and ", dims[2], " columns in self_rep. Found ",
+    paste(dim(clutter_scale), collapse = ", "), " instead. Check into it."
+  )
+}
+```
+
+## Clean categorical variables
+
+- By default, FM Pro exports all categorical variables as character variables.
+- When analyzing data in R, we prefer to work factors and occasionally with numeric values.
+- Below, we:
+  - Convert character values to numeric values
+  - Create a version of each column with "Don't know" and "Refused" converted to NA
+  - Create a factor version of each column (w/o "Don't know" and "Refused")
+  - Arrange the columns as: original column, numeric column w/o "Don't know" and "Refused", 
+    and the factor version of the column.
 
 ```{r}
 # Create recoded variable for look_living
@@ -175,14 +213,25 @@ clutter_scale <- clutter_scale %>%
   ))
 ```
 
+### Data check
+
+Number of columns after cleaning the environment variables section.
+
 ```{r}
 # Data check
-dim(clutter_scale) # 893  29
+ncols <- 29
+if (ncol(clutter_scale) != ncols) {
+  stop(
+    ncols, " columns expected in clutter_scale after cleaning the environment variables. ", 
+    ncol(clutter_scale), " columns found. Check into it."
+  )
+}
 ```
 
 
 # Save as rds file
 
 ```{r}
-write_rds(clutter_scale, "../data/cleaned_rds_files/clutter_scale_import.rds")
+write_rds(clutter_scale, 
+          here::here("data", "cleaned_rds_files", "clutter_scale_import.rds"))
 ```

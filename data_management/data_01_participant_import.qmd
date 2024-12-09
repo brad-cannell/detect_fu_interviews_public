@@ -1,0 +1,450 @@
+---
+title: "Import Data from FileMaker Pro: Participant"
+---
+
+
+```{r, message= FALSE}
+library(readr)
+library(stringr)
+library(janitor)
+library(dplyr)
+library(tidyr)
+library(here)
+```
+
+
+# Load custom functions
+
+```{r}
+source(here::here("R", "recoding_factoring_relocating.R"))
+source(here::here("R", "nums_to_na.R"))
+source(here::here("R", "data_cleaning_tools.R"))
+```
+
+
+# Load the data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+participant <- read_csv(here("data", "filemaker_pro_exports", 
+                             "participant_import.csv"))
+```
+
+# Clean the data
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+participant <- clean_names(participant)
+```
+
+```{r}
+# Data check
+dim(participant) # 92160 94
+```
+
+## Coerce categorical variables to factor variables
+
+## Create recoded factor variables
+### Change N/A string values to logical constant values
+```{r}
+# select variables that contain N/A string values
+change_na <- participant %>%
+  select_if(is.character) %>%
+  select_if(~ any(. == "N/A")) %>%
+  colnames()
+```
+
+```{r}
+participant <- participant %>%
+  mutate(
+    across(
+      .cols = all_of(change_na),
+      .fns = ~ case_when(
+        .x == "N/A" ~ NA,
+        TRUE ~ .x
+      )
+    )
+  )
+```
+
+### Create recoded variables for DETECT tool variables
+
+```{r}
+cols <- c(
+  "x_unusual_odor", "x_unmet_needs", "x_difficulty_medications", 
+  "x_hoarding_medications", "x_disarray_hoarding", "x_health_safety_concern", 
+  "x_caregiver_lack_knowledge", "x_caregiver_unengaged", 
+  "x_caregiver_frustrated", "x_caregiver_anxious", "x_isolated_home", 
+  "x_depressed", "x_poor_personal_hygiene", "x_inadequately_clothed"
+  )
+
+get_values(participant, cols)
+```
+
+```{r}
+participant <- participant %>%
+  mutate(
+    # Make the case of the row values match that of the responses from the DETECT F/U Interviews
+    across(
+      .cols = all_of(cols),
+      .fns = ~ str_to_sentence(.x)
+    )
+  )
+
+get_values(participant, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "Yes" = 1, "No" = 0, "No caregiver present" = 2, 
+    "Did not enter patient's home" = 3, "Unable to assess" = 8 
+)
+
+# NA values
+na_values <- c(8)
+
+# Suffix for the version of each column with "Unable to assess" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Unable to assess" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Unable to assess" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+participant <- participant |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Unable to assess" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Unable to assess")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Create factor variables for race
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("race")
+```
+
+Check values.
+
+```{r}
+get_values(participant, cols)
+```
+
+
+Code the race variable numerically, grouping values with multiple races
+and "Other" under the same numeric code  - 6.
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "American Indian or Alaskan Native" = 1, "Asian" = 2, 
+  "Black or African American" = 3,
+  "Native Hawaiian or Other Pacific Islander" = 4,
+  "White" = 5, "Other race or multiple races" = 6, "Not Applicable" = 7, 
+  "Not Recorded" = 9
+  )
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+participant <- participant %>%
+  mutate(
+    # Create a temporary variable for "Hispanic or Latino"
+    race_hispanic = case_when(
+      grepl("Hispanic or Latino", race) == TRUE ~ 1,
+      is.na(race) ~ NA_integer_,
+      TRUE ~ 0
+    ),
+    
+    # Remove "Hispanic or Latino"
+    race_8cat = case_when(
+      grepl("Hispanic or Latino", race) == TRUE & 
+        nchar(race) > 20 ~
+        trimws(
+          gsub("Hispanic or Latino,|, Hispanic or Latino",
+               "", race) 
+          ),
+      race == "Hispanic or Latino" ~ NA_character_,
+      TRUE ~ race
+    ),
+    
+    # Remove "Not recorded" or "Not applicable" when they occur with other values.
+    race_8cat = case_when(
+      grepl("Not Recorded|Not Applicable", race_8cat) == TRUE & 
+        nchar(race_8cat) > 14 ~
+        trimws(
+          gsub("Not Recorded,|Not Applicable,|, Not Recorded|, Not Applicable",
+               "", race_8cat)
+          ),
+      TRUE ~ race_8cat
+    )
+  )
+```
+
+
+```{r}
+get_values(participant, "race_8cat")
+```
+
+```{r}
+participant <- participant %>%
+  mutate(
+    race_8cat = case_when(
+      is.na(race_8cat) ~ NA_integer_,
+      race_8cat == "American Indian or Alaskan Native" ~ 1,
+      race_8cat == "Asian" ~ 2,
+      race_8cat == "Black or African American" ~ 3,
+      race_8cat == "Native Hawaiian or Other Pacific Islander" ~ 4,
+      race_8cat == "White" ~ 5,
+      race_8cat == "Not Applicable" ~ 7,
+      race_8cat == "Not Recorded" ~ 9,
+      TRUE ~ 6 # "Other race or multiple races",
+    ),
+    race_6cat = case_when(
+      race_8cat == 7 | race_8cat == 9 ~ NA_integer_,
+      TRUE ~ race_8cat
+    ),
+    race_6cat_f = factor(race_6cat,
+                              levels = as.numeric(factor_labs_levs),
+                              labels = names(factor_labs_levs))
+  )
+  
+# Relocate new race variables after race  
+cols <- c("race_6cat_f", "race_6cat", "race_8cat") 
+for (col in cols) {
+  participant <- participant %>%
+    dplyr::relocate(all_of(col), .after = race)
+} 
+```
+
+```{r}
+value_labels <- c(
+  "Hispanic, any race" = 1, "Black, non-Hispanic" = 2, "White, non-Hispanic" = 3, 
+  "Other race or multiple races, non-Hispanic" = 4
+)
+
+participant <- participant %>%
+  mutate(
+    race_eth_4cat = case_when(
+      is.na(race_hispanic) ~ NA_integer_,
+      race_hispanic == 1 ~ 1, # "Hispanic, any race"
+      race_6cat == 3 & race_hispanic == 0 ~ 2, # "Black, non-Hispanic"
+      race_6cat == 5 & race_hispanic == 0 ~ 3, # "White, non-Hispanic"
+      TRUE ~ 4, # "Other race or multiple races, non-Hispanic"
+    ),
+    race_eth_4cat_f = factor(
+      race_eth_4cat,
+      levels = as.numeric(value_labels),
+      labels = names(value_labels)
+    )
+  )
+
+# Relocate new race_eth variables after race  
+cols <- c("race_eth_4cat_f", "race_eth_4cat") 
+for (col in cols) {
+  participant <- participant %>%
+    dplyr::relocate(all_of(col), .after = race_6cat_f)
+}
+
+# Remove the race_hispanic variable
+participant <- participant %>% select(-c("race_hispanic"))
+```
+
+### Create factor variable for sex
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sex")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(participant, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Male" = 1, "Female" = 2, "Unknown (Unable To Determine)" = 7
+  )
+
+# NA values
+na_values <- c(7)
+
+# Suffix for the version of each column with "Unknown (Unable To Determine)" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Unknown (Unable To Determine)" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Unknown (Unable To Determine)" converted to NA
+# - Create a factor version of each column (w/o "Unknown (Unable To Determine)")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+participant <- participant |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Unknown (Unable To Determine)" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Unknown (Unable To Determine)")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Create factor variables for xc_detect_status
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("xc_detect_status")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(participant, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Positive" = 1, "Negative" = 0
+  )
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+participant <- participant |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Create factor variables for x_aps_reported and x_do_not_call
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("x_aps_reported", "x_do_not_call")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(participant, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Yes" = 1, "No" = 0
+  )
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+participant <- participant |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+```{r}
+# Data check
+dim(participant) # 92160 103
+```
+
+# Save as rds file
+
+```{r}
+write_rds(participant, here::here("data", "cleaned_rds_files", 
+                                  "participant_import.rds"))
+```
