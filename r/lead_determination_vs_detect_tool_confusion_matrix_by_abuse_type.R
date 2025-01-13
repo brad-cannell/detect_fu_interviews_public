@@ -12,26 +12,43 @@ compare_det <- function(lead_final_det, detect_tool, abuse_type){
   # Select the specific abuse column from the final determination dataframe
   abuse_final_det <- lead_final_det %>% select(medstar_id, {{abuse_type}}) %>%
     
-    # convert  Yes/ No factor abuse determination variable to Positive/ Negative variable
+    # convert  Yes/ No factor abuse determination variable to Positive/ 
+    # Negative variable
     mutate(
       abuse_item_chr :=  case_when(
         {{abuse_type}} == "Yes" ~ "positive",
         {{abuse_type}} == "No"  ~ "negative"
       ),
-      "{{abuse_type}}_pn" := factor(abuse_item_chr, levels = c("positive", "negative"))
+      "{{abuse_type}}_pn" := factor(abuse_item_chr, 
+                                    levels = c("positive", "negative"))
     )
   
-  # Determine the initial MedStar Medic DETECT tool abuse determination (counts as positive if at least one of the items in the DETECT tool was positive)
+  # Determine the initial MedStar Medic DETECT tool abuse determination 
+  # (counts as positive if at least one of the items in the DETECT tool was 
+  # positive)
+  
+  # List of detect tool factor columns
+  detect_tool_cols <- cols <- c(
+    "x_unusual_odor_4cat_f", "x_unmet_needs_4cat_f", 
+    "x_difficulty_medications_4cat_f", "x_hoarding_medications_4cat_f", 
+    "x_disarray_hoarding_4cat_f", "x_health_safety_concern_4cat_f", 
+    "x_caregiver_lack_knowledge_4cat_f", "x_caregiver_unengaged_4cat_f", 
+    "x_caregiver_frustrated_4cat_f", "x_caregiver_anxious_4cat_f", 
+    "x_isolated_home_4cat_f", "x_depressed_4cat_f", 
+    "x_poor_personal_hygiene_4cat_f", "x_inadequately_clothed_4cat_f"
+  )
   detect_tool <- detect_tool %>% 
     mutate(
-      # Create a column that has a value of "positive" if at least one of the items in the DETECT tool variables are positive
+      # Create a column that has a value of "positive" if at least one of the 
+      # items in the DETECT tool variables are positive
       detect_tool_det = case_when(
-        if_any(ends_with("_5cat_f"), ~. == "Yes")  ~ "positive",
-        if_all(ends_with("_5cat_f"), ~. == "No")   ~ "negative",
+        if_any(all_of(detect_tool_cols), ~. == "Yes")  ~ "positive",
+        if_all(all_of(detect_tool_cols), ~. == "No")   ~ "negative",
         TRUE                                       ~ NA
       ),
       # Convert variable type to factor
-      detect_tool_det = factor(detect_tool_det, levels = c("positive", "negative"))
+      detect_tool_det = factor(detect_tool_det, levels = c("positive", 
+                                                           "negative"))
     )
   
   # Combine the two variables into one df
@@ -41,21 +58,30 @@ compare_det <- function(lead_final_det, detect_tool, abuse_type){
   lead_abuse <- tool_vs_lead %>% select(ends_with("_pn")) %>% names()
  
   # Create contingency table
-  conf_con <- tool_vs_lead %>% select({lead_abuse}, detect_tool_det) %>% drop_na() %>% table(dnn = c(lead_abuse, "detect_tool_det")) %>% as.data.frame()
+  conf_con <- tool_vs_lead %>% select({lead_abuse}, detect_tool_det) %>% 
+    drop_na() %>% table(dnn = c(lead_abuse, "detect_tool_det")) %>% 
+    as.data.frame()
   
    
   # Create a frequency data frame with columns structured appropriately for flextable
     
   col_1_label <- c("positive", "negative", "Total")
-  col_2_actual_positive <- c(conf_con$Freq[conf_con[[lead_abuse]] == "positive" & conf_con$detect_tool_det == "positive"], 
-                             conf_con$Freq[conf_con[[lead_abuse]] == "positive" & conf_con$detect_tool_det == "negative"],
+  col_2_actual_positive <- c(conf_con$Freq[conf_con[[lead_abuse]] == "positive" & 
+                                             conf_con$detect_tool_det == "positive"], 
+                             conf_con$Freq[conf_con[[lead_abuse]] == "positive" & 
+                                             conf_con$detect_tool_det == "negative"],
                              sum(conf_con$Freq[conf_con[[lead_abuse]] == "positive"]))
-  col_3_actual_negative <- c(conf_con$Freq[conf_con[[lead_abuse]] == "negative" & conf_con$detect_tool_det == "positive"], 
-                             conf_con$Freq[conf_con[[lead_abuse]] == "negative" & conf_con$detect_tool_det == "negative"],
+  col_3_actual_negative <- c(conf_con$Freq[conf_con[[lead_abuse]] == "negative" & 
+                                             conf_con$detect_tool_det == "positive"], 
+                             conf_con$Freq[conf_con[[lead_abuse]] == "negative" & 
+                                             conf_con$detect_tool_det == "negative"],
                              sum(conf_con$Freq[conf_con[[lead_abuse]] == "negative"]))
-  col_4_total <- c(sum(conf_con$Freq[conf_con$detect_tool_det == "positive"]), sum(conf_con$Freq[conf_con$detect_tool_det == "negative"]), sum(conf_con$Freq)) 
+  col_4_total <- c(sum(conf_con$Freq[conf_con$detect_tool_det == "positive"]), 
+                   sum(conf_con$Freq[conf_con$detect_tool_det == "negative"]), 
+                   sum(conf_con$Freq)) 
   
-  con_flex <- data.frame(col_1_label, col_2_actual_positive, col_3_actual_negative, col_4_total) %>%
+  con_flex <- data.frame(col_1_label, col_2_actual_positive, 
+                         col_3_actual_negative, col_4_total) %>%
   
     # Convert to flextable and format flextable
     flextable() %>%
@@ -95,11 +121,19 @@ compare_det <- function(lead_final_det, detect_tool, abuse_type){
   # Create table with specificity, sensitivity and prevalence
   conf_calc <- conf_con %>%
     summarise(
-      Sensitivity = paste0(format(round((Freq[lead_abuse_vector == "positive" & detect_tool_det == "positive"]/sum(Freq[lead_abuse_vector == "positive"]))*100,
+      Sensitivity = paste0(format(round((Freq[lead_abuse_vector == "positive" & 
+                                                detect_tool_det == "positive"]/
+                                           sum(Freq[lead_abuse_vector == 
+                                                      "positive"]))*100,
                                         digits = 2), nsmall = 2), " %"),
-      Specificity = paste0(format(round((Freq[lead_abuse_vector == "negative" & detect_tool_det == "negative"]/sum(Freq[lead_abuse_vector == "negative"]))*100,
+      Specificity = paste0(format(round((Freq[lead_abuse_vector == "negative" & 
+                                                detect_tool_det == "negative"]/
+                                           sum(Freq[lead_abuse_vector == 
+                                                      "negative"]))*100,
                                         digits = 2), nsmall = 2), " %"),
-      Prevalence = paste0(format(round((sum(Freq[lead_abuse_vector == "positive"])/sum(Freq))*100, digits = 2), nsmall = 2), " %")
+      Prevalence = paste0(format(round((sum(Freq[lead_abuse_vector == 
+                                                   "positive"])/sum(Freq))*100, 
+                                       digits = 2), nsmall = 2), " %")
       
     ) %>% t() %>% as.data.frame() %>% rownames_to_column() %>% 
     flextable() %>%
@@ -109,6 +143,6 @@ compare_det <- function(lead_final_det, detect_tool, abuse_type){
     bold(j = 1) %>%
     width(width = 1, unit = "in")
   
-  out <- list(con_flex, conf_calc, tool_vs_lead)              # Store output in list
+  out <- list(con_flex, conf_calc, tool_vs_lead)        # Store output in list
   return(out)
 }

@@ -1,0 +1,903 @@
+---
+title: "Import Data from FileMaker Pro: General Health"
+---
+
+# Overview
+
+In this file, we import and do some initial cleaning of the General Health data collected and stored in FileMaker Pro.
+
+
+# Load packages
+
+```{r, message= FALSE}
+library(dplyr, warn.conflicts = FALSE)
+library(readr)
+library(purrr)
+library(stringr)
+library(janitor)
+library(here)
+```
+
+
+# Load custom functions
+
+```{r}
+source(here::here("R", "recoding_factoring_relocating.R"))
+source(here::here("R", "nums_to_na.R"))
+source(here::here("R", "data_cleaning_tools.R"))
+```
+
+
+# Load data
+
+Load the data table into the global environment as a data frame using the raw csv file. See this Wiki page for more information about the location of the data: https://github.com/brad-cannell/detect_fu_interviews_public/wiki/Using-this-repository. 
+
+```{r}
+general_health_path <- here::here("data", "filemaker_pro_exports", "general_health_import.csv")
+```
+
+```{r}
+general_health <- readr::read_csv(general_health_path)
+rm(general_health_path)
+```
+
+## Data check
+
+The initial number of rows and columns.
+
+```{r}
+# Data check
+dims <- c(955, 65)
+if (nrow(general_health) != dims[1] || ncol(general_health) != dims[2]) {
+  stop(
+    "Expecting ", dims[1], " rows and ", dims[2], " columns in general_health. Found ",
+    paste(dim(general_health), collapse = ", "), " instead. Check into it."
+  )
+}
+```
+
+
+# Data cleaning
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+general_health <- clean_names(general_health, replace = c("4Weeks" = "_4weeks"))
+```
+
+## Fix apastrophe encoding issue
+
+R doesn't recognize the apostrophe in "Don’t know" as being the same as the 
+apostrophe in "Don't know". They are similar but slightly different in appearance
+and have different UTF-8 encoding. We will convert all of the first in the 
+data frame to the second to prevent errors.
+
+```{r}
+general_health <- general_health |>
+  mutate(
+    across(
+      .cols = where(is.character),
+      .fns = ~gsub("’", "'", .x)
+    )
+  )
+```
+
+
+## Clean categorical variables
+
+- By default, FM Pro exports all categorical variables as character variables.
+- When analyzing data in R, we prefer to work factors and occasionally with numeric values.
+- Below, we:
+  - Convert character values to numeric values
+  - Create a version of each column with "Don't know" and "Refused" converted to NA
+  - Create a factor version of each column (w/o "Don't know" and "Refused")
+  - Arrange the columns as: original column, numeric column w/o "Don't know" and "Refused", 
+    and the factor version of the column.
+  - The original column will be dropped when it has the same values as the 
+    version without "Don't know and "Refused".  
+    
+### PEG: A Three-Item Scale Assessing Pain Intensity and Interference
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("peg_pain", "peg_enjoyment", "peg_activity")
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "0 - No pain" = 0, "1" = 1, "2" = 2, "3" = 3, "4" = 4, "5" = 5, "6" = 6, 
+  "7" = 7, "8" = 8, "9" = 9, "10 - Pain as bad as you can imagine" = 10, 
+  "Refused" = 99
+)
+
+# NA values
+na_values <- c(99)
+
+# Suffix for the version of each column with "Refused" changed
+# to NA.
+suffix <- "11cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Refused" converted to NA
+# - Create a factor version of each column (w/o "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Refused", and 
+# the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Medical Outcomes Study
+
+#### outcomes_4weeks_pain variable
+
+The "Very Severe" response has inconsistent capitalization
+
+```{r}
+table(general_health$outcomes_4weeks_pain)
+```
+
+Covert the variable to sentence case to fix this.
+
+```{r}
+general_health <- general_health %>% 
+  mutate(
+    outcomes_4weeks_pain = str_to_sentence(outcomes_4weeks_pain)
+  )
+
+table(general_health$outcomes_4weeks_pain)
+```
+
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("outcomes_4weeks_pain")
+
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "None" = 0, "Very mild" = 1, "Mild" = 2, "Moderate" = 3, "Severe" = 4, 
+    "Very severe" = 5, "Don't know" = 7, "Refused" = 9
+)
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "6cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+#### Limited by health variables
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("outcomes_health_vigorous", "outcomes_health_moderate", 
+          "outcomes_health_uphill", "outcomes_health_bend", 
+          "outcomes_health_block", "outcomes_health_bathe")
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "Yes, limited for more than 3 months" = 1, 
+    "Yes, limited for 3 months or less" = 2, "Not limited at all" = 3,
+    "Don't know" = 7, "Refused" = 9
+)
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "3cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+#### outcomes_health_keep and outcomes_health_unable
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("outcomes_health_keep", "outcomes_health_unable")
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "Yes, for more than 3 months" = 1, "Yes, for 3 months or less" = 2, 
+    "No" = 3, "Don't know" = 7, "Refused" = 9
+)
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "3cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+#### outcomes_health_general
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("outcomes_health_general")
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "Excellent" = 1, "Very good" = 2, "Good" = 3, "Fair" = 4, "Poor" = 5,
+    "Don't know" = 7, "Refused" = 9
+)
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+#### How much of the time variables
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "outcomes_month_social", "outcomes_month_nervous", "outcomes_month_calm", 
+  "outcomes_month_blue", "outcomes_month_happy", "outcomes_month_dumps"
+)
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "All of the time" = 1, "Most of the time" = 2, "Some of the time" = 3, 
+    "A little of the time" = 4, "None of the time" = 5, "Don't know" = 7, 
+    "Refused" = 9
+)
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+#### How true or false variables
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "outcomes_tf_ill", "outcomes_tf_anybody", "outcomes_tf_health", 
+  "outcomes_tf_bad"
+)
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "Definitely true" = 1, "Mostly true" = 2, "Don't know" = 3,
+    "Mostly false" = 4, "Definitely false" = 5, "Refused" = 9
+)
+
+# NA values
+na_values <- c(9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### GDS variables
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "depres_satisfied", "depres_hopeless", "depres_better", "depres_activities", 
+  "depres_empty", "depres_bored", "depres_spirits", "depres_afraid", 
+  "depres_happy", "depres_helpless", "depres_home", "depres_memory", 
+  "depres_alive", "depres_worthless", "depres_energy"
+)
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c("No" = 0, "Yes" = 1)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### UCLA Loneliness Scale variables
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("ls_lack_companionship", "ls_feel_left_out", "ls_feel_isolated")
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Hardly ever" = 1, "Some of the time" = 2, "Often" = 3, "Refused" = 9
+  )
+
+# NA values
+na_values <- c(9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "3cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### NESARC-III
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("nesarc_drink", "nesarc_months")
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "No" = 0, "Yes" = 1, "Don't know" = 7, "Refused" = 9
+  )
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### AUDIT-C
+
+#### auditc_drink
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("auditc_drink")
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Never" = 0, "Monthly or less" = 1, "2-4 times a month" = 2,  
+  "2-3 times a week" = 3, "4 or more times a week" = 4, "Don't know" = 7, 
+  "Refused" = 9
+  )
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+#### auditc_five
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("auditc_five")
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Never" = 0, "Less than monthly" = 1, "Monthly" = 2, "Weekly" = 3, 
+  "Daily or almost daily" = 4, "Don't know" = 7, 
+  "Refused" = 9
+  )
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+#### auditc_day
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("auditc_day")
+
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "1 or 2" = 1, "3 or 4" = 2, "5 or 6" = 3, "7 to 9" = 4, "10 or more" = 5,
+  "Don't know" = 7, "Refused" = 9
+  )
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Health variables not in the codebook
+
+There are some variables with the prefix "health_" in the dataframe that are not 
+in the codebook.
+
+```{r}
+health_cols <- general_health %>% select(starts_with("health_")) %>% names()
+health_cols
+```
+
+```{r}
+get_values(general_health, health_cols)
+```
+
+As they only contain "NA" values, they will be excluded from the data
+
+```{r}
+general_health <- general_health |> select(-c(all_of(health_cols)))
+```
+
+### Data check
+
+Number of columns after cleaning the environment variables section.
+
+```{r}
+# Data check
+ncols <- 135
+if (ncol(general_health) != ncols) {
+  stop(
+    ncols, " columns expected in general_health after cleaning the environment variables. ", 
+    ncol(general_health), " columns found. Check into it."
+  )
+}
+```
+
+View variable characteristics.
+
+```{r}
+col_characteristics(general_health)
+```
+
+
+# Save as rds file
+
+```{r}
+write_rds(general_health, 
+          here::here("data", "cleaned_rds_files", "general_health_import.rds"))
+```

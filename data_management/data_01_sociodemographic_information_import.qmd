@@ -1,0 +1,762 @@
+---
+title: "Import Data from FileMaker Pro: Sociodemographic Information"
+---
+
+```{r, message= FALSE}
+library(dplyr, warn.conflicts = FALSE)
+library(readr)
+library(purrr)
+library(stringr)
+library(janitor)
+library(here)
+```
+
+
+# Load custom functions
+
+```{r}
+source(here::here("R", "recoding_factoring_relocating.R"))
+source(here::here("R", "nums_to_na.R"))
+source(here::here("R", "data_cleaning_tools.R"))
+```
+
+
+# Load the data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+sociodemographic_information_path <- here::here("data", "filemaker_pro_exports", "sociodemographic_information_import.csv")
+``` 
+
+```{r}
+sociodemographic_information <- read_csv(sociodemographic_information_path)
+rm(sociodemographic_information_path)
+```
+
+
+# Clean the data
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+# Convert all variable names to snake case
+
+sociodemographic_information <- clean_names(sociodemographic_information)
+```
+
+## Fix apastrophe encoding issue
+
+R doesn't recognize the apostrophe in "Don’t know" as being the same as the 
+apostrophe in "Don't know". They are similar but slightly different in appearance
+and have different UTF-8 encoding. We will convert all of the first in the 
+data frame to the second to prevent errors.
+
+```{r}
+soc_dem <- sociodemographic_information |>
+  mutate(
+    across(
+      .cols = everything(),
+      .fns = ~gsub("’", "'", .x)
+    )
+  )
+```
+
+## Remove rows
+
+For MedStar IDs ...92912, ...83082, ...281fa, ...9b0f2, ...3a6e2, and ...4419d, no consent was given. There was no follow-up interview scheduled. There aren't any values in FM Pro. We will delete these records. For more details, see `check_consenting_participants.qmd`.
+
+```{r}
+soc_dem <- soc_dem |>
+  filter(!stringr::str_detect(medstar_id, "92912")) |>
+  filter(!stringr::str_detect(medstar_id, "83082")) |>
+  filter(!stringr::str_detect(medstar_id, "281fa")) |>
+  filter(!stringr::str_detect(medstar_id, "9b0f2")) |>
+  filter(!stringr::str_detect(medstar_id, "3a6e2")) |>
+  filter(!stringr::str_detect(medstar_id, "4419d"))
+```
+
+## Data check
+
+The initial number of rows and columns.
+
+```{r}
+# Data check
+dims <- c(957, 28)
+if (nrow(soc_dem) != dims[1] || ncol(soc_dem) != dims[2]) {
+  stop(
+    "Expecting ", dims[1], " rows and ", dims[2], " columns in soc_dem. Found ",
+    paste(dim(soc_dem), collapse = ", "), " instead. Check into it."
+  )
+}
+```
+
+## Clean categorical variables
+
+- By default, FM Pro exports all categorical variables as character variables.
+- When analyzing data in R, we prefer to work factors and occasionally with numeric values.
+- Below, we:
+  - Convert character values to numeric values
+  - Create a version of each column with "Don't know" and "Refused" converted to NA
+  - Create a factor version of each column (w/o "Don't know" and "Refused")
+  - Arrange the columns as: original column, numeric column w/o "Don't know" and "Refused", 
+    and the factor version of the column.
+  - The original column will be dropped when it has the same values as the 
+    version without "Don't know and "Refused".  
+    
+### Yes/ No
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sode_hispanic", "sode_military", "sode_unwanted", "sode_sexual", 
+"hsi_contact")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c("Yes" = 1, "No" = 0, "Don't know" = 7, "Refused" = 9)
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### sode_people
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sode_people")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "1" = 1, "2" = 2, "3" = 3, "4" = 4, "5" = 5, "6" = 6, "7" = 7, "8" = 8, 
+  "9" = 9, "Don't know" = 77, "Refused" = 99
+  )
+
+new_value_labels <- c(
+  "1" = 1, "2" = 2, "3" = 3, "4" = 4, "5" = 5, "6" = 6, "7" = 7, "8" = 8, 
+  "9+" = 9, "Don't know" = 77, "Refused" = 99
+  )
+
+# NA values
+na_values <- c(77,99)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "9cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- new_value_labels[!new_value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### sode_marital
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sode_marital")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Married" = 1, "Living as an unmarried or common law couple" = 2, 
+  "Separated" = 3, "Divorced" = 4, "Widowed" = 5, "Single, or never married" = 6, 
+  "Don't know" = 77, "Refused" = 99
+  )
+
+# NA values
+na_values <- c(77,99)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "6cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### sogi_identity
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sogi_identity")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Male" = 1, "Female" = 2, "Other" = 3, "Don't know" = 7, "Refused" = 9
+  )
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "3cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### sogi_orientation
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sogi_orientation")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Straight/heterosexual" = 1, "Gay man" = 2, "Lesbian/gay woman" = 3, 
+  "Bisexual" = 4, "Queer" = 5, "Other" = 6, "Don't know" = 7, "Refused" = 9
+  )
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "6cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### sode_age
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sode_age")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Age 65 to 100+" = 1, "Don't know" = 7, "Refused" = 9
+  )
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "1cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### sode_age_years
+
+```{r}
+soc_dem <- soc_dem %>%
+  mutate(
+    sode_age_years = as.numeric(sode_age_years)
+  )
+```
+
+### sode_race
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sode_race")
+```
+
+Check values.
+
+```{r}
+get_values(soc_dem, cols)
+```
+
+Code the sode_race variable numerically, grouping values with multiple races
+and "Other" under the same numeric code  - 6.
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "American Indian or Alaskan Native" = 1, "Asian" = 2, 
+  "Black or African American" = 3, 
+  "Native Hawaiian or Other Pacific Islander" = 4,
+  "White" = 5, "Other race or multiple races" = 6, "Don't know" = 7, "Refused" = 9
+  )
+
+# NA values
+na_values <- c(7,9)
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+soc_dem <- soc_dem %>%
+  mutate(
+    sode_race_8cat = case_when(
+      is.na(sode_race) ~ NA_integer_,
+      sode_race == "American Indian or Alaskan Native" ~ 1,
+      sode_race == "Asian" ~ 2,
+      sode_race == "Black or African American" ~ 3,
+      sode_race == "Native Hawaiian or Other Pacific Islander" ~ 4,
+      sode_race == "White" ~ 5,
+      sode_race == "Don't know" ~ 7,
+      sode_race == "Refused" ~ 9,
+      TRUE ~ 6 # "Other race or multiple races",
+    ),
+    sode_race_6cat = case_when(
+      sode_race_8cat == 7 | sode_race_8cat == 9 ~ NA_integer_,
+      TRUE ~ sode_race_8cat
+    ),
+    sode_race_6cat_f = factor(sode_race_6cat,
+                              levels = as.numeric(factor_labs_levs),
+                              labels = names(factor_labs_levs))
+  )
+  
+
+# Relocate new sode_race variables after sode_race  
+cols <- c("sode_race_6cat_f", "sode_race_6cat", "sode_race_8cat") 
+for (col in cols) {
+  soc_dem <- soc_dem %>%
+    dplyr::relocate(all_of(col), .after = sode_race)
+} 
+```
+
+```{r}
+value_labels <- c(
+  "Hispanic, any race" = 1, "Black, non-Hispanic" = 2, "White, non-Hispanic" = 3, 
+  "Other race or multiple races, non-Hispanic" = 4
+)
+
+soc_dem <- soc_dem %>%
+  mutate(
+    sode_race_eth_4cat = case_when(
+      is.na(sode_hispanic_2cat_f) ~ NA_integer_,
+      sode_hispanic_2cat_f == "Yes" ~ 1, # "Hispanic, any race"
+      sode_race_6cat == 3 & sode_hispanic_2cat_f == "No" ~ 2, # "Black, non-Hispanic"
+      sode_race_6cat == 5 & sode_hispanic_2cat_f == "No" ~ 3, # "White, non-Hispanic"
+      TRUE ~ 4, # "Other race or multiple races, non-Hispanic"
+    ),
+    sode_race_eth_4cat_f = factor(
+      sode_race_eth_4cat,
+      levels = as.numeric(value_labels),
+      labels = names(value_labels)
+    )
+  )
+
+# Relocate new sode_race_eth variables after sode_race  
+cols <- c("sode_race_eth_4cat_f", "sode_race_eth_4cat") 
+for (col in cols) {
+  soc_dem <- soc_dem %>%
+    dplyr::relocate(all_of(col), .after = sode_race_6cat_f)
+} 
+```
+
+### sode_school
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sode_school")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+Some of the values in the instrument do not match the actual data, specifically the ones pertaining to high school, but the following will be considered as equivalent:
+
+ - "High school graduate or GED" = "High school graduate"
+ - "Did not complete high school or GED" = "Some high school (no diploma)"
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Did not complete high school or GED" = 1, "High school graduate or GED" = 2,
+  "Some college (no degree)" = 3, "Associate's degree" = 4,  
+  "Bachelor's degree (BA, AB, BS, etc.)" = 5, 
+  "Some graduate or professional school (no degree)" = 6,
+  "Graduate or professional school degree (MS, MA, MD, PhD, etc.)" = 7,
+  "Don't know" = 77, "Refused" = 99
+  )
+
+# NA values
+na_values <- c(77,99)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "7cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### sode_employed
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sode_employed")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+Some of the values in the instrument do not match the actual data, specifically the ones pertaining to high school, but the following will be considered as equivalent:
+
+ - "High school graduate or GED" = "High school graduate"
+ - "Did not complete high school or GED" = "Some high school (no diploma)"
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "Employed full time" = 1, "Employed part time" = 2, "In the military" = 3, 
+  "Unemployed" = 4, "Retired" = 5, "A student" = 6, "A homemaker" = 7, 
+  "Disabled or unable to work" = 8, "Something else" = 9, "Don't know" = 77, 
+  "Refused" = 99
+  )
+
+# NA values
+na_values <- c(77,99)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "9cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### sode_income
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("sode_income")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(soc_dem, cols)
+```
+Some of the values in the instrument do not match the actual data, specifically the ones pertaining to high school, but the following will be considered as equivalent:
+
+ - "High school graduate or GED" = "High school graduate"
+ - "Did not complete high school or GED" = "Some high school (no diploma)"
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+  "$10,000 or less" = 1, "Between $10,001 and $20,000" = 2, 
+  "Between $20,001 and $35,000" = 3, "Between $35,001 and $50,000" = 4, 
+  "Between $50,001 and $75,000" = 5, "Between $75,001 and $100,000" = 6, 
+  "More than $100,000" = 7, "Don't know" = 77, "Refused" = 99
+  )
+
+# NA values
+na_values <- c(77,99)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "7cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+soc_dem <- soc_dem |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+
+# Data check
+
+Number of columns after cleaning the environment variables section.
+
+```{r}
+# Data check
+ncols <- 58
+if (ncol(soc_dem ) != ncols) {
+  stop(
+    ncols, " columns expected in soc_dem after cleaning the environment variables. ", 
+    ncol(soc_dem ), " columns found. Check into it."
+  )
+}
+```
+
+View variable characteristics.
+
+```{r}
+col_characteristics(soc_dem)
+```
+
+
+# Save as rds file
+
+```{r}
+write_rds(soc_dem, here::here("data", "cleaned_rds_files", "sociodemographic_information_import.rds"))
+```
+

@@ -1,0 +1,156 @@
+var,label
+unique_id,Unique ID
+medstar_id,MedStar ID
+ls_lack_companionship_3cat_f,UCLA LS lack companionship
+ls_feel_left_out_3cat_f,UCLA LS feel left out 
+ls_feel_isolated_3cat_f,UCLA LS feel isolated
+ls_total,UCLA LS total score
+ls_total_7cat_f,UCLA LS total score (categorical)
+loneliness_det_2cat_f,UCLA LS determination
+peg_pain_11cat,PEG pain
+peg_enjoyment_11cat,PEG enjoyment
+peg_activity_11cat,PEG activity
+peg_total,PEG total score
+depres_satisfied_2cat,GDS satisfied
+depres_hopeless_2cat,GDS hopeless
+depres_better_2cat,GDS better off
+depres_activities_2cat,GDS activities
+depres_empty_2cat,GDS empty
+depres_bored_2cat,GDS bored
+depres_spirits_2cat,GDS spirits
+depres_afraid_2cat,GDS afraid
+depres_happy_2cat,GDS happy
+depres_helpless_2cat,GDS helpless
+depres_home_2cat,GDS home
+depres_memory_2cat,GDS memory
+depres_alive_2cat,GDS alive
+depres_worthless_2cat,GDS worthless
+depres_energy_2cat,GDS energy
+gds_total,GDS total score
+depres_det_2cat_f,GDS determination
+outcomes_month_social_7cat_f,MOS limited social 
+outcomes_month_nervous_5cat_f,MOS nervous
+outcomes_month_calm_5cat_f,MOS calm
+outcomes_month_blue_5cat_f,MOS blue
+outcomes_month_happy_5cat_f,MOS happy
+outcomes_month_social_5cat,MOS limited social 
+outcomes_month_nervous_5cat,MOS nervous
+outcomes_month_calm_5cat,MOS calm
+outcomes_month_blue_5cat,MOS blue
+outcomes_month_happy_5cat,MOS happy
+auditc_drink_5cat,AUDIT-C drink
+auditc_day_5cat,AUDIT-C day
+auditc_five_5cat,AUDIT-C five
+aud_total,AUDIT-C total score
+aud_det_2cat_f,AUDIT-C determination
+sode_race_eth_4cat,Race/ ethnicity
+sogi_orientation_6cat,Sexual orientation
+sode_marital_6cat,Marital Status
+sode_employed_9cat,Employment status
+sode_income_7cat,Household income
+sode_military_2cat,Veteran status
+sex_2cat,Sex
+age,Age
+age_4cat_f,Age category
+sode_school_7cat,Education attainment
+sode_people_9cat_f,Household size category
+sode_people_9cat,Household size
+ever_phys_2cat,Ever physical abuse
+ever_sex_2cat,Ever sexual abuse
+ever_emo_2cat,Ever emotional or psychological abuse
+ever_fin_2cat,Ever financial exploitation
+neglect_bills_pot_2cat,Potential neglect (bills)
+neglect_clean_pot_2cat,Potential neglect (cleaning)
+neglect_food_pot_2cat,Potential neglect (food/ medicine)
+neglect_go_pot_2cat,Potential neglect (transport)
+neglect_house_pot_2cat,Potential neglect (household tasks)
+neglect_ready_pot_2cat,Potential neglect (getting ready)
+any_pot_neglect_2cat,Any potential neglect
+over_65_phys_2cat,Physical abuse 65 or older
+over_65_sex_2cat,Sexual abuse 65 or older
+over_65_emo_2cat,Emotional or psychological abuse 65 or older
+over_65_fin_2cat,Financial exploitation 65 or older
+pm_phys_2cat,Past month physical abuse
+pm_sex_2cat,Past month sexual abuse
+pm_emo_2cat,Past month emotional or psychological abuse
+pm_fin_2cat,Past month financial exploitation
+ever_abuse_any_2cat,Any ever abuse
+over_65_abuse_any_2cat,Any abuse 65 or older
+pm_abuse_any_2cat,Any past month abuse
+ever_phys_2cat_f,Ever physical abuse
+ever_sex_2cat_f,Ever sexual abuse
+ever_emo_2cat_f,Ever emotional or psychological abuse
+ever_fin_2cat_f,Ever financial exploitation
+neglect_bills_pot_2cat_f,Potential neglect (bills)
+neglect_clean_pot_2cat_f,Potential neglect (cleaning)
+neglect_food_pot_2cat_f,Potential neglect (food/ medicine)
+neglect_go_pot_2cat_f,Potential neglect (transport)
+neglect_house_pot_2cat_f,Potential neglect (household tasks)
+neglect_ready_pot_2cat_f,Potential neglect (getting ready)
+any_pot_neglect_2cat_f,Any potential neglect
+over_65_phys_2cat_f,Physical abuse 65 or older
+over_65_sex_2cat_f,Sexual abuse 65 or older
+over_65_emo_2cat_f,Emotional or psychological abuse 65 or older
+over_65_fin_2cat_f,Financial exploitation 65 or older
+pm_phys_2cat_f,Past month physical abuse
+pm_sex_2cat_f,Past month sexual abuse
+pm_emo_2cat_f,Past month emotional or psychological abuse
+pm_fin_2cat_f,Past month financial exploitation
+ever_abuse_any_2cat_f,Any ever abuse
+over_65_abuse_any_2cat_f,Any abuse 65 or older
+pm_abuse_any_2cat_f,Any past month abuse
+count,
+loneliness_det_2cat_f,Lonely
+sode_race_eth_4cat_f,Race/ ethnicity
+hispanic,Hispanic
+black,Black
+white,White
+other_race,Other
+sogi_orientation_4cat_f,Sexual orientation
+straight,Straight
+gay_man,Gay man
+lesbian,Lesbian
+bisexual,Bisexual
+sode_marital_6cat_f,Marital Status (categorical)
+married,Married
+common_law,Living as an unmarried or common law couple
+separated,Separated
+divorced,Divorced
+widowed,Widowed
+single,"Single, or never married"
+sode_marital_2cat_f,Marital Status (binary)
+live_alone_2cat_f,Live alone
+sode_school_7cat_f,Education attainment
+some_high_school,Some high school (no diploma)
+high_school,High school graduate
+some_college,Some college (no degree)
+associate,Associate's degree
+bachelor,"Bachelor's degree (BA, AB, BS, etc.)"
+some_graduate,Some graduate or professional school (no degree)
+graduate,"Graduate or professional school degree (MS, MA, MD, PhD, etc.)"
+sode_employed_9cat_f,Employment status
+full_time,Employed full time
+part_time,Employed part time
+in_military,In the military
+unemployed,Unemployed
+retired,Retired
+student,A student
+homemaker,A homemaker
+disabled,Disabled or unable to work
+other,Something else
+sode_income_7cat_f,Household income
+inc_10,"$10,000 or less"
+inc_20,"Between $10,001 and $20,000"
+inc_35,"Between $20,001 and $35,000"
+inc_50,"Between $35,001 and $50,000"
+inc_75,"Between $50,001 and $75,000"
+inc_100,"Between $75,001 and $100,000"
+inc_above_100,"More than $100,000"
+sode_military_2cat_f,Ever military service
+sex_2cat_f,Sex
+female,Female
+male,Male
+age_65_74,Age 65 to 74
+age_75_84,Age 75 to 84
+age_85_94,Age 85 to 94
+age_95,Age 95 and older

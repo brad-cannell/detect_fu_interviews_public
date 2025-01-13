@@ -1,0 +1,481 @@
+---
+title: "Import Data from FileMaker Pro: LEAD Panel Assessment"
+---
+
+```{r, message= FALSE}
+# Load all necessary libraries
+library(readr)
+library(janitor)
+library(dplyr)
+library(here)
+```
+
+
+# Load the data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+lpa_path <- here::here("data", "filemaker_pro_exports", "lead_panel_assessment_import.csv")
+```
+
+```{r}
+lpa <- read_csv(lpa_path)
+rm(lpa_path)
+```
+
+
+# Load custom functions
+
+```{r}
+source(here::here("R", "data_cleaning_tools.R"))
+```
+
+
+# Clean the data
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+# Convert all variable names to snake case
+lpa <- clean_names(lpa)
+```
+
+```{r}
+# Data check
+dim(lpa) # 6866  28
+```
+
+## Clean categorical variables
+
+- By default, FM Pro exports all categorical variables as character variables.
+- When analyzing data in R, we prefer to work with factors and occasionally with numeric values.
+- Below, we:
+  - Convert character values to numeric values
+  - Arrange the columns as: numeric column and the factor version of the column.
+
+### Panelist names
+
+```{r}
+get_values(lpa, "panelist_name")
+```
+
+#### Fix incorrect panelist name
+
+Replace instances where panelist name is "Jason Knebl" with the name "Janice Knebl"
+```{r}
+lpa <- lpa %>%
+  mutate(
+    panelist_name = case_when(
+      panelist_name == "Jason Knebl" ~ "Janice Knebl",
+      TRUE ~ panelist_name
+    )
+  )
+
+get_values(lpa, "panelist_name")
+```
+
+#### Create numeric and factor variables
+
+```{r}
+# Numeric coding for character values
+value_labels <- c(
+  "Hannah Bell" = 1, "Janice Knebl" = 2, 
+  "Jason Burnett" = 3, "John Halphen" = 4, "Jordan Rolfe" = 5, 
+  "Kristen Reuter" = 6, "Samantha Fant" = 7, "Stephanie Large" = 8,
+  "Tarrant County District Attorney's Office" = 9)
+
+lpa <- lpa %>%
+  mutate(
+    panelist_name_9cat = as.numeric(
+      factor(panelist_name,
+             levels = names(value_labels),
+             labels = as.numeric(value_labels)
+             )
+      ),
+    panelist_name_9cat_f = factor(panelist_name_9cat,
+                                   levels = as.numeric(value_labels),
+                                   labels = names(value_labels))
+  ) %>%
+  # Relocate new numeric and factor columns after the original column
+  relocate(c("panelist_name_9cat", "panelist_name_9cat_f"), 
+           .after = panelist_name) %>%
+  # Remove original column
+  select(-c(panelist_name))
+```
+
+### Assessment type
+
+```{r}
+get_values(lpa, "assessment_type")
+```
+
+```{r}
+# Numeric coding for character values
+value_labels <- c(
+  "Initial assessment" = 1, "Secondary assessment" = 2, 
+  "Post-detect assessment" = 3
+  )
+
+lpa <- lpa %>%
+  mutate(
+    assessment_type = as.numeric(
+      factor(assessment_type,
+             levels = names(value_labels),
+             labels = as.numeric(value_labels)
+             )
+      ),
+    assessment_type_3cat_f = factor(assessment_type,
+                                   levels = as.numeric(value_labels),
+                                   labels = names(value_labels))
+    # Relocate new numeric and factor columns after the original column
+  ) %>% relocate(assessment_type_3cat_f, .after = assessment_type)
+```
+
+### Abuse variables
+
+```{r}
+cols <-  c("physical_abuse", "sexual_abuse", "emotional_psycho_abuse", "neglect", 
+           "self_neglect", "financial_exploitation", "abandonment")
+```
+
+```{r}
+get_values(lpa, cols)
+```
+
+```{r}
+cols_2cat <- paste0(cols, "_2cat")
+cols_2cat_f <- paste0(cols_2cat, "_f")
+
+cols_cat_list <- sort(c(cols, cols_2cat, cols_2cat_f)) %>% cbind() %>% 
+  split(., cut(seq_along(.), length(cols), labels = FALSE))
+cols_cat_list
+```
+
+### Abuse variables
+
+```{r}
+# Numeric coding for character values
+value_labels <- c("Yes" = 1, "No" = 0)
+
+lpa <- lpa %>%
+  mutate(
+    # Create numeric categorical variables
+    across(
+      .cols = all_of(cols),
+      .fns = ~ case_when(
+        .x == "Yes" ~ 1,
+        .x == "No" ~ 0
+      ),
+      .names = "{col}_2cat"
+    ),
+    # Create factor variables
+    across(
+      .cols = all_of(cols_2cat),
+      .fns = ~ factor(.x,
+                                 levels = as.numeric(value_labels),
+                                 labels = names(value_labels)
+                          ),
+      .names = "{col}_f"
+      )
+    )
+# Relocate new numeric and factor columns after the original columns
+for (col in cols_cat_list){
+  lpa <- lpa %>%
+  relocate(c(col[2], col[3]), .after = col[1])
+}
+# Remove original columns
+lpa <- lpa %>% select(-c(all_of(cols)))
+```
+
+### Assessment screened
+
+```{r}
+# Numeric coding for character values
+value_labels <- c("Positive" = 1, "Negative" = 0)
+
+lpa <- lpa %>%
+  mutate(
+    xc_assessment_screened_2cat = case_when(
+      xc_assessment_screened == "Negative" ~ 0,
+      xc_assessment_screened == "Positive" ~ 1
+    ),
+    xc_assessment_screened_2cat_f = factor(
+      xc_assessment_screened_2cat,
+      levels = as.numeric(value_labels),
+      labels = names(value_labels)
+    )
+  ) %>% 
+  # Relocate new numeric and factor columns after the original column
+  relocate(c("xc_assessment_screened_2cat", "xc_assessment_screened_2cat_f"), 
+           .after = "xc_assessment_screened") %>%
+  # Remove the original column
+  select(-c(xc_assessment_screened))
+```
+
+## Include panelist discipline variables
+
+Create two new variables _panelist_discipline_ and _healthcare_worker_ that describe the LEAD panelists' professions. This is based on the Panelists names and disciplines file.
+
+```{r}
+# Numeric coding for panelist discipline valriable character values
+pd_value_labels <- c("Assistant district attorney" = 1, 
+                  "Geriatric nurse practitioner" = 2, 
+                  "Elder mistreatment researcher" = 3, 
+                  "Geriatric social worker" = 4, "Geriatrician" = 5)
+
+# Numeric coding for healthcare worker variable character values
+hw_value_labels <- c("Yes" = 1, "No" = 0)
+
+lpa <- lpa %>%
+  mutate(
+    panelist_discipline_5cat = case_when(
+      panelist_name_9cat_f == "Samantha Fant" |
+        panelist_name_9cat_f == "Jordan Rolfe" |
+        panelist_name_9cat_f == "Hannah Bell" |
+        panelist_name_9cat_f == "Tarrant County District Attorney's Office"
+      ~ 1,
+      panelist_name_9cat_f == "Stephanie Large" ~ 2,
+      panelist_name_9cat_f == "Jason Burnett" ~ 3,
+      panelist_name_9cat_f == "Kristen Reuter" ~ 4,
+      panelist_name_9cat_f == "Janice Knebl" |
+        panelist_name_9cat_f == "John Halphen" ~ 5
+    ),
+    panelist_discipline_5cat_f = factor(
+      panelist_discipline_5cat,
+      levels = as.numeric(pd_value_labels),
+      labels = names(pd_value_labels)
+    ),
+    healthcare_worker_2cat = case_when(
+      panelist_discipline_5cat == 5 | 
+        panelist_discipline_5cat == 2 ~ 1,
+      TRUE ~ 0
+    ),
+    healthcare_worker_2cat_f = factor(
+      healthcare_worker_2cat,
+      levels = as.numeric(hw_value_labels),
+      labels = names(hw_value_labels)
+    )
+  ) %>%
+  # Relocate new columns to position after "panelist_name_9cat_f"
+  relocate(c("panelist_discipline_5cat", "panelist_discipline_5cat_f",
+             "healthcare_worker_2cat", "healthcare_worker_2cat_f"),
+           .after = "panelist_name_9cat_f")
+```
+
+```{r}
+# Data check
+dim(lpa) # 6866 42
+```
+
+## Panelist multiple assessment data error problem description
+
+There is an error in the LEAD panel assessment data where there are multiple rows of data for certain panelists in the same assessment of the same participant.
+
+For instance, medstar_id 47311d550da4471297501ae2b3b03b02 has multiple rows with Jason Burnett as the LEAD panelist in the initial assessment within a short time frame. 
+
+## Identify Medstar IDs with data error and remove rows based on certain criteria.
+
+The code in the following chunk identifies the specific issues, indicates whether a row should be excluded or not and then removes the identified rows based on the following criteria:
+ - 1. Identical duplicates: Keep the most recent row.
+ - 2. Additional entries with all values missing: Remove rows with all missing vote values
+ - 3. Additional entries where not all values are missing: Keep only the most recent
+
+### Identify and count case - panelist copies
+Assign an ID for each unique case (MedStar ID) - panelist name combination for each assessment type and count the copies.
+```{r}
+lpa <- lpa %>%
+  group_by(medstar_id, panelist_name_9cat_f, assessment_type_3cat_f) %>%
+  mutate(
+    case_panelist_id = cur_group_id(),
+    copy_count = n()  # length(panelist_name_9cat_f)
+  ) %>%
+  ungroup()
+
+# Visually inspect the groupings
+lpa %>% select(case_panelist_id, copy_count, medstar_id, panelist_name_9cat_f, 
+                 assessment_type_3cat_f) %>%
+  arrange(assessment_type_3cat_f, medstar_id, panelist_name_9cat_f) %>% 
+  filter(copy_count > 1)
+```
+
+There are 53 cases with the error. 44 have 2 copies and 9 have 3 copies.
+
+```{r}
+table(lpa$copy_count)
+```
+
+
+### Check if the assessment votes are the same
+
+For each of the cases (MedStar IDs) that have been identified as having more than one assessment per panelist, are the abuse assessment votes the same or different for all the copies?
+
+```{r}
+abuse_cols <- c("sexual_abuse_2cat_f", "emotional_psycho_abuse_2cat_f", 
+                "neglect_2cat_f", "self_neglect_2cat_f", 
+                "financial_exploitation_2cat_f", "abandonment_2cat_f")
+
+lpa <- lpa %>%
+  group_by(case_panelist_id, across(all_of(abuse_cols))) %>%
+  # Assign an ID for each unique case (MedStar ID) - panelist name - votes
+  # combination
+  mutate(
+    case_panelist_vote_id = cur_group_id(),
+    vote_copy_count = n()
+  ) %>%
+  ungroup() %>%
+  group_by(case_panelist_id) %>%
+  mutate(
+    same_vote = case_when(
+      copy_count > 1 & copy_count == vote_copy_count ~ 1,
+      copy_count > 1 & copy_count != vote_copy_count ~ 0,
+      TRUE ~ NA
+    )
+  ) %>%
+  ungroup()
+
+# Visually inspect the groupings
+lpa %>% select(case_panelist_id, all_of(abuse_cols), copy_count, 
+                          vote_copy_count, same_vote) %>%
+  arrange(case_panelist_id) %>% 
+  filter(copy_count > 1)
+```
+
+### Missing status 
+
+For the groups that don't have the same values, are none, some or all values missing for any of the copies.
+
+```{r}
+lpa <- lpa %>%
+  # NA status for each individual copy.
+  mutate(
+    na_status_copy = case_when(
+      copy_count == 1 ~ NA_character_,
+      copy_count > 1 & if_all(all_of(abuse_cols), ~ is.na(.)) ~ "all",
+      copy_count > 1 & if_any(all_of(abuse_cols), ~ is.na(.)) & 
+        !(if_all(all_of(abuse_cols), ~ is.na(.))) ~ "some",
+      copy_count > 1 & if_all(all_of(abuse_cols), ~ !is.na(.)) ~ "none"
+    )
+  ) %>%
+  # NA status for each case-panelist combination.
+  group_by(case_panelist_id) %>%
+  mutate(
+    na_status_cp = case_when(
+      all(na_status_copy == "all") ~ "all",
+      any(na_status_copy == "all") & !(all(na_status_copy == "all")) ~ "some",
+      all(na_status_copy == "none") ~ "none"
+    )
+  )
+
+# Visually inspect the groupings
+lpa %>% select(case_panelist_id, all_of(abuse_cols), copy_count, 
+                          vote_copy_count, same_vote, na_status_copy, 
+               na_status_cp) %>%
+  arrange(case_panelist_id) %>% 
+  filter(copy_count > 1)
+```
+
+There are no copies with the error that have only some missing values. Either all or none of the values are missing.
+
+```{r}
+table(lpa$na_status_copy)
+```
+
+
+### Most recent assessments
+
+For each MedStar ID with multiple assessments for the same panelist, check if the assessments were performed within one day of each other and identify the most recent assessment.
+
+```{r}
+lpa <- lpa %>%
+  group_by(case_panelist_id) %>%
+  mutate(
+    most_recent = case_when(
+      x_created_timestamp == max(x_created_timestamp) ~ 1,
+      x_created_timestamp != max(x_created_timestamp) ~ 0,
+    )
+  ) %>% ungroup()
+
+
+# Visually inspect the groupings
+lpa %>% select(case_panelist_id, x_created_timestamp, copy_count,
+                 vote_copy_count, same_vote, na_status_copy, na_status_cp, 
+               most_recent) %>%
+  arrange(case_panelist_id) %>% 
+  filter(copy_count > 1)
+```
+
+### Determine which copies should be removed
+
+Should this row be removed or is further review required to determine this
+based on the rules below?
+
+```{r}
+lpa <- lpa %>%
+  mutate(
+    remove = case_when(
+      # Case when there is no error
+      copy_count == 1 ~ "No",
+      # Case when all copies are the same, only keep the most recent copy.
+      copy_count > 1 & same_vote == 1 & most_recent == 1  ~ "No",
+      copy_count > 1 & same_vote == 1 & most_recent == 0 ~ "Yes",
+      # Case when there are only 2 copies and only one has missing values. Keep
+      # the other copy
+      copy_count == 2 & same_vote == 0 & na_status_copy == "none" & 
+        na_status_cp != "none" ~ "No",
+      copy_count == 2 & same_vote == 0 & na_status_copy != "none" & 
+        na_status_cp != "all" ~ "Yes",
+      # Case when there are only 2 non-identical copies and neither has missing
+      # values. Keep the most recent.
+      copy_count == 2 & same_vote == 0 & na_status_cp == "none" 
+      & most_recent == 1 ~ "No",
+      copy_count == 2 & same_vote == 0 & na_status_cp == "none" 
+      & most_recent == 0 ~ "Yes"
+    )
+  ) %>%
+  ungroup() %>%
+  # Case when there are 3 copies and only some of the copies have NA values.
+  # Inspect manually.
+  mutate(
+    remove = case_when(
+      copy_count == 3 & same_vote == 0 & na_status_cp == "some" ~ 
+        "Inspect manually",
+      TRUE ~ remove
+    )
+  )
+
+# Visually inspect the groupings
+lpa %>% select(case_panelist_id, x_created_timestamp, copy_count, 
+                          vote_copy_count, same_vote, na_status_cp, 
+                          na_status_copy, most_recent, remove) %>%
+  arrange(case_panelist_id) %>% 
+  filter(copy_count > 1)
+```
+
+28 observations were identified for removal.
+
+```{r}
+table(lpa$remove)
+```
+
+### Remove identified rows
+
+```{r}
+# Remove rows marked by the error_check function for removal.
+lpa <- lpa %>% filter(!(remove == "Yes")) %>%
+  # Remove filtering columns
+  select(-c(case_panelist_id, case_panelist_vote_id, vote_copy_count, same_vote,
+            copy_count, na_status_copy, na_status_cp, most_recent, remove))
+```
+
+```{r}
+# Data check
+dim(lpa) # 6838 42
+```
+
+
+# Save as rds file
+
+```{r}
+write_rds(lpa, here::here("data", "cleaned_rds_files", "lead_panel_assessment_import.rds"))
+```

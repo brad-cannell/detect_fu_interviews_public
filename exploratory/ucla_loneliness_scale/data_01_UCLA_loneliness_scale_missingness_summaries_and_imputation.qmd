@@ -1,0 +1,599 @@
+# Load packages
+
+```{r, warning=FALSE, echo=FALSE, output = FALSE}
+library(flextable)
+library(table1)
+library(dplyr)
+library(tibble)
+library(officer)
+library(tidyverse)
+library(here)
+library(purrr, include.only = "reduce")
+library(ggplot2)
+library(mice)
+library(reshape2, include.only = "melt")
+```
+
+
+# Load cleaned data and custom functions
+
+Load the general health and participant datasets
+```{r}
+#| warning: false
+general_health <- readRDS(here("data", "cleaned_rds_files", "general_health_import.rds"))
+
+participant <- readRDS(here("data", "unique_id_creation", "participant_unique_id.rds"))
+
+soc_dem <- readRDS(here("data", "cleaned_rds_files", "sociodemographic_information_import.rds"))  
+
+self_report <- readRDS(here("data", "cleaned_rds_files", "self_report_import.rds")) 
+
+sr_aggregate <- readRDS(here::here("data", "self_report_aggregate_data.rds"))
+
+aps <- readRDS(here("data", "cleaned_rds_files", "aps_investigations_import.rds"))   
+
+lpa <- readRDS(here("data", "cleaned_rds_files", "lead_panel_assessment_import.rds")) 
+
+# Function for analyzing LEAD Panel Assessment data
+source(here::here("r","lead_positive_votes_analysis.R"))
+
+# Functions for summarizing missingness patterns
+source(here::here("r", "missingness_pattern.R"))
+source(here::here("r", "missingness_summary.R"))
+```
+
+
+```{r}
+# Variable labels
+all_labels <- read.csv(here::here("exploratory", "ucla_variable_labels.csv"))
+```
+
+
+# Data Preparation
+
+Select the relevant data and convert it to an analysis-ready format.
+
+## Participant
+
+  - The unique ID variable is useful for identifying individual participants.
+  - The sociodemographic data set has missing values for sex and age so the corresponding variables in the participant data set will be used instead.
+  
+```{r}
+# Select ID variables from the participant unique id data set.
+part_id <- participant %>% select(unique_id, medstar_id)
+
+# Select age and sex variables from the dataset
+part_age_sex <- participant %>% select(medstar_id, sex_2cat_f, age)
+```
+
+## General Health
+ 
+### UCLA 3-Item Loneliness Scale
+
+#### Missingness Patterns
+
+```{r}
+# Create lists of loneliness scale variables
+ls_vars_num <- c("ls_lack_companionship_3cat", "ls_feel_left_out_3cat", 
+             "ls_feel_isolated_3cat")
+
+ls_vars_f <- c("ls_lack_companionship_3cat_f", "ls_feel_left_out_3cat_f", 
+             "ls_feel_isolated_3cat_f")
+```
+
+```{r}
+ls <- general_health %>% 
+  # Select loneliness scale factor variables and drop rows with missing values
+  select(
+    medstar_id, x_created_timestamp, starts_with("ls_")
+  ) 
+```
+
+```{r}
+ls_mp <- missing_pattern(ls, ls_vars_f, all_labels)
+ls_mp
+```
+
+```{r}
+ls_ms <- missing_summary(ls, ls_vars_f, all_labels)
+ls_ms
+```
+
+#### Determine when we started collecting the loneliness scale data
+
+Anything before this point is not actually missing.
+
+```{r}
+ls_start_df <- general_health %>% select(medstar_id, x_created_timestamp, 
+                                         all_of(ls_vars_f)) %>%
+  arrange(x_created_timestamp) 
+
+ls_start <- ls_start_df %>%
+  summarise(
+  medstar_id = medstar_id[min(which(if_all(
+    .cols = all_of(ls_vars_f),
+    .fns = ~!is.na(.x)
+  )))],
+  ls_start = as.Date.POSIXct(x_created_timestamp)[min(which(if_all(
+    .cols = all_of(ls_vars_f),
+    .fns = ~!is.na(.x)
+  )))]
+  )
+
+ls_start_date <- ls_start[[2]]
+ls_start_id <- ls_start[[1]]
+
+cat("The first non-NA value for the loneliness scale variables was collected on:",
+    as.character(ls_start_date), 
+    "\nThe corresponding MedStar ID is:", ls_start_id)
+```
+
+Missingness pattern when all dates before start date are ignored
+
+```{r}
+ls_collected <- ls_start_df %>% filter(x_created_timestamp >= ls_start_date)
+```
+
+```{r}
+ls_collected_mp <- missing_pattern(ls_collected, ls_vars_f, all_labels)
+ls_collected_mp
+```
+
+```{r}
+ls_collected_ms <- missing_summary(ls_collected, ls_vars_f, all_labels)
+ls_collected_ms
+```
+
+```{r}
+ls <- ls %>%
+  drop_na(all_of(ls_vars_f)) %>%
+  # Create total score and loneliness determination variables
+  mutate(
+    ls_total = ls_lack_companionship_3cat + ls_feel_left_out_3cat + 
+                   ls_feel_isolated_3cat
+  ) %>% select(-c(starts_with("ls") & ends_with("4cat")))
+
+# Merge the Unique ID variable to the UCLA variables
+ls <- right_join(part_id, ls, by = "medstar_id") 
+```
+
+#### Unique people count
+
+Create table with counts of unique names and number of names that occur once or more than once excluding rows with missing data.
+
+```{r, warning = FALSE}
+# Unique people count
+unique_people <- ls %>%
+  select(unique_id, medstar_id) %>%
+  group_by(unique_id) %>%
+  summarise( unique_id, medstar_id,
+    count = n()) %>%
+  ungroup() %>%
+  select(-c(medstar_id)) %>% distinct()
+  
+# List of people whose names occur in only one row with complete ls scale data
+ucs <- unique_people %>% filter(count == 1)
+
+# People whose names occur in more than one row with complete ls scale data and 
+# the number of occurrences
+nucs <- unique_people %>% filter(count > 1)
+
+# Unique MedStar IDs
+unique_m_id <- ls %>% select(medstar_id) %>% unique()
+
+# Table summarizing counts of unique names and number of names that occur once or more than once excluding rows with missing loneliness scale data
+
+sum_table <- data.frame(
+  Value = c("Unique people", "People with multiple MedStar IDs", 
+            "People with only one MedStar ID", "Total unique MedStar IDs"),
+  Count = c(nrow(unique_people), nrow(nucs), nrow(ucs), nrow(unique_m_id))
+) %>%
+  flextable()
+# Set caption
+
+sum_table <- set_caption(sum_table, "Unique and Non-unique Name Counts")
+sum_table <- width(sum_table, j = c(1,2), width = c(3,1))
+
+sum_table
+```
+
+#### Filter first assessment for each unique person rows
+
+```{r}
+first_ucla <- ls %>% group_by(unique_id) %>%
+  arrange(as.POSIXct(x_created_timestamp), .by_group = TRUE) %>%
+  mutate(
+    visit_no = row_number()
+  ) %>% filter(visit_no == 1) %>%
+  ungroup() %>%
+  select(medstar_id, all_of(ls_vars_f), ls_total)
+```
+
+#### Variable Selection and Calculation
+
+```{r}
+quintile_ls <- quantile(first_ucla$ls_total, prob=c(0.2,0.4,0.6,0.8, 1), type=1)
+
+ls_plot <- ggplot(first_ucla, aes(ls_total)) +
+  geom_histogram(binwidth = 1) +
+  xlab("3-Item UCLA Loneliness Scale Score Total") +
+  geom_vline(aes(xintercept = quintile_ls[4])) +
+  geom_text(aes(x = quintile_ls[4], label = "\n4th quintile", y = 100), colour="blue", angle=90) +
+  theme(legend.position="none")
+```
+
+### PEG 3-Item Pain Assessment
+
+```{r}
+peg_vars <- c("peg_pain_11cat", "peg_enjoyment_11cat", "peg_activity_11cat")
+
+peg <- general_health %>% 
+  # Select relevant variables.
+  select(medstar_id, all_of(peg_vars)) %>%
+  mutate(
+    peg_total = round((peg_pain_11cat + peg_enjoyment_11cat + 
+                     peg_activity_11cat)/3, digits = 2)
+  )
+ls_peg <- first_ucla %>% left_join(peg, by = "medstar_id")
+```
+
+### Geriatric Depression Scale
+
+Select geriatric depression scale variables and create a total score variable.
+    
+```{r}
+gds <- general_health %>% 
+  # Select relevant variables.
+  select(c(medstar_id, starts_with("depres") & ends_with("_2cat"))) %>%
+  # drop_na(c(starts_with("depres") & ends_with("_2cat"))) %>%     
+  mutate(
+    gds_total = depres_satisfied_2cat + depres_hopeless_2cat + 
+      depres_better_2cat + depres_activities_2cat + depres_empty_2cat + 
+      depres_bored_2cat + depres_spirits_2cat + depres_afraid_2cat + 
+      depres_happy_2cat + depres_helpless_2cat + depres_home_2cat + 
+      depres_memory_2cat + depres_alive_2cat + depres_worthless_2cat + 
+      depres_energy_2cat
+  )
+             
+                                          
+ls_gds <- first_ucla %>% left_join(gds, by = "medstar_id")
+```
+
+### MO-11 to MO_16 of the medical outcomes study
+
+Select the MO-11 to MO_16 of the medical outcomes study variables. 
+
+```{r}
+mos <- general_health %>% 
+  # Select relevant variables.
+  select(c(medstar_id, outcomes_month_social_5cat, 
+           outcomes_month_nervous_5cat, outcomes_month_calm_5cat, 
+           outcomes_month_blue_5cat, outcomes_month_happy_5cat, 
+           outcomes_month_blue_5cat))
+
+ls_mos <- first_ucla %>% left_join(mos, by = "medstar_id")
+```
+
+### 3-item AUDIT-C scale
+
+Select the alcohol use disorders variables.
+
+```{r}
+aud_vars <- c("auditc_drink_5cat", "auditc_day_5cat", "auditc_five_5cat")
+
+aud <- general_health %>% 
+  # Select relevant variables.
+  select(medstar_id, all_of(aud_vars)) %>%
+  mutate(
+    aud_total = auditc_drink_5cat + auditc_day_5cat + auditc_five_5cat
+  )
+ls_aud <- first_ucla %>% left_join(aud, by = "medstar_id")
+```
+
+## Sociodemographic Information
+
+sode_sexual and sode_uwanted were remove due to higher numbers of missing values.
+```{r}
+socio_dem <- soc_dem %>% select(medstar_id, sode_race_eth_4cat, 
+                              sogi_orientation_6cat, sode_marital_6cat, 
+                              sode_people_9cat, sode_school_7cat,
+                              sode_employed_9cat, sode_income_7cat, 
+                              sode_military_2cat) %>%
+  # Take more complete sex and age variables from participant dataset
+  left_join(part_age_sex, by = "medstar_id")
+
+ls_sd <- first_ucla %>% left_join(socio_dem, by = "medstar_id")
+```
+
+## Self Report
+
+```{r}
+sr_ag <- sr_aggregate %>% select(-c(ends_with("_2cat_f"), unique_id))
+ls_sr <- first_ucla %>% left_join(sr_ag, by = "medstar_id")
+```
+
+
+# Missing Data Summaries for Other Variables
+
+## PEG 3-Item Pain Assessment
+
+```{r}
+peg_mp <- missing_pattern(ls_peg, peg_vars, all_labels)
+
+peg_mp
+```
+
+
+```{r}
+peg_ms <- missing_summary(ls_peg, peg_vars, all_labels)
+
+peg_ms
+```
+
+## Geriatric depression scale
+
+```{r}
+gds_vars <- ls_gds %>% ungroup() %>% 
+  select(starts_with("depres_") & ends_with("_2cat"), 
+         gds_total) %>% names()
+
+gds_mp <- missing_pattern(ls_gds, gds_vars, all_labels)
+gds_mp
+```
+
+```{r}
+gds_ms <- missing_summary(ls_gds, gds_vars, all_labels)
+gds_ms
+```
+
+## MO-11 to MO_16 of the medical outcomes study
+
+```{r}
+mos_vars <- ls_mos %>% ungroup() %>% select(starts_with("outcomes_")) %>% names()
+
+mos_mp <- missing_pattern(ls_mos, mos_vars, all_labels)
+mos_mp
+```
+
+```{r}
+mos_ms <- missing_summary(ls_mos, mos_vars, all_labels)
+mos_ms
+```
+
+## 3-item AUDIT-C scale
+
+```{r}
+aud_vars <- ls_aud %>% ungroup() %>% select(starts_with("aud")) %>% names()
+
+aud_mp <- missing_pattern(ls_aud, aud_vars, all_labels)
+aud_mp
+```
+
+```{r}
+aud_ms <- missing_summary(ls_aud, aud_vars, all_labels)
+aud_ms
+```
+
+## Sociodemographic Information
+
+```{r}
+sd_vars <- ls_sd %>% ungroup() %>% select(starts_with("sode"), starts_with("sex"), 
+                                       starts_with("age"), starts_with("sogi")
+                                       ) %>% names()
+
+sd_mp <- missing_pattern(ls_sd, sd_vars, all_labels)
+sd_mp
+```
+
+```{r}
+sd_ms <- missing_summary(ls_sd, sd_vars, all_labels)
+sd_ms
+```
+
+## Self Report
+
+```{r}
+sr_vars <- ls_sr %>% ungroup() %>% 
+  select(-c("medstar_id", starts_with("ls_"))) %>% 
+  names()
+
+sr_mp <- missing_pattern(ls_sr, sr_vars, all_labels)
+sr_mp
+```
+
+```{r}
+sr_ms <- missing_summary(ls_sr, sr_vars, all_labels)
+sr_ms
+```
+
+## All Variables
+
+```{r}
+ls_peg_all <- ls_peg %>% select(medstar_id, peg_total)
+ls_gds_all <- ls_gds %>% select(medstar_id, gds_total)
+ls_mos_all <- ls_mos %>% select(medstar_id, starts_with("outcomes_"))
+ls_aud_all <- ls_aud %>% select(medstar_id, aud_total)
+ls_sd_all <- ls_sd %>% 
+  select(-c(starts_with("ls_")))
+ls_sr_all <- ls_sr %>% 
+  select(-c(starts_with("ls_")))
+
+all <- list(first_ucla, ls_peg_all, ls_gds_all, ls_mos_all, ls_aud_all, 
+            ls_sd_all, ls_sr_all) %>% 
+  reduce(left_join, by = "medstar_id")
+```
+
+```{r}
+all_vars <- all %>% ungroup() %>% 
+  select(-c(medstar_id)) %>% names()
+
+all_mp <- missing_pattern(all, all_vars, all_labels)
+all_mp
+```
+
+```{r}
+all_ms <- missing_summary(all, all_vars, all_labels)
+all_ms
+```
+
+Due to the large number of missing values (above 20% of total), the following variables will be dropped:
+- AUDIT-C variables
+- Any past month abuse
+
+To prevent issues in missingness imputation arising from colinearity <https://stackoverflow.com/questions/58831710/mice-glm-fit-algorithm-did-not-converge>, the 
+following self report variables will also be droppe
+
+  - ever_phys_2cat             
+  - ever_sex_2cat  
+  - ever_emo_2cat              
+  - ever_fin_2cat              
+  - neglect_bills_pot_2cat     
+  - neglect_clean_pot_2cat    
+  - neglect_food_pot_2cat      
+  - neglect_go_pot_2cat        
+  - neglect_house_pot_2cat     
+  - neglect_ready_pot_2cat 
+  - any_pot_neglect_2cat       
+  - over_65_phys_2cat          
+  - over_65_sex_2cat           
+  - over_65_emo_2cat  
+  - over_65_fin_2cat           
+  - pm_phys_2cat               
+  - pm_sex_2cat                
+  - pm_emo_2cat
+  - pm_fin_2cat                
+  - ever_abuse_any_2cat  
+```{r}
+all_new <- all %>% select(-c(aud_total, pm_abuse_any_2cat)) %>% 
+  select(-c(ever_phys_2cat, ever_sex_2cat, ever_emo_2cat, ever_fin_2cat,
+            neglect_bills_pot_2cat, neglect_clean_pot_2cat, 
+            neglect_food_pot_2cat, neglect_go_pot_2cat, 
+            neglect_house_pot_2cat, neglect_ready_pot_2cat, 
+            any_pot_neglect_2cat, over_65_phys_2cat, over_65_sex_2cat,
+            over_65_emo_2cat, over_65_fin_2cat, pm_phys_2cat, 
+            pm_sex_2cat, pm_emo_2cat, pm_fin_2cat, ever_abuse_any_2cat))
+
+all_vars <- all_new %>% ungroup() %>% 
+  select(-c(medstar_id)) %>% names()
+
+all_mp <- missing_pattern(all_new, all_vars, all_labels)
+all_mp
+```
+
+```{r}
+all_ms <- missing_summary(all_new, all_vars, all_labels)
+all_ms
+```
+
+
+# Missingness Imputation
+
+```{r}
+mice_out <- mice(all_new, m = 5, seed = 11, maxit = 50)
+```
+
+```{r}
+png(filename = here::here("exploratory", "ucla_loneliness_scale",
+                          "mice_output_density_plot.png"), 
+    type="cairo",
+    units="in", 
+    width=5, 
+    height=4, 
+    pointsize=12, 
+    res=300)
+
+mice::densityplot(mice_out)
+dev.off()
+```
+
+# Save mice output
+
+```{r}
+path <- here::here("data", "ucla_ls_scale_mice_output.RData")
+save(mice_out,
+     file = path)
+```
+
+# Create Word Document
+
+```{r, eval=FALSE}
+# Open word file as an object
+ucla_doc <- read_docx(here::here("exploratory", "officer_template.docx"))
+
+ucla_doc <- ucla_doc %>%
+  # Add UCLA ls
+  body_add_par("UCLA Loneliness Scale Analysis", style = "Title") %>%
+  body_add_par("UCLA 3-Item Loneliness Scale Data", style = "heading 1") %>%
+  body_add_gg(ls_plot, height = 4.09, width = 4.91) %>%
+  body_add_par("Missing Data Summary", style = "heading 2") %>%
+  body_add_flextable(ls_ms, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par("Missing Data Summary Excluding Period before Loneliness Scale 
+               Data was Collected", 
+               style = "heading 2") %>%
+  body_add_par("Loneliness Scale data was not collected from the beginning of the study. The first date when not all the loneliness scale variables were missing was 2022-01-17. The corresponding MedStar ID was 'f561525ec4f94a17af7ba3e2c12fee0f'. Data for dates prior to 2022-01-17 were filtered out.", 
+               style = "Normal") %>%
+  body_add_flextable(ls_collected_ms, align = "left") %>%
+  body_add_par(value = "") %>%
+  body_add_par("Unique Patient Counts Summary", style = "heading 2") %>%
+  body_add_flextable(sum_table, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+  # Add other data variables
+  body_add_par("Predictor variables", style = "heading 1") %>%
+  
+  # Sociodemographic Information
+  body_add_par("Sociodemographic Information", style = "heading 2") %>%
+  body_add_par("Missing Data Summary", style = "heading 3") %>%
+  body_add_flextable(sd_ms, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+  # PEG 
+  body_add_par("PEG 3-Item Pain Assessment", style = "heading 2") %>%
+  body_add_par("Missing Data Summary", style = "heading 3") %>%
+  body_add_flextable(peg_ms, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+  # GDS
+  body_add_par("Geriatric Depression Scale", style = "heading 2") %>%
+  body_add_par("Missing Data Summary", style = "heading 3") %>%
+  body_add_flextable(gds_ms, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+  # MOS
+  body_add_par("Medical Outcomes Study", style = "heading 2") %>%
+  body_add_par("Missing Data Summary", style = "heading 3") %>%
+  body_add_flextable(mos_ms, align = "left") %>% 
+  body_add_par(value = "") %>%
+  
+  # AUDIT-C
+  body_add_par("AUDIT-C Scale", style = "heading 2") %>%
+  body_add_par("Missing Data Summary", style = "heading 3") %>%
+  body_add_flextable(aud_ms, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+  # Self Report
+  body_add_par("Self Report", style = "heading 2") %>%
+  body_add_par("Missing Data Summary", style = "heading 3") %>%
+  body_add_flextable(sr_ms, align = "left") %>%
+  body_add_par(value = "") %>%
+
+  # Model Variables
+  body_add_par("All Variables", style = "heading 1") %>%
+  body_add_flextable(all_ms, align = "left") %>%
+  body_add_par(value = "") %>%
+  
+  # Mice output density plots
+  body_add_par("MICE Package Missingness Imputation Output", 
+               style = "heading 1") %>%
+  body_add_par("Below are density plots for the output of the MICE missingness imputation. Variables with 1 or less missing values in the original data do not have density plots.", 
+               style = "Normal") %>%
+  body_add_img(src = here::here("exploratory", "mice_output_density_plot.png"),
+               width = 5, height = 4)
+
+
+# print the word document
+print(ucla_doc, 
+      target = here::here("exploratory", "ucla_loneliness_scale", 
+                          "UCLA_loneliness_scale_missingness_summary.docx"))
+```

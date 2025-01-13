@@ -10,20 +10,29 @@
 ## Create summary dataframes for each assessment within the LEAD panel assessment data that include calculated columns indicating the total number of 
 ## positive votes, the proportion of positive votes, whether or not there were any positive determinations at each assessment for each MedStar ID.
 
+cols <- c(
+  "physical_abuse_2cat", "sexual_abuse_2cat", "emotional_psycho_abuse_2cat",
+  "neglect_2cat", "abandonment_2cat", "financial_exploitation_2cat", 
+  "self_neglect_2cat"
+)
+
+cols_t <- paste0(cols, "_t")
+cols_t_p <- paste0(cols_t, "_p")
+
 pos_votes <- function(lead_panel_cleaned) {
   pos_votes <- lead_panel_cleaned %>% 
     group_by(medstar_id, assessment_type_3cat_f) %>% 
     reframe(
       # compute the sum of positive votes for each MedStar ID in each assessment
       across(
-        .cols  = c(physical_abuse_2cat : abandonment_2cat, xc_assessment_screened_2cat),
+        .cols  = all_of(cols),
         .fns   = ~ sum(.x),
         .names = "{col}_t"
       ),
       assessment_type_3cat_f  = unique(assessment_type_3cat_f),
       # compute the proportion of positive votes for each MedStar ID
       across(
-        .cols  = physical_abuse_2cat_t : xc_assessment_screened_2cat_t,
+        .cols  = all_of(cols_t),
         .fns   = ~ case_when(
           .x   == 0  ~ 0,
           .x  !=  0  ~ .x/n()
@@ -33,24 +42,25 @@ pos_votes <- function(lead_panel_cleaned) {
     ) %>%
     # rename the new columns
     rename_with(
-      .cols   = ends_with("_t"), 
+      .cols   = all_of(cols_t), 
       .fn     = ~ gsub("2cat_t", "total", .x)
     ) %>% 
     rename_with(
-      .cols   = ends_with("_p"), 
+      .cols   = all_of(cols_t_p), 
       .fn     = ~ gsub("2cat_t_p", "prop", .x)
     )
   
-  # Create a dichotomous variable that indicates if there were _any_ positive determinations at each assessment (initial, secondary, and post-DETECT) 
+  # Create a dichotomous variable that indicates if there were _any_ positive 
+  # determinations at each assessment (initial, secondary, and post-DETECT) 
   # for each subtype of abuse.
   any_pos <- pos_votes %>% 
     group_by(assessment_type_3cat_f) %>%
     mutate(
       across(
-        .cols   = physical_abuse_total : xc_assessment_screened_total,
-        .fn     = ~ case_when(
-          .x    == 0 ~ 0,
-          .x    >  0 ~ 1
+        .cols = ends_with("_total"),
+        .fn = ~ case_when(
+          .x == 0 ~ 0,
+          .x >  0 ~ 1
         ),
         .names  = "{col}_any"
       ),
@@ -73,7 +83,7 @@ pos_votes <- function(lead_panel_cleaned) {
     group_by(assessment_type_3cat_f) %>%
     mutate(
       across(
-        .cols   = physical_abuse_prop : xc_assessment_screened_prop,
+        .cols   = ends_with("_prop"),
         .fn     = ~ case_when(
           .x    <= 0.5         ~ 0,
           .x    >  0.5         ~ 1
@@ -100,8 +110,8 @@ pos_votes <- function(lead_panel_cleaned) {
       group_by(assessment_type_3cat_f) %>%
       mutate(
         abuse_any = case_when(
-          if_any(physical_abuse_det : abandonment_det, ~. == "Yes")  ~ 1,
-          if_all(physical_abuse_det : abandonment_det, ~. == "No")   ~ 0,
+          if_any(ends_with("_det"), ~. == "Yes")  ~ 1,
+          if_all(ends_with("_det"), ~. == "No")   ~ 0,
           TRUE                                                       ~ NA
         )
       ) %>%
@@ -115,10 +125,15 @@ pos_votes <- function(lead_panel_cleaned) {
       ungroup()
     # Create a data frame with only the data used for the final abuse determination, merge it with the abuse_any data frame and create a column that 
     # distinguishes the rows in the original final abuse data set from the rest
-    initial_pos_votes <- abuse_any %>% filter(assessment_type_3cat_f == "Initial assessment")
-    secondary_pos_votes <- abuse_any %>% filter(assessment_type_3cat_f == "Secondary assessment")
+    initial_pos_votes <- abuse_any %>% 
+      filter(assessment_type_3cat_f == "Initial assessment")
+    
+    secondary_pos_votes <- abuse_any %>% 
+      filter(assessment_type_3cat_f == "Secondary assessment")
     final_det <- initial_pos_votes[!initial_pos_votes$medstar_id %in% secondary_pos_votes$medstar_id,]
+    
     final_det <- rbind(final_det, secondary_pos_votes)
+    
     final_det <- bind_rows(list( "0" = abuse_any, "1" = final_det), .id = "final_determination") %>% 
       mutate(final_determination = factor(final_determination))
     

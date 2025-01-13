@@ -14,6 +14,7 @@ In this file, we import and do some initial cleaning of the EM self-report data 
 library(dplyr, warn.conflicts = FALSE)
 library(janitor, warn.conflicts = FALSE)
 library(stringr)
+library(here)
 ```
 
 

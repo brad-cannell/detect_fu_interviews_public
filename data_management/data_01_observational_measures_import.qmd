@@ -1,0 +1,1223 @@
+---
+title: "Import Data from FileMaker Pro: Observational Measures"
+---
+
+# Overview
+
+In this file, we import and do some initial cleaning of the Observational Measures data collected and stored in FileMaker Pro.
+
+```{r, message= FALSE}
+library(dplyr, warn.conflicts = FALSE)
+library(readr)
+library(purrr)
+library(stringr)
+library(janitor)
+library(here)
+```
+
+
+# Load custom functions
+
+```{r}
+source(here::here("R", "recoding_factoring_relocating.R"))
+source(here::here("R", "nums_to_na.R"))
+source(here::here("R", "data_cleaning_tools.R"))
+```
+
+# Load data
+
+Load the data table into the global environment as a data frame using the raw csv file. We will create categorical variables with numerical values that match the codebook and also create a factor variable for each categorical variable in the data frame to be used for analysis.
+
+```{r}
+obs_meas_path <- here::here("data", "filemaker_pro_exports", "observational_measures_import.csv")
+```
+
+```{r}
+obs_meas <- readr::read_csv(obs_meas_path)
+rm(obs_meas_path)
+```
+
+## Data check
+
+The initial number of rows and columns.
+
+```{r}
+# Data check
+dims <- c(935, 107)
+if (nrow(obs_meas) != dims[1] || ncol(obs_meas) != dims[2]) {
+  stop(
+    "Expecting ", dims[1], " rows and ", dims[2], " columns in obs_meas. Found ",
+    paste(dim(obs_meas), collapse = ", "), " instead. Check into it."
+  )
+}
+```
+
+
+# Clean data
+
+Here we will convert all variable names to snake case so that everything is uniform.
+
+```{r}
+# Convert all variable names to snake case
+obs_meas <- clean_names(obs_meas)
+```
+
+## Clean categorical variables
+
+- By default, FM Pro exports all categorical variables as character variables.
+- When analyzing data in R, we prefer to work factors and occasionally with numeric values.
+- Below, we:
+  - Convert character values to numeric values
+  - Create a version of each column with "Don't know" and "Refused" converted to NA
+  - Create a factor version of each column (w/o "Don't know" and "Refused")
+  - Arrange the columns as: original column, numeric column w/o "Don't know" and "Refused", 
+    and the factor version of the column.
+  - The original column will be dropped when it has the same values as the 
+    version without "Don't know and "Refused".  
+
+### Screening items
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "unusual_odor", "disarray_hoarding", "health_safety_concern", 
+  "caregiver_lack_knowledge", "caregiver_unengaged", "caregiver_frustrated", 
+  "caregiver_anxious", "isolated_home", "depressed", "poor_personal_hygiene", 
+  "inadequately_clothed", "difficulty_medications", "hoarding_medications", 
+  "unmet_needs", "report_elder_abuse"
+  )
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "Yes" = 1, "No" = 0, "No caregiver present" = 2, 
+    "Did not enter patient's home" = 3, "Unable to assess" = 8 
+)
+
+# NA values
+na_values <- c(8)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Self-neglect Severity Scale
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("hygiene", "nutrition", "skin_integrity")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "Very good" = 1, "Good" = 2, "Poor" = 3, "Very poor" = 4, 
+    "Unable to assess" = 8 
+)
+
+# NA values
+na_values <- c(8)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix)  %>%
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(., cols, cols_suffix)
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("clothes")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Clean/neat" = 0, "1" = 1, "2" = 2, "3" = 3, "4 - Very soiled" = 4, 
+    "Unable to assess" = 8 
+)
+
+# NA values
+na_values <- c(8)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("hair")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Clean/combed" = 0, "1" = 1, "2" = 2, "3" = 3, "4 - Matted/dirty" = 4, 
+    "Unable to assess" = 8 
+)
+
+# NA values
+na_values <- c(8)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("nails")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Clean/trimmed" = 0, "1" = 1, "2" = 2, "3" = 3, 
+    "4 - Long/untrimmed/dirty" = 4, "Unable to assess" = 8 
+)
+
+# NA values
+na_values <- c(8)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Possible Abuse Indicators
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "bruising", "lacerations", "fractures", "stages_healing", "sexual_abuse", 
+  "abuse_statement", "contracture", "decubitus", "dehydration", "diarrhea", 
+  "depression", "impaction", "malnutrition", "urine_burn", "poor_hygiene", 
+  "obvious_disease", "inappropriate_medication", "repetitive_hosp_admission", 
+  "neglect_statement", "money_misuse", "evidence", "goods_for_services", 
+  "inability_account_money", "exploitation_statement", 
+  "caretaker_withdrawn_care", "left_alone_unsafe", "abandonment_statement"
+)
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "No evidence" = 0, "Possible evidence" = 1, "Probable evidence" = 2, 
+    "Definite evidence" = 3, "Unable to assess" = 8 
+)
+
+# NA values
+na_values <- c(8)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+### Environmental Status of Subject
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("exterior_condition", "yard_sidewalk")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Neat/well kept/no trash, debris" = 0, "1" = 1, "2" = 2, "3" = 3, 
+    "4 - Poorly maintained/trash, other debris" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+```{r}
+# Columns of interest for this code chunk
+cols <- c("roof", "walls")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Intact/no structural damage" = 0, "1" = 1, "2" = 2, "3" = 3, 
+    "4 - Dilapidated/poorly maintained, holes" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+```{r}
+# Columns of interest for this code chunk
+cols <- c("windows", "interior_condition")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Intact/not broken or missing" = 0, "1" = 1, "2" = 2, "3" = 3, 
+    "4 - Multiple sections broken/missing" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("odor")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Normal household odor" = 0, "1" = 1, "2" = 2, "3" = 3, 
+    "4 - Pungent, unpleasant odor (may be human/animal waste, rotting food)" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Cleanliness
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "kitchen_cleanliness", "bathroom_cleanliness", "bedroom_cleanliness", 
+          "living_room_cleanliness"
+  )
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Clean, no evidence of unsanitary conditions" = 0, "1" = 1, "2" = 2, 
+    "3" = 3, "4 - Very dirty, unwashed dishes, trash litter" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Clutter
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("clutter")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - Neat/orderly" = 0, "1" = 1, "2" = 2, 
+    "3" = 3, "4 - Very cluttered/difficult to move around or find things" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Structural problems
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("structural_problems")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - No structural problems" = 0, "1" = 1, "2" = 2, 
+    "3" = 3, 
+    "4 - Severe structural damage (e.g., holes in sheetrock, floor leaking, ceiling)" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Pets
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("pets")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - All animals cared for" = 0, "1 or 2 - Uncared animals" = 1, 
+    "3 - 4 uncared for animals" = 2, "5 or 6 - Uncared animals" = 3, 
+    "6 or more uncared for animals" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+### Utilities
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("utilities")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "0 - All utilities work" = 0, "1 - No phone" = 1, 
+    "2 - No gas/electricity" = 2, "3 - No water" = 3, 
+    "4 - Multiple utilities do not work" = 4
+)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "5cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Summary variables
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "summary_evidence_abuse", "summary_evidence_neglect", 
+  "summary_evidence_exploitation", "summary_evidence_abandonment"
+  )
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "No evidence" = 0, "Possible evidence" = 1, "Probable evidence" = 2, 
+    "Definite evidence" = 3, "Unable to assess" = 8 
+)
+
+# NA values
+na_values <- c(8)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "4cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### Medic EM Assessment
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "at_physical", "at_sexual", "at_emotional", "at_neglect", "at_abandon", 
+  "at_financial", "at_self"
+  )
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c(
+    "Yes" = 1, "No" = 0, "Don't know" = 7, "Refused" = 9
+)
+
+# NA values
+na_values <- c(7,9)
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### C_detect status
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("c_detect_status")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c("Positive" = 1, "Negative" = 0)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+
+### aps_reported
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("aps_reported")
+```
+
+Check that there are no capitalization or other inconsistencies in the columns of interest.
+
+```{r}
+get_values(obs_meas, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c("Yes" = 1, "No" = 0)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+### aps_method
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c("aps_reported_method")
+```
+
+```{r}
+get_values(obs_meas, cols)
+```
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c("Phone" = 1, "Online" = 2, "Other" = 3)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "3cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+obs_meas <- obs_meas |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+
+# Data check
+
+Number of columns after cleaning the environment variables section.
+
+```{r}
+# Data check
+ncols <- 229
+if (ncol(obs_meas) != ncols) {
+  stop(
+    ncols, " columns expected in obs_meas after cleaning the environment variables. ", 
+    ncol(obs_meas), " columns found. Check into it."
+  )
+}
+```
+
+View variable characteristics.
+
+```{r}
+col_characteristics(obs_meas)
+```
+
+
+# Save as rds file
+
+```{r}
+write_rds(obs_meas, here::here("data", "cleaned_rds_files", "observational_measures_import.rds"))
+```
