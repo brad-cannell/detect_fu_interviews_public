@@ -177,7 +177,7 @@ source(here::here("r", "stack_ids.R"))
 
 ## APS Identifier Data for Chunking
 
-APS client data was originally in XLSX format. It had been cleaned and exported to an RDS file with 568,616 rows and 23 columns. The data was further modified with flags in the fastLink process.
+APS client data was originally in XLSX format. It had been cleaned and exported to an RDS file with 568,616 rows and 23 columns. The data was further modified by reducing to 378,604 unique combinations and the addition of flags in the fastLink process.
 
 ```{r}
 aps_path <- here::here(

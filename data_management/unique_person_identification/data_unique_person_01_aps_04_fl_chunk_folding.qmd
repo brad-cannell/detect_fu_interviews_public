@@ -136,7 +136,7 @@ source(here::here("r", "stack_ids.R"))
 
 ## APS Identifier Data for Chunking
 
-APS client data was originally in XLSX format. It had been cleaned and exported to an RDS file with 568,616 rows and 23 columns. The data was further modified with flags in the fastLink process.
+APS client data was originally in XLSX format. It had been cleaned and exported to an RDS file with 568,616 rows and 23 columns. The data was further modified by reducing to 378,604 unique combinations and the addition of flags in the fastLink process.
 
 ```{r}
 aps_path <- here::here(
@@ -2835,7 +2835,7 @@ subset_b_pack$df <- aps_chunk_5
 subset_b_pack$suffix <- '5'
 subset_b_pack$ids <- fl_ids
 
-# fastLink
+#fastLink
 fl_out <- fastLink::fastLink(
   # Chunk A
       dfA = subset_a_pack$df,
@@ -3800,7 +3800,7 @@ We exported our map, for later use.
 
 ```{r}
 saveRDS(
-  aps,
+  map,
   here::here(
     "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
     "00_map-aps_id-to-client_id.rds"
