@@ -29,7 +29,7 @@ Please note: as these files contain PHI and proprietary information, they are no
 
 # Summary
 
--   Reduced 378,418 `client_id` values to  370,958 `aps_id` values, a 1.971% reduction
+-   Reduced 378,418 `client_id` values to  371,975 `aps_id` values, a 1.967% reduction..
 
 -   Output file of `client_id` to `aps_id` value translations saved as "00_map-aps_id-to-client_id.rds"
 
@@ -3855,7 +3855,7 @@ paste0(
 We found all of these values to be reasonable as true matches. We revised these values for our revised map.
 
 ```{r}
-map <- aps_chunk |>
+map<- aps_chunk |>
   dplyr::rows_update(
     checking |>
       dplyr::select(case_id, aps_id) |>
@@ -3868,15 +3868,10 @@ map <- aps_chunk |>
     by = 'case_id'
     ) |>
   dplyr::select(client_id, aps_id) |>
-  dplyr::group_by(client_id) |>
-  dplyr::mutate(new_id = dplyr::first(aps_id)) |>
-  dplyr::ungroup() |>
-  dplyr::select(client_id, new_id) |>
-  dplyr::rename_at(c('new_id'), ~c('aps_id')) |>
   dplyr::distinct()
 ```
 
-This map reduced our unique subject IDs from 378,418 `client_id` values to  370,958 `aps_id` values, a 1.971% reduction.
+This map reduced our unique subject IDs from 378,418 `client_id` values to  371,975 `aps_id` values, a 1.967% reduction.
 
 ```{r}
 paste0(
