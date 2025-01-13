@@ -29,7 +29,7 @@ Please note: as these files contain PHI and proprietary information, they are no
 
 # Summary
 
--   Reduced 378,418 `client_id` values to 371,072 `aps_id` values, a 1.941% reduction.
+-   Reduced 378,418 `client_id` values to  371,975 `aps_id` values, a 1.967% reduction..
 
 -   Output file of `client_id` to `aps_id` value translations saved as "00_map-aps_id-to-client_id.rds"
 
@@ -3706,9 +3706,9 @@ nrow(
 # [1] TRUE
 ```
 
-# Final QC
+## QC Check
 
-We performed a final QC check of our newly assigned unique subject IDs. We identified several rows which required revision, most frequently due to lingering spousal/familial matches.
+We performed a QC check of our newly assigned unique subject IDs. We identified several rows which required revision, most frequently due to lingering spousal/familial matches.
 
 ```{r}
 split_rows <- c(
@@ -3794,7 +3794,102 @@ paste0(
 # 1.941% reduction."
 ```
 
-### 💾 Save and Export Data
+## Final QC
+
+We performed a final QC of our map based on guidance provided by APS that each `case_id` should only correspond to a single client, but each client may have more than one `case_id` - as such, each `case_id` should correspond to a single value of `aps_id`.
+
+We loaded the original APS data, prior to reduction to unique identifier values (which resulted in the omission of `case_id`).
+
+```{r}
+aps_path <- here::here(
+  "data","cleaned_rds_files", "unique_subject_ids", "aps", "aps_00_clean.rds"
+  )
+
+informative_df_import(
+    "aps", aps_path, overwrite = T
+  )
+
+# 2024-11-13: APS data imported with 568,616 rows and 23 columns.
+# Data last modified on OneDrive: 2024-11-01 16:59:03
+```
+
+We applied our map to this data, omitting any row without `client_id` values (only one row present, without any identifier data).
+
+```{r}
+aps_chunk <- aps |>
+  # Omit known row with a missing client_id value
+  dplyr::filter(!is.na(client_id)) |>
+  dplyr::mutate(aps_id = NA_integer_) |>
+  dplyr::rows_update(
+    map |>
+      dplyr::filter(!is.na(client_id)),
+    by = 'client_id'
+  ) |>
+  # Add map's aps_id value for the single row missing a client_id value
+  rbind(
+    aps[is.na(aps$client_id),] |>
+      dplyr::mutate(aps_id = map[is.na(map$client_id),]$aps_id)
+  )
+```
+
+We found that there were 252 `aps_id` values that were cross-referenced in 125 `case_id` values, potentially indicating failed matches. We manually reviewed these observations.
+
+```{r}
+checking <- aps_chunk |>
+  dplyr::group_by(case_id) |>
+  dplyr::mutate(n_ids = dplyr::n_distinct(aps_id)) |>
+  dplyr::filter(n_ids > 1) |>
+  dplyr::ungroup() |>
+  dplyr::arrange(case_id)
+
+
+paste0(
+  nrow(checking), " observations across ", 
+  length(unique(checking$aps_id)), " aps_id values and ",
+  length(unique(checking$case_id)), " case_id values."
+)
+
+# [1] "252 observations across 252 aps_id values and 125 case_id values."
+```
+
+We found all of these values to be reasonable as true matches. We revised these values for our revised map.
+
+```{r}
+map<- aps_chunk |>
+  dplyr::rows_update(
+    checking |>
+      dplyr::select(case_id, aps_id) |>
+      dplyr::group_by(case_id) |>
+      dplyr::mutate(new_id = dplyr::first(aps_id)) |>
+      dplyr::ungroup() |>
+      dplyr::select(case_id, new_id) |>
+      dplyr::rename_at(c('new_id'), ~c('aps_id')) |>
+      dplyr::distinct(),
+    by = 'case_id'
+    ) |>
+  dplyr::select(client_id, aps_id) |>
+  dplyr::distinct()
+```
+
+This map reduced our unique subject IDs from 378,418 `client_id` values to  371,975 `aps_id` values, a 1.967% reduction.
+
+```{r}
+paste0(
+  "Reduced ",
+  format(length(unique(map$client_id)), big.mark = ','),
+  " client_id values to ",
+  format(length(unique(map$aps_id)), big.mark = ','),
+  " aps_id values, a ",
+  format( (100*(length(unique(map$client_id)) - length(unique(map$aps_id)))/
+             length(unique(map$client_id))), digits = 4), 
+  "% reduction."
+  )
+
+# [1] "Reduced 378,418 client_id values to 370,975 aps_id values, a 
+# 1.967% reduction."
+```
+
+# 💾 Save and Export Data
 
 We exported our map, for later use.
 
