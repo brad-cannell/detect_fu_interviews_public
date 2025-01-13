@@ -157,7 +157,7 @@ get_unique_value_summary <- function(.df, ... ) {
     
     # adds count of missing values in each column
     
-    table<- add_row(table, col_value = NA, freq = sum(is.na(.df[i])))
+    table<- tibble::add_row(table, col_value = NA, freq = sum(is.na(.df[i])))
     
     # read names of columns to "value" and the name of the target column(s)
     
@@ -165,13 +165,13 @@ get_unique_value_summary <- function(.df, ... ) {
     
     # joins table's summary counts to complete the count values
     
-    unique_summary <- left_join(unique_summary,table, by="col_value")
+    unique_summary <- dplyr::left_join(unique_summary,table, by="col_value")
   }
   
   # Replace any missing values in counts with 0 (does not remove it from value)
   
   unique_summary <- unique_summary |>
-    dplyr::mutate_at(vars(-c(col_value)), ~replace(., is.na(.), 0))
+    dplyr::mutate_at(dplyr::vars(-c(col_value)), ~replace(., is.na(.), 0))
   
   # Sort data frame by 'value'
   unique_summary <- unique_summary |> 
