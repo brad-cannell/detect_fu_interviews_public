@@ -188,22 +188,6 @@ county_list <- unique(tolower(county_list$county_name))
 For fixes that required potential use of PHI, we utilized a CSV file.
 
 ```{r}
-unresolvable_path <- here::here("data","aps_caseids_unresolvables.csv")
-
-informative_df_import("unresolvables", unresolvable_path, show_col_types = F)
-
-unresolvables <- unresolvables |>
-  janitor::clean_names()
-
- # 2024-11-01: UNRESOLVABLES data imported with 368 rows and 1 columns.
- # Data last modified on OneDrive: 2024-11-01 16:35:44 
-```
-
-## Unresolvable Case IDs
-
-Generated during the course of this file, we made a list of Case IDs associated with unresolvable entries. 
-
-```{r}
 pointfix_path <- here::here("data","aps_fuzzy-prep-clean_point-fixes.csv")
 
 informative_df_import("point_fixes", pointfix_path, show_col_types = F)
@@ -213,6 +197,22 @@ point_fixes <- point_fixes |>
 
  # 2024-11-01: POINT FIXES data imported with 31 rows and 3 columns.
  # Data last modified on OneDrive: 2024-11-01 15:32:15   
+```
+
+## Unresolvable Case IDs
+
+Generated during the course of this file, we made a list of Case IDs associated with unresolvable entries. 
+
+```{r}
+unresolvable_path <- here::here("data","aps_caseids_unresolvables.csv")
+
+informative_df_import("unresolvables", unresolvable_path, show_col_types = F)
+
+unresolvables <- unresolvables |>
+  janitor::clean_names()
+
+ # 2024-11-01: UNRESOLVABLES data imported with 368 rows and 1 columns.
+ # Data last modified on OneDrive: 2024-11-01 16:35:44 
 ```
 
 # Initial Data Structure
