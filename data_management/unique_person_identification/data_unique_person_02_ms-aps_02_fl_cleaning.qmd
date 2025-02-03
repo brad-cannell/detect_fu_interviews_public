@@ -23,7 +23,7 @@ These files contained 92,160 observations of approximately 30 demographic variab
 
 ## This File
 
-This file builds on [the previous Quarto document](), which performed fastLink fuzzy-matching of subjects in the APS and MedStar data sets. This file documents the review of pairs and ID assignments for between-set subject-level matching.
+This file builds on [the previous Quarto document](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_02_ms-aps_01_fl_generation.qmd), which performed fastLink fuzzy-matching of subjects in the APS and MedStar data sets. This file documents the review of pairs and ID assignments for between-set subject-level matching.
 
 ## Internal Files
 
@@ -2402,7 +2402,7 @@ medstar <- dplyr::rows_update(
     )
   )
 
-# Reduce Medstar to desired columns (ID, KEYS)
+# Reduce MedStar to desired columns (ID, KEYS)
 medstar <- medstar |> 
   dplyr::select(id_ms, x_primary_key, medstar_internal_id) |>
   dplyr::mutate(id = NA_integer_)
