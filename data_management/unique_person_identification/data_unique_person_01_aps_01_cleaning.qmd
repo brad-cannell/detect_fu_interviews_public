@@ -12066,7 +12066,7 @@ We exported our data, for further use.
 saveRDS(
   aps,
   here::here(
-    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "data", "cleaned_rds_files", "record_linkage", "aps", 
     "aps_00_clean.rds"
     )
 )

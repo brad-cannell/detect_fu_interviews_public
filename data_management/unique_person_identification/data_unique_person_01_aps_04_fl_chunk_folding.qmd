@@ -140,7 +140,7 @@ APS client data was originally in XLSX format. It had been cleaned and exported 
 
 ```{r}
 aps_path <- here::here(
-  "data","cleaned_rds_files", "unique_subject_ids", "aps", 
+  "data","cleaned_rds_files", "record_linkage", "aps", 
   "aps_01_prepped_for_fl.rds"
   )
 
@@ -163,7 +163,7 @@ purrr::walk(
     informative_df_import(
       paste0("aps_chunk_", x), 
       paste0(
-        here::here("data","cleaned_rds_files", "unique_subject_ids", "aps"), 
+        here::here("data","cleaned_rds_files", "record_linkage", "aps"), 
         "/aps_02_ids_chunk_",
         x, 
         ".rds"
@@ -3802,7 +3802,7 @@ We loaded the original APS data, prior to reduction to unique identifier values 
 
 ```{r}
 aps_path <- here::here(
-  "data","cleaned_rds_files", "unique_subject_ids", "aps", "aps_00_clean.rds"
+  "data","cleaned_rds_files", "record_linkage", "aps", "aps_00_clean.rds"
   )
 
 informative_df_import(
@@ -3902,7 +3902,7 @@ We exported our map, for later use.
 saveRDS(
   map,
   here::here(
-    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "data", "cleaned_rds_files", "record_linkage", "aps", 
     "00_map-aps_id-to-client_id.rds"
     )
 )

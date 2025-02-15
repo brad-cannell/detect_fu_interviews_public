@@ -41,11 +41,11 @@ Please note: as these files contain PHI and proprietary information, they are no
 
 This file resulted in the creation of three subject linkage maps:
 
--   APS within-set Unique Subject Map (`01_aps-client_id-to_id-aps.rds`), which connects `client_id` to our assigned `id_aps` values
+-   APS within-set Unique Subject Map (`data/cleaned_rds_files/record_linkage/maps/01_aps-client_id-to_id-aps.rds`), which connects `client_id` to our assigned `id_aps` values
 
--   MedStar within-set Unique Subject Map (`02_medstar-keys-to-id_ms.rds`), which connects `x_primary_key` and `medstar_internal_id` values to `id_ms` values.
+-   MedStar within-set Unique Subject Map (`data/cleaned_rds_files/record_linkage/maps/02_medstar-keys-to-id_ms.rds`), which connects `x_primary_key` and `medstar_internal_id` values to `id_ms` values.
 
--   Between-set APS to MedStar Unique Subject Map (`03_aps_to_ms-subject-links.rds`), which connects `id_aps` and `id_ms` values to a cross-set `id` value
+-   Between-set APS to MedStar Unique Subject Map (`data/cleaned_rds_files/record_linkage/maps/03_aps_to_ms-subject-links.rds`), which connects `id_aps` and `id_ms` values to a cross-set `id` value
 
 We had a total of 4,656 subjects linked between data sets.
 
@@ -155,7 +155,7 @@ We loaded the output of our fastLink fuzzy matching.
 
 ```{r}
 path <- here::here(
-  "data", "cleaned_rds_files", "unique_subject_ids", "aps_to_ms_processing", 
+  "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
   "01_cross_id_gen-fl_out.rds"
   )
 
@@ -173,7 +173,7 @@ We loaded our packed APS Data for generation of pair and identifier data.
 
 ```{r}
 path <- here::here(
-  "data", "cleaned_rds_files", "unique_subject_ids", "aps_to_ms_processing", 
+  "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
   "01_cross_id_gen-aps_packed.rds"
   )
 
@@ -191,7 +191,7 @@ A map assigning APS within-set unique subject IDs to the provided `client_id` va
 
 ```{r}
 path <- here::here(
-    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "data", "cleaned_rds_files", "record_linkage", "aps", 
     "00_map-aps_id-to-client_id.rds"
     )
 
@@ -209,7 +209,7 @@ We loaded our packed MedStar Data for generation of pair and identifier data.
 
 ```{r}
 path <- here::here(
-  "data", "cleaned_rds_files", "unique_subject_ids", "aps_to_ms_processing", 
+  "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
   "01_cross_id_gen-ms_packed.rds"
   )
 
@@ -2486,7 +2486,7 @@ We exported our subject-linkage maps, for later use.
 saveRDS(
   aps_id_map,
   here::here(
-    "data", "cleaned_rds_files", "unique_subject_ids", "maps", 
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
     "01_aps-client_id-to_id-aps.rds"
     )
 )
@@ -2494,7 +2494,7 @@ saveRDS(
 saveRDS(
   ms_ids,
   here::here(
-    "data", "cleaned_rds_files", "unique_subject_ids", "maps", 
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
     "02_medstar-keys-to-id_ms.rds"
     )
 )
@@ -2502,7 +2502,7 @@ saveRDS(
 saveRDS(
   temp_ids,
   here::here(
-    "data", "cleaned_rds_files", "unique_subject_ids", "maps", 
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
     "03_aps_to_ms-subject-links.rds"
     )
 )
