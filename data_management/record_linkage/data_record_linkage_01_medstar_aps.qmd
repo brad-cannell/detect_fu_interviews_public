@@ -1,0 +1,2001 @@
+---
+title: "APS-MedStar Cross-Set Subject Identification: Manual Review"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## APS Data Background
+
+The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). 
+
+The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`. Refinement of unique subject ID assignments in subject-linkage to MedStar resulted in 370,825 values of `aps_id`.
+
+The primary file of interest for case-level temporal linkage is the "Investigations.xlsx" file. This file contained 57,407 observations of 8 variables, including 378,418 values for `client_id` (linked to 370,825 values of `aps_id`, including 1 observation without a value for `client_id` or `aps_id`), 568,386 values for `case_id`, and 571,407 values for `investigation_id`. A subject may have more than one investigation associated with a single `case_id` value, though each subject should (ideally) only have one `investigation_id` at any one time. Through the `case_id` variable, these values could be linked to Intakes through the "Intakes.xlsx" file (primary file of interest for 1:1 record linkage of MedStar Response to APS Intake) and investigation outcomes in the "Allegations.xlsx" file.
+
+## MedStar Data Background
+
+The MedStar records were originally recorded in Filemaker Pro. Processing of this data was extensive and across multiple data files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). 
+
+The primary files of interest for subject-level interest included participant demographic data in the `participant_import.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd), and the within-set unique subject ID assignment in `participant_unique_ids.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+These files contained 92,160 observations of approximately 30 demographic variables. Refinement of unique subject ID assignments in subject-linkage to APS resulted in 41,951 values of `ms_id`.
+
+## This File
+
+This file performs temporal linkage of APS Cases/Investigations ("Investigations.xlsx") to MedStar Responses. A MedStar Response is considered temporally linked to an APS Case if there is an APS Case within 30 days (before or after) the MedStar Response, as temporal proximity allows the APS Case to reasonably reflect a "gold standard" judgement for conditions at the time of the MedStar Response.
+
+1.  Observations in the APS and MedStar data are trimmed to only include observations reflecting the 4,654 subjects present in both data sets.
+2.  A case window is calculated for each APS Investigation, reflecting the total time the Investigation is considered open and active.
+3.  We match MedStar Responses to APS Investigations that were open at the time of the MedStar Response ("direct link", "exact")
+    - If there is more than one potentially temporally-linked APS Investigation, we review and select a single "best" matching Investigation
+3.  A 60 day window, representing the 30 days before and after, is generated for each MedStar Response.
+4.  We match MedStar Responses to APS Investigations that were open at any time within the 60-day window of each MedStar Response ("broader link", "window")
+    - If there is more than one potentially temporally-linked APS Investigation, we review and select a single "best" matching Investigation
+5.  We match MedStar Responses to APS Intakes that occurred 72 hours after the MedStar Response
+    - We flagged investigations for easy filtering of "any reporter type", "EMS possible reporter type", and "EMS explicit reporter type"
+
+This file resulted in the creation of two linkage maps:
+
+-   Response-Case/Investigation Linkage Map (`data/cleaned_rds_files/record_linkage/maps/04_medstar-records_to_aps-case-invs.rds`), which connects the unique combination of cross-set Subject ID and MedStar Response Number (`id` and `ems_num`) to APS Investigations (`inv_id`). Additional columns indicate if the pairing is an exact or broader temporal match (`exact`), the "best match" (`best_exact`, `best_window`), the overall disposition of the matched Investigation (`inv_dispo`), if there's also matched APS Intake (`intake_paired`) and if any paired Intake was of an EMS-possible (`intake_ems_poss`) or explicit (`intake_ems_expl`) reporter type. Response timestamp (`resp_ts`) and APS Case ID (`case_id`) are included for additional filtering.
+
+-   Response-Intake Linkage Map (`data/cleaned_rds_files/record_linkage/maps/05_medstar-records_to_aps-intakes.rds`), which connects the unique combination of cross-set Subject ID and MedStar Response Number (`id` and `ems_num`) to APS Intakes (`intake_id`). Additional columns indicate the associated APS Case ID (`case_id`). Intakes matched to multiple Responses are flagged (`multi_resp`), and Intakes that represent an EMS possible (`reporter_possible`) or explicit (`reporter_ems`) are flagged, in addition to the inclusion of all reporter type values (`reporter_type`). Response timestamp (`resp_ts`) and Intake Date (`intake_date`) are included for additional filtering.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ). 
+
+It is recommended that anyone orienting to the task start at the primary task notes document, which provides a high-level overview of the task data, parameters, and process: [notes_01_task_01_00_merging aps and medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_01_task_01_00_merging aps and medstar task.docx?d=w542529e69bd2411da7a2d7efe56269a5&csf=1&web=1&e=8ZF6Rg).
+
+Notes for the APS data are located in the [notes_00_data_aps.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_00_data_aps.docx?d=w854dec51d8b049bdab8b0018f3d4bfff&csf=1&web=1&e=DKCWsI) file. Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
+
+Notes relating to this specific step of processing are in the [notes_01_task_03_04_aps medstar cross-set record matching task notes.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_01_task_03_04_aps%20medstar%20cross-set%20record%20matching%20task%20notes.docx?d=wc473dd3f8b6d4e48aea8e1925674049c&csf=1&web=1&e=vDwhhr) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# Summary
+
+We connected our APS and MedStar records in three ways, based on matching subject and time.
+
+1.  MedStar Responses were linked to APS Investigations that were open during the time of the MedStar Response.
+    -   This linked 3,180 MedStar Responses to an APS Investigation (1,638 subjects), with an average of 1.02 Investigations per Response
+2.  MedStar Responses were linked to APS Investigations that were open at any time within a 60 day (30 days before, 30 days after) window reflecting the broader time around the MedStar Response.
+    -   This linked 6,156 MedStar Responses to an APS Investigation (2,539 subjects), with an average of 1.17 Investigations per Response
+3.  MedStar Responses were linked to APS Intakes within 72 hours after the response, which had a reporter type that could reasonably reflect reporting by APS
+    -   This linked 1,571 MedStar Responses to 1,581 APS Intakes (1,345 APS Cases, 1,033 subjects); an average of 1.15 Intakes and 1.04 Cases per Response, 1.3 Responses per Intake and 1.3 per Case
+        -   When filtered for EMS-possible reporter types, this linkage was reduced to 1,404 MedStar Responses to 1,375 APS Intakes (1,191 APS Cases, 920 subjects); an average of 1.12 Intakes and 1.03 Cases per Response, 1.29 Responses per Intake and 1.29 per Case
+        -   When filtered to only include "Health Care Providers/Staff -- EMS/EMT" reporter types, this linkage was reduced to 686 MedStar Responses to 606 APS Intakes (573 APS Cases, 473 subjects); an average of 1.04 Intakes and 1.01 Cases per Response, 1.35 Responses per Intake and 1.35 per Case
+
+## Assumptions and Considerations
+
+1. An APS Case open within the 30 days before or after a MedStar response likely reflects APS judgement on conditions at the time of the MedStar response.
+2. An APS Case open at the time of the MedStar response likely best reflects APS judgement on conditions at the time of the MedStar response.
+3. The APS Reporter types of "Health Care Providers/Staff -- EMS/EMT" is the most likely to reflect an EMS reporter. However, caller types of "Anonymous", "Community Agencies/Organizations", "Health Care Providers/Staff", "Other Providers", "Others", and "Unknown" are reasonably possible. Caller types of "Family Members and Relatives", "Financial Institution", "Friends and Neighbors", "Law Enforcement", "Legal and Court-Related Services", and "State Agencies" are not likely to reflect an EMS reporter.
+4. Standards and policies indicate that EMS should report suspected EM as soon as possible. EMS shifts are rarely longer than 72 hours in a continuous stretch. EMS that have not made a report (represented as an intake) after 72 hours are less likely to be related to the specific response in the records.
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r, warning = FALSE}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(fastLink)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   fastLink version 0.6.1
+-   janitor version 2.2.0
+
+## Functions
+
+```{r}
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+# Function that creates a modified version of table output, allowing
+# simplified manual review of unique values in a given column or set of
+# columns
+source(here::here("r", "get_unique_value_summary.R"))
+```
+
+# 📥 Load Data
+
+## APS Data
+
+APS Investigation/Case data was originally in XLSX format. It had been cleaned and exported to an RDS file with 571,407 rows and 8 columns. We had several rows with the word "blank" instead of being left blank, so we had expected errors.
+
+```{r}
+aps_path <- here::here(
+  "data","DETECT Shared with APS","Investigations.xlsx")
+
+informative_df_import(
+    "aps", aps_path, 
+    #read_excel() arguments                    
+    sheet = "Investigations",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), rep("date", 2), "text", "numeric", "text"
+      )
+  )
+
+aps <- aps |>
+  janitor::clean_names()
+```
+
+We also loaded our APS within-set subject linkage map, connecting our generated values of `id_aps` to `client_id` values that appear across the MedStar data sets.
+
+```{r}
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "01_aps-client_id-to_id-aps.rds"
+    )
+
+informative_df_import(
+    "aps_ids", path, overwrite = T
+  )
+
+
+```
+
+We also loaded our APS participant data, in case any subject ID assignments required verification.
+
+```{r}
+path <- here::here(
+  "data","cleaned_rds_files", "record_linkage", "aps", 
+  "aps_01_prepped_for_fl.rds"
+  )
+
+informative_df_import(
+    "aps_par", path, overwrite = T
+  )
+
+```
+
+We loaded our APS Allegation (outcomes) data.
+
+```{r}
+aps_path <- here::here(
+  "data","DETECT Shared with APS","Allegations.xlsx")
+
+informative_df_import(
+    "allegations", aps_path, 
+    #read_excel() arguments                    
+    sheet = "Allegations - Alleg Dtail Block",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), rep("text", 3)
+      )
+  )
+
+allegations <- allegations |>
+  janitor::clean_names()
+```
+
+We loaded our APS Intakes data.
+
+```{r}
+aps_path <- here::here(
+  "data","DETECT Shared with APS","Subsequent Intakes.xlsx")
+
+informative_df_import(
+    "intakes", aps_path, 
+    #read_excel() arguments                    
+    sheet = "Initial and Subsequent Intakes",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), "date", "text"
+      )
+  )
+
+intakes <- intakes |>
+  janitor::clean_names()
+```
+
+## MedStar Response Data
+
+MedStar participant data was imported from Filemaker Pro in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd).
+
+```{r}
+path <- here::here("data", "unique_id_creation", "participant_unique_id.rds")
+
+informative_df_import(
+    "medstar", path, overwrite = T
+  )
+
+
+```
+
+We also loaded our MedStar within-set subject linkage map, connecting our generated values of `id_ms` to `x_primary_key` and `medstar_internal_id` values that appear across the MedStar data sets. 
+
+```{r}
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "02_medstar-keys-to-id_ms.rds"
+    )
+
+informative_df_import(
+    "ms_ids", path, overwrite = T
+  )
+```
+
+## Subject-Linkage Maps
+
+We loaded our unique subject identifier maps.
+
+```{r}
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "03_aps_to_ms-subject-links.rds"
+    )
+
+informative_df_import(
+    "aps_to_ms", path, overwrite = T
+  )
+```
+
+We extracted a list of the 4,654 cross-set ID values shared in both data sets.
+
+```{r}
+shared_ids <- aps_to_ms |> 
+  dplyr::filter(
+    !is.na(id_aps) & !is.na(id_ms)
+    ) |>
+  dplyr::select(id) |> 
+  dplyr::pull()
+
+length(shared_ids)
+# [1] 4654
+```
+
+# Initial Data Wrangling
+
+## APS Data
+
+We first added our within and between-set subject IDs to the APS data sets.
+
+```{r}
+# Intake/Case Data
+aps <- aps |>
+  dplyr::mutate(
+    id = NA_integer_, id_aps = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    aps_ids,
+    by = 'client_id'
+  )
+
+# Identifier Data
+aps_par <- aps_par |>
+  dplyr::mutate(
+    id = NA_integer_, id_aps = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    aps_ids,
+    by = 'client_id'
+  )
+
+# Intake Data
+intakes <- intakes |>
+  dplyr::mutate(
+    id = NA_integer_, id_aps = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    aps_ids |>
+      dplyr::filter(client_id %in% intakes$client_id),
+    by = 'client_id'
+  )
+
+# Allegations Data
+allegations <- allegations |>
+  dplyr::mutate(
+    id = NA_integer_, id_aps = NA_integer_
+  ) |>
+  dplyr::rows_update(
+  # client_id is not in this data set! Must join using APS Case Data
+    aps |>
+      dplyr::filter(investigation_id %in% allegations$investigation_id) |>
+      dplyr::select(id, id_aps, investigation_id) |>
+      dplyr::distinct(),
+    by = 'investigation_id'
+  )
+
+# Clean up
+rm(aps_ids)
+```
+
+### Investigations/Cases
+
+We then filtered our data to only subjects present in both the APS and MedStar data.
+
+```{r}
+temp_nrows <- nrow(aps)
+
+aps <- aps |>
+  dplyr::filter(id %in% shared_ids)
+
+# Format a human-legible summary output
+paste0(
+  "Reduced APS data from ", format(temp_nrows, big.mark =','), 
+  " rows to ", format(nrow(aps), big.mark = ','), " rows with shared IDs."
+  )
+
+rm(temp_nrows)
+
+# [1] "Reduced APS data from 571,407 rows to 8,826 rows with shared IDs."
+```
+
+We reduced our data to only our columns of interest, and enforced date format for our date columns.
+
+```{r}
+aps <- aps |>
+  # Select only desired columns
+  dplyr::select(
+    id, id_aps, case_id, investigation_id, 
+    date_investigation_opened, date_investigation_closed, client_id,
+    overall_disposition, investigation_closure_reason
+    ) |>
+  # Rename columns for code
+  dplyr::rename_at(
+    c(
+      'investigation_id', 'date_investigation_opened', 
+      'date_investigation_closed', 'overall_disposition',
+      'investigation_closure_reason'
+      ), 
+    ~c('inv_id', 'date_open', 'date_close', 'overall_dispo', 'close_reason')
+  ) |>
+  # Enforce date format for date items
+  dplyr::mutate(
+    date_open = lubridate::date(date_open),
+    date_close = lubridate::date(date_close)
+  )
+```
+
+We calculated the interval for the APS Cases.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    case_window = lubridate::interval(date_open, date_close)
+  )
+```
+
+We also calculated the number of cases for each subject ID.
+
+```{r}
+aps <- aps |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(
+    num_cases = dplyr::n_distinct(case_id)
+  ) |>
+  dplyr::ungroup()
+```
+
+Finally, we modified our overall disposition variable to have standardized, lowercase values.
+
+```{r}
+aps <- aps |> 
+  dplyr::mutate(
+    overall_dispo = stringr::str_trim(
+      stringr::str_to_lower(overall_dispo), 
+      'both'
+      ),
+    overall_dispo = ifelse(
+      overall_dispo == "unable to determine", 'utd', overall_dispo
+      )
+    )
+```
+
+### Allegation Data
+
+We adjusted our allegation data. First, we reduced our data set to only the subjects present in both the APS and MedStar data sets. Then, we standardized all variable names. We also converted the variable reflecting a Self/Non-Self Perpetrator-Victim relationship into a logical/boolean, with a value of TRUE indicating a Self-relationship.
+
+```{r}
+allegations <- allegations |>
+  # Filter to IDs present in both data sets
+  dplyr::filter(id %in% shared_ids) |>
+  # Rename variables for use in code per SOPs
+  dplyr::rename_at(
+    c(
+      'investigation_id', 'allegation_id', 'allegation_type', 
+      'allegation_disposition', 'perpetrator_self_not_self_relationship'
+      ), 
+    ~c('inv_id', 'alleg_id', 'alleg_type', 'alleg_dispo', 'perpetrator_self')
+   ) |>
+  dplyr::mutate(
+    # Convert "self/non-self" into TRUE/FALSE
+    perpetrator_self = perpetrator_self == "Self"
+  )
+    
+```
+
+We next wished to convert our data into a consolidated wide format, where each row would (ideally) reflect the allegations and outcomes of a single investigation. This required us to modify values in our Allegation Type and Allegation Disposition variables, to facilitate meaningful pivot and consolidation.
+
+We first explored the relationship between allegation types and the self-non self perpetrator relationship. We found that only allegation types of neglect were ever represented as "Self". This would necessitate additional variants of these allegation types, to consolidate the allegation type and Self-Nonself Perpetrator-Victim relationship data.
+
+```{r}
+allegations |>
+  dplyr::select(alleg_type, perpetrator_self) |>
+  table()
+```
+
+We explored the relationship between allegation dispositions of "blank" (any variant) and the self-non self perpetrator relationship. We found that all allegation types had at least one "blank" disposition. This would necessitate additional variants of the "self" allegation types, to consolidate the allegation type and Self-Nonself Perpetrator-Victim relationship data.
+
+```{r}
+allegations |>
+  dplyr::filter(stringr::str_detect(stringr::str_to_lower(alleg_dispo),'blank')) |>
+  dplyr::select(alleg_type, perpetrator_self) |>
+  table()
+```
+
+We revised our Allegation Types and Disposition values, and flagged any disposition that included the term "blank". We then pivoted our data from a long format into a wide format, so each allegation type (and flag) would be represented by its own column.
+
+```{r}
+allegations <- allegations |>
+  dplyr::mutate(
+  # Convert Allegation Types into reasonable column names
+    alleg_type = dplyr::case_when(
+      # Non-Self Variants
+      alleg_type == 'Exploitation' ~'exploit',
+      alleg_type == 'Sexual Abuse' ~'abuse_sex',
+      alleg_type == 'Physical Abuse' ~'abuse_phys',
+      alleg_type == 'Emot/Verbl Abuse' ~'abuse_verbal',
+      (alleg_type == 'Medical Neglect') & (!perpetrator_self) ~
+        'neglect_med',
+      (alleg_type == 'Men Health Neg.') & (!perpetrator_self) ~
+        'neglect_mental',
+      (alleg_type == 'Physical Neglect') & (!perpetrator_self) ~
+        'neglect_phys',
+      # Self Variants
+      (alleg_type == 'Medical Neglect') & (perpetrator_self) ~
+        'neglect_med_self',
+      (alleg_type == 'Men Health Neg.') & (perpetrator_self) ~
+        'neglect_mental_self',
+      (alleg_type == 'Physical Neglect') & (perpetrator_self) ~
+        'neglect_phys_self',
+      TRUE ~ alleg_type
+    ),
+    # Flag Disposition if it includes the term "Blank"
+    blank = stringr::str_detect(
+      stringr::str_to_lower(alleg_dispo), 'blank'
+      ),
+    # Standardize dispositions
+    alleg_dispo = dplyr::case_when(
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'invalid'
+        ) ~ 'invalid',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'valid'
+        ) ~ 'valid',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'vnf'
+        ) ~ 'valid',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'unable to determine'
+        ) ~ 'utd',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'utd'
+        ) ~ 'utd',
+      # Per APS documentation, "Other" indicated no allegations with
+      # dispositions
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'other'
+        ) ~ NA_character_,
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'not specified'
+        ) ~ NA_character_,
+      TRUE ~ alleg_dispo
+    )
+  ) |>
+  # Shorten name of disposition variable
+  dplyr::rename_at('alleg_dispo', ~'dispo') |>
+  # Pivot wider (allegation types as columns)
+  tidyr::pivot_wider(
+    names_from = alleg_type, 
+    names_glue = "{alleg_type}_{.value}",
+    values_from = c(dispo, blank)
+    ) |>
+  # Remove unnecessary columns
+  dplyr::select(-c(alleg_id, perpetrator_self))
+```
+
+We then consolidated our allegation data to reflect a unique outcome at the investigation level. If any instance of an allegation type within the given level had a value of "valid", all values were converted to "valid" (as combinations were only of "valid" and "utd").
+
+```{r}
+allegations <- allegations |> 
+  dplyr::group_by(inv_id) |>
+  # Extend "disposition" and "blank" values to fill blanks within a given
+  # investigation
+  tidyr::fill(
+    dplyr::all_of(dplyr::ends_with("_dispo")), 
+    .direction = 'updown') |>
+  tidyr::fill(
+    dplyr::all_of(dplyr::ends_with("_blank")), 
+    .direction = 'updown') |>
+  # Consolidate any combinations of dispositions to reflect the APS 
+  # hierarchy of dispositions within a single investigation
+  # Valid > UTD > Invalid
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::all_of(dplyr::ends_with("_dispo")), 
+      ~dplyr::case_when(
+        'valid' %in% .x ~ 'valid',
+        'utd' %in% .x ~ 'utd',
+        'invalid' %in% .x ~ 'invalid',
+        TRUE ~ NA_character_
+        )
+      )
+    ) |>
+  dplyr::ungroup() |>
+  dplyr::distinct()
+```
+
+### Intake Data
+
+We filtered our intake data to only include subjects present in both the APS and MedStar data. We also renamed our variables for use in code.
+
+```{r}
+intakes <- intakes |> 
+  dplyr::filter(id %in% shared_ids) |>
+  dplyr::rename_at(
+    'caller_relationship_category', ~'reporter_type'
+  )
+```
+
+We also flagged our reporter types. If a reporter type was not likely to reflect an EMS reporter, it would not be flagged as a potential EMS reporter. If the reporter type explicitly mentioned EMS as the reporter, that was also flagged.
+
+```{r}
+omitted_types <- c(
+  "Family Members and Relatives", "Financial Institution", 
+  "Friends and Neighbors", "Law Enforcement", 
+  "Legal and Court-Related Services", "State Agencies"
+  )
+
+intakes <- intakes |>
+  dplyr::mutate(
+  reporter_possible = !(reporter_type %in% omitted_types),
+  reporter_ems = reporter_type == "Health Care Providers/Staff -- EMS/EMT"
+  )
+```
+
+## MedStar
+
+We first added our within and between-set subject IDs to the MedStar data set.
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(
+    id = NA_integer_, id_ms = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    ms_ids |>
+      dplyr::select(-medstar_internal_id),
+    by = 'x_primary_key'
+  )
+```
+
+We then filtered our data to only subjects present in both the APS and MedStar data.
+
+```{r}
+temp_nrows <- nrow(medstar)
+
+medstar <- medstar |>
+  dplyr::filter(id %in% shared_ids)
+
+# Format a human-legible summary output
+paste0(
+  "Reduced MedStar data from ", format(temp_nrows, big.mark =','), 
+  " rows to ", format(nrow(medstar), big.mark = ','), " rows with shared IDs."
+  )
+
+rm(temp_nrows)
+
+# [1] "Reduced MedStar data from 92,160 rows to 19,757 rows with shared IDs."
+```
+
+We reduced our data to only our columns of interest, and enforced date format for our date columns.
+
+```{r}
+medstar <- medstar |> 
+  # Reduce to desired variables
+  dplyr::select(id, id_ms, ems_response_number, incident_timestamp) |>
+  # Extract date from timestamp
+  dplyr::mutate(
+    resp_date = lubridate::date(incident_timestamp)
+  ) |>
+  # Rename variables for use in code
+  dplyr::rename_at(
+    c('ems_response_number', 'incident_timestamp'),
+    ~c('ems_num', 'resp_ts')
+  )
+```
+
+We calculated our 60 day window for each response (30 days before and 30 days after).
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(
+    resp_window = lubridate::interval(
+      resp_date - lubridate::ddays(30),
+      resp_date + lubridate::ddays(30)
+      )
+    )
+```
+
+We also calculated the number of responses and unique incident timestamps for each subject ID.
+
+```{r}
+medstar <- medstar |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(
+    num_resps = dplyr::n_distinct(ems_num),
+    num_times = dplyr::n_distinct(resp_ts)
+  ) |>
+  dplyr::ungroup()
+```
+
+We joined the number of cases from the APS data into the MedStar data.
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(num_cases = NA_integer_) |>
+  dplyr::rows_update(
+    aps |> 
+      dplyr::select(id, num_cases) |>
+      dplyr::distinct(),
+    by = 'id'
+  )
+```
+
+# Record Linkage
+
+We connected our APS and MedStar records in three ways, based on matching subject and time.
+
+1. MedStar Responses were linked to APS Investigations that were open during the time of the MedStar Response.
+2. MedStar Responses were linked to APS Investigations that were open at any time within a 60 day (30 days before, 30 days after) window reflecting the broader time around the MedStar Response.
+3. MedStar Responses were linked to APS Intakes within 72 hours after the response, which had a reporter type that could reasonably reflect reporting by APS 
+
+## Case-Response Linkage
+
+First, we performed temporal linkage of MedStar Responses to APS Cases/Investigations.
+
+### Response in Case Window
+
+We first extracted all `investigation_id` values for any APS Case/Investigation Window that included the MedStar Response Date, as each APS window was tied to the individual investigations.
+
+```{r}
+medstar <- medstar |>
+  # Rename 'id' to 't_id' to avoid errors in filtering APS set
+  dplyr::rename_at('id', ~'t_id') |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    # Extract a text list of investigation_id values for case windows that 
+    # include the MedStar response date
+    invs_exact = paste(
+      dplyr::pull(
+        aps |>
+          dplyr::filter(id == t_id) |>
+          dplyr::filter(resp_date %within% case_window) |>
+          dplyr::select(inv_id) |>
+          dplyr::distinct()
+        ), collapse = ', '
+      )
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    # Convert non-matches (empty strings) to missing values
+    invs_exact = dplyr::na_if(invs_exact, ''),
+    # Get number of matched investigations
+    num_invs_exact = ifelse(
+      !is.na(invs_exact), 
+      stringr::str_count(invs_exact, ',') + 1, 
+      0
+      )
+    ) |>
+  # Return name of 'id' variable
+  dplyr::rename_at('t_id', ~'id') |>
+  dplyr::distinct()
+```
+
+We identified patterns in the number of investigations matched to each MedStar response. As APS should only have one open/active investigation/case at for a subject at a time, we expected to only have one or no matching case/investigation windows.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# No Matching Investigation
+paste0(
+  format(nrow(medstar |> dplyr::filter(num_invs_exact == 0)), big.mark = ','), 
+  " responses with no matching investigations, representing ",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_invs_exact == 0) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), " IDs."
+)
+
+# One Matching Investigation
+paste0(
+  format(nrow(medstar |> dplyr::filter(num_invs_exact == 1)), big.mark = ','), 
+  " responses with exactly one investigation, representing ",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_invs_exact == 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), " IDs."
+)
+
+# More than One Matching Investigation
+paste0(
+  format(nrow(medstar |> dplyr::filter(num_invs_exact > 1)), big.mark = ','), 
+  " responses with more than one investigation, representing ",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_invs_exact > 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), " IDs."
+)
+
+# [1] "16,574 responses with no matching investigations, representing 4,209 
+# IDs."
+# [1] "3,107 responses with exactly one investigation, representing 1,625 IDs."
+# [1] "76 responses with more than one investigation, representing 58 IDs."
+```
+
+We then examined our 58 IDs associated with more than one matching investigation for possible falsely linked subjects. Only 12 of the ID values had more than one `client_id` value.
+
+```{r}
+# Extract all APS investigations that multiply matched a single MedStar 
+# Response
+repeat_invs <- paste(
+  medstar |>
+    dplyr::filter(num_invs_exact > 1) |>
+    dplyr::select(invs_exact) |>
+    dplyr::pull(), 
+  collapse = ', ')
+
+# Convert this text-based list into a vector of numerics
+repeat_invs <- as.numeric(
+  unique(
+    unlist(stringr::str_split(repeat_invs, ', '))
+    )
+  )
+
+# Extract the client_id values associated with any overlapping investigations 
+# that had more than one client_id value
+check_clients <- aps |>
+  dplyr::filter(inv_id %in% repeat_invs) |>
+  dplyr::relocate(client_id) |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(n_clients = dplyr::n_distinct(client_id)) |>
+  dplyr::ungroup() |>
+  dplyr::filter(n_clients > 1) |> 
+  dplyr::select(client_id) |> 
+  dplyr::distinct() |> 
+  dplyr::pull()
+
+# Examine identifiers associated with these rows, clustered by assigned ID
+checking <- aps_par |>
+  dplyr::filter(client_id %in% check_clients) |>
+  dplyr::arrange(id)
+
+# Display number of unique client_id values in a human-legible summary
+paste0(
+  "Checking ", length(unique(checking$client_id)), " client_id values across ", 
+  length(unique(checking$id)), " id values."
+  )
+
+# [1] "Checking 25 client_id values across 12 id values."
+```
+
+All ID assignments appeared to be proper merges due to strong matches (identical or near identical). We then examined the overall dispositions of the investigations associated with our multiple matches, to determine if one investigation was best kept as the "final" match.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(inv_id %in% repeat_invs) |>
+  dplyr::arrange(id, case_id, inv_id, overall_dispo)
+```
+
+We determined our "best matching" investigation for our EMS responses:
+
+1.  If there is only one matched investigation, it is the best matching investigation
+2.  If there are multiple matching investigations with only one disposition type, the latest opening investigation is the best matching investigation as it opened closest to the response time. If there is only one opening date, chose the lowest investigation number.
+3.  If there are multiple matching investigations and they include a mixed overall disposition pattern of "valid/other", "utd/other", or "invalid/other", only the investigation with a disposition type that is *not* "other" should be considered the best matching investigation.
+4.  If there are multiple matching investigations and they include a mix of "valid/invalid", "valid/utd", "invalid/utd", or any similar combination, investigations are picked on a case-by-case review basis. In this section, "valid" was the best matching investigation for all combinations.
+
+
+```{r}
+# Set default of "best investigation exact match" to the value of the 
+# investigation (if only one is matched), otherwise NA
+# ===========================================================================
+medstar <- medstar |>
+  dplyr::mutate(
+    # Two step conversion avoids "NAs by conversion" issues
+    inv_exact_best = ifelse(
+      !is.na(invs_exact) & !stringr::str_detect(invs_exact, ","),
+      invs_exact,
+      NA_character_
+      ),
+    inv_exact_best = as.numeric(inv_exact_best)
+  )
+
+# Select a single "best" Investigation match for each Response
+# ---------------------------------------------------------------------------
+
+temp_df <- medstar |>
+  # Filter to EMS responses that have more than one matched investigation
+  dplyr::filter(num_invs_exact > 1) |>
+  # Pivot longer, so each row represents one possible EMS Response and 
+  # Investigation pairing
+  dplyr::mutate(inv_exact_best = invs_exact) |>
+  tidyr::separate_longer_delim(inv_exact_best, delim = ', ') |>
+  dplyr::mutate(inv_exact_best = as.numeric(inv_exact_best)) |>
+  # Extract the overall disposition and open date for each of these entries
+  dplyr::mutate(
+    overall_dispo = NA_character_, date_open = NA_Date_
+  ) |>
+  dplyr::rows_update(
+    aps |>
+      dplyr::filter(inv_id %in% repeat_invs) |>
+      dplyr::select(inv_id, overall_dispo, date_open) |>
+      dplyr::rename_at('inv_id', ~'inv_exact_best'),
+    by = 'inv_exact_best'
+  ) |>
+  # Select only one investigation for each EMS Response
+  dplyr::group_by(id, ems_num) |>
+  dplyr::mutate(
+    drop = dplyr::case_when(
+      # Only one disposition, but multiple open dates - keep the latest
+      # open date
+      dplyr::n_distinct(overall_dispo) == 1 & 
+        dplyr::n_distinct(date_open) > 1 & 
+        date_open != max(date_open) ~ T,
+      # Only one disposition, and only one open date - keep the lowest
+      # investigation number value
+      dplyr::n_distinct(overall_dispo) == 1 & 
+        dplyr::n_distinct(date_open) == 1 & 
+        inv_exact_best != max(inv_exact_best) ~ T,
+      # More than one overall disposition - keep the non-"other" disposition
+      # type investigation
+      dplyr::n_distinct(overall_dispo) > 1 &
+        overall_dispo == "other" ~ T,
+      # For select cases with more than one overall disposition but no "other"
+      # disposition to omit, keep the "valid" disposition type investigation
+      dplyr::n_distinct(overall_dispo) > 1 &
+        id %in% c(1267, 1979) &
+        overall_dispo != "valid" ~ T,
+      TRUE ~ F
+    )
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::filter(!drop) |>
+  dplyr::select(ems_num, inv_exact_best)
+
+medstar <- medstar |>
+  dplyr::rows_update(
+    temp_df,
+    by = 'ems_num'
+  )
+
+# Add Dispositions based on Best Matched Investigations
+# ---------------------------------------------------------------------------
+
+medstar <- medstar |>
+  dplyr::mutate(inv_exact_best_dispo = NA_character_) |>
+  dplyr::rows_update(
+    aps |>
+      dplyr::filter(inv_id %in% medstar$inv_exact_best) |>
+      dplyr::select(inv_id, overall_dispo) |>
+      dplyr::rename_at(
+        c('inv_id', 'overall_dispo'), 
+        ~c('inv_exact_best', 'inv_exact_best_dispo')),
+    by = 'inv_exact_best'
+  )
+```
+
+
+### Overlap of 60-Day Response Window and Case Window
+
+We then extracted all `investigation_id` values for any APS Case/Investigation Window that had any overlap with the 60-day window (30 days before, 30 days after) surrounding our Response Date.
+
+```{r}
+medstar <- medstar |>
+  # Rename 'id' to 't_id' to avoid errors in filtering APS set
+  dplyr::rename_at('id', ~'t_id') |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    # Extract a text list of case_id values for overlapping cases
+    invs_window = paste(
+      dplyr::pull(
+        aps |>
+          dplyr::filter(id == t_id) |>
+          dplyr::filter(lubridate::int_overlaps(case_window, resp_window)) |>
+          dplyr::select(inv_id) |>
+          dplyr::distinct()
+        ), collapse = ', '
+      )
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    # Convert non-matches (empty strings) to missing values
+    invs_window = dplyr::na_if(invs_window,''),
+    # Get number of overlapping cases
+    num_overlap = ifelse(
+      !is.na(invs_window), 
+      stringr::str_count(invs_window, ',') + 1, 
+      0
+      )
+    ) |>
+  # Return name of 'id' variable
+  dplyr::rename_at('t_id', ~'id') |>
+  dplyr::distinct()
+```
+
+We identified patterns in the number of investigations matched to each MedStar response. 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# No matching investigation
+paste0(
+  format(nrow(medstar |> dplyr::filter(num_overlap == 0)), big.mark = ','), 
+  " responses with no matching investigation, representing ",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_overlap == 0) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), " IDs."
+)
+
+# One matching investigation
+paste0(
+  format(nrow(medstar |> dplyr::filter(num_overlap == 1)), big.mark = ','), 
+  " responses with exactly one investigation, representing ",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_overlap == 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), " IDs."
+)
+
+# More than one matching investigation
+paste0(
+  format(nrow(medstar |> dplyr::filter(num_overlap > 1)), big.mark = ','), 
+  " responses with more than one investigation, representing ",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_overlap > 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), " IDs."
+)
+
+# [1] "13,597 responses with no matching investigation, representing 3,750 IDs."
+# [1] "5,371 responses with exactly one investigation, representing 2,421 IDs."
+# [1] "785 responses with more than one investigation, representing 310 IDs."
+```
+
+We then examined our 310 IDs associated with more than one matching investigation for possible falsely linked subjects. Only 98 of the ID values had more than one `client_id` value.
+
+```{r}
+# Extract all APS investigations that multiply matched a single MedStar 
+# Response
+repeat_invs <- paste(
+  medstar |>
+    dplyr::filter(num_overlap > 1) |>
+    dplyr::select(invs_window) |>
+    dplyr::pull(), 
+  collapse = ', ')
+
+# Convert this text-based list into a vector of numerics
+repeat_invs <- as.numeric(
+  unique(
+    unlist(stringr::str_split(repeat_invs, ', '))
+    )
+  )
+
+# Extract the client_id values associated with any overlapping investigations 
+# that had more than one client_id value
+check_clients <- aps |>
+  dplyr::filter(inv_id %in% repeat_invs) |>
+  dplyr::relocate(client_id) |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(n_clients = dplyr::n_distinct(client_id)) |>
+  dplyr::ungroup() |>
+  dplyr::filter(n_clients > 1) |> 
+  dplyr::select(client_id) |> 
+  dplyr::distinct() |> 
+  dplyr::pull()
+
+# Examine identifiers associated with these rows, clustered by assigned ID
+checking <- aps_par |>
+  dplyr::filter(client_id %in% check_clients) |>
+  dplyr::arrange(id)
+
+# Display number of unique client_id values in a human-legible summary
+paste0(
+  "Checking ", length(unique(checking$client_id)), " client_id values across ", 
+  length(unique(checking$id)), " id values."
+  )
+
+# [1] "Checking 98 client_id values across 47 id values."
+```
+
+All ID assignments appeared to be proper merges due to strong matches (identical or near identical). We then examined the overall dispositions of the investigations associated with our multiple matches, to determine if one investigation was best kept as the "final" match.
+
+```{r}
+checking <- aps |>
+  dplyr::filter(inv_id %in% repeat_invs) |>
+  dplyr::arrange(id, case_id, inv_id, overall_dispo)
+```
+
+First, we isolated a copy of the responses with at least one temporally linked investigation. We pulled the investigation disposition, open date, close date, and closure reason to assist our manual review.
+
+```{r}
+temp_df <- medstar |>
+  # Select only responses that have at least one paired investigation
+  dplyr::filter(!is.na(invs_window)) |>
+  # Pivot longer, so each row represents one possible EMS Response and 
+  # Investigation pairing
+  dplyr::mutate(inv_window_best = invs_window) |>
+  tidyr::separate_longer_delim(inv_window_best, delim = ', ') |>
+  dplyr::mutate(inv_window_best = as.numeric(inv_window_best)) |>
+  # Prepare to extract the overall disposition, open, and close dates for each 
+  # investigation
+  dplyr::mutate(
+    overall_dispo = NA_character_, 
+    date_open = NA_Date_, 
+    date_close = NA_Date_,
+    close_reason = NA_character_
+  )
+
+temp_df <- temp_df |>
+  # Extract the overall disposition, open, and close dates for each
+  # investigation to assist in consolidation and review
+  dplyr::rows_update(
+    aps |>
+      dplyr::filter(inv_id %in% temp_df$inv_window_best) |>
+      dplyr::select(inv_id, overall_dispo, date_open, date_close, close_reason) |>
+      dplyr::rename_at('inv_id', ~'inv_window_best'),
+    by = 'inv_window_best'
+  ) |>
+  # Calculate the number of dispositions. Calculate the overall disposition
+  # of the set using the APS heirarchy (Valid/Invalid > UTD > Other)
+  dplyr::group_by(id, ems_num) |>
+  dplyr::mutate( 
+    num_dispos = dplyr::n_distinct(overall_dispo),
+    case_dispo = dplyr::case_when(
+      'invalid' %in% overall_dispo & 'valid' %in% overall_dispo ~ 'mixed v-i',
+      'invalid' %in% overall_dispo ~ 'invalid',
+      'valid' %in% overall_dispo ~ 'valid',
+      'utd' %in% overall_dispo ~ 'utd',
+      'other' %in% overall_dispo ~ 'other',
+      TRUE ~ NA_character_
+    )
+    ) |>
+  dplyr::ungroup() |>
+  # Calculate the temporal distance from the response to the open and close
+  # dates of the investigation, as well as the minimum of the two
+  dplyr::mutate(
+    dist_open = abs(as.numeric(
+      difftime(resp_date, date_open, units = 'days')
+      )),
+    dist_close = abs(as.numeric(
+      difftime(resp_date, date_close, units = 'days')
+      )),
+    min_dist = pmin(dist_open, dist_close)
+  ) |>
+  # Arrange for ease of further filtering and review
+  dplyr::arrange(id, ems_num, inv_window_best)
+```
+
+After manual review, we identified several subsets for "best investigation" selection. First, we identified the "best investigation match" for responses that were previously matched in the direct pairing (response occured during an open investigation). We then made selections for responses with conflicting dispositions. For responses with a single investigation match, that investigation was kept as the "best investigation".
+
+```{r}
+# 1-3 Correct make selections for responses that occurred during an open
+# APS investigation (reflected in prior direct pairing)
+# ===========================================================================
+# 1. If the list of matching investigations is the same as from the previous 
+# (direct) matching, or it has a mix of "Valid/Invalid" dispositions (and
+# was resolved previously in direct matching) take the same "best" 
+# investigation
+
+t_df <- temp_df |>
+  dplyr::filter(stringr::str_detect(invs_window, ', ')) |>
+  dplyr::filter(!is.na(inv_exact_best)) |>
+  dplyr::filter(invs_exact == invs_window | case_dispo == 'mixed v-i') |>
+  dplyr::filter(inv_exact_best == inv_window_best) |>
+  dplyr::select(id, ems_num, inv_window_best, overall_dispo, case_dispo) |>
+  dplyr::distinct()
+
+# 2. If the previous direct match has the same disposition as the overall 
+# disposition of the broader set of investigations, keep that investigation
+
+t_df <- t_df |>
+  dplyr::bind_rows(
+    temp_df |>
+      dplyr::filter(stringr::str_detect(invs_window, ', ')) |>
+      dplyr::filter(!is.na(inv_exact_best)) |>
+      dplyr::filter(invs_exact != invs_window) |>
+      dplyr::filter(
+        inv_exact_best == inv_window_best & overall_dispo == case_dispo
+        ) |>
+      dplyr::select(id, ems_num, inv_window_best, overall_dispo, case_dispo) |>
+      dplyr::distinct()
+  )
+
+# 3. If the previous direct match does *not* have the same disposition as the 
+# overall disposition of the broader set of investigations, and it does *not* 
+# include both "valid" and "invalid" (a move up the hierarchy only, not a 
+# mixed result), take the temporally-closest investigation that matches the 
+# overall disposition of the set of investigations. In the case of ties,
+# take the lowest investigation number.
+
+t_df <- t_df |>
+  dplyr::bind_rows(
+    temp_df |>
+      dplyr::filter(stringr::str_detect(invs_window, ', ')) |>
+      dplyr::filter(!is.na(inv_exact_best)) |>
+      dplyr::filter(invs_exact != invs_window) |>
+      dplyr::filter(overall_dispo == case_dispo) |>
+      dplyr::filter(case_dispo != 'mixed v-i') |>
+      dplyr::filter(inv_exact_best != inv_window_best) |>
+      dplyr::filter(num_dispos > 1) |>
+      # Take lowest temporal distance; ties take lowest investigation number
+      dplyr::group_by(id, ems_num) |>
+      dplyr::slice_min(min_dist, n = 1) |>
+      dplyr::slice_min(inv_window_best, n = 1) |> 
+      ungroup() |>
+      # Don't add any values that are already present in the table of 
+      # "chosen" combinations. Needs to be a combination key as ems number
+      # does repeat sometimes.
+      dplyr::mutate(key = paste(id, ems_num, sep = '_')) |>
+      dplyr::filter(
+        !key %in% dplyr::pull(
+          t_df |> 
+            dplyr::mutate(key = paste(id, ems_num, sep = '_')) |> 
+            dplyr::select(key)
+          )
+        ) |> 
+      dplyr::select(id, ems_num, inv_window_best, overall_dispo, case_dispo) |>
+      dplyr::distinct() 
+          
+  )
+
+# 4-5 Correct make selections for responses that did not occur during an open
+# APS investigation (were not in previous pairing)
+# ===========================================================================
+
+# 4. For responses without a direct pair and either only one disposition type, 
+# or a disposition "up" the hierarchy, take the investigation with the least 
+# temporal distance that matches the overall set disposition. In the case of 
+# ties, take the lowest investigation number
+
+t_df <- t_df |>
+  dplyr::bind_rows(
+    temp_df |>
+      dplyr::filter(stringr::str_detect(invs_window, ', ')) |>
+      dplyr::filter(is.na(inv_exact_best)) |>
+      dplyr::filter(case_dispo != 'mixed v-i') |>
+      dplyr::filter(case_dispo == overall_dispo) |>
+      # Take lowest temporal distance; ties take lowest investigation number
+      dplyr::group_by(id, ems_num) |>
+      dplyr::slice_min(min_dist, n = 1) |>
+      dplyr::slice_min(inv_window_best, n = 1) |> 
+      ungroup() |>
+      dplyr::select(id, ems_num, inv_window_best, overall_dispo, case_dispo) |>
+      dplyr::distinct() 
+  )
+
+# 5. For responses without a direct pair that included both "valid" and 
+# "invalid" investigation dispositions in the investigation set, take the 
+# investigation with the least temporal distance that matches the overall set 
+# disposition. In the case of ties, selection was based on manual review of 
+# allegation content of the investigations.
+
+t_df <- t_df |>
+   dplyr::bind_rows(
+    temp_df |>
+      dplyr::filter(stringr::str_detect(invs_window, ', ')) |>
+      dplyr::filter(is.na(inv_exact_best)) |>
+      dplyr::filter(case_dispo == 'mixed v-i') |>
+      # Take lowest temporal distance; ties take lowest investigation number
+      dplyr::group_by(id, ems_num) |>
+      dplyr::slice_min(min_dist, n = 1) |> 
+      # Get count of investigations to mark ties
+      dplyr::mutate(n_invs = dplyr::n_distinct(inv_window_best)) |>
+      dplyr::ungroup() |>
+      # Keep "valid" investigation as best match for our two ties
+      dplyr::filter(n_invs == 1 | overall_dispo == 'valid') |>
+      dplyr::select(id, ems_num, inv_window_best, overall_dispo, case_dispo) |>
+      dplyr::distinct() 
+  )
+
+# 6. For responses with only one investigation in the set, take that
+# investigation as the "best match."
+# ===========================================================================
+t_df <- t_df |>
+  dplyr::bind_rows(
+    temp_df |>
+      dplyr::filter(
+        !is.na(invs_window) & !stringr::str_detect(invs_window, ',')
+        ) |>
+      dplyr::mutate(inv_window_best = as.numeric(invs_window)) |>
+      dplyr::select(id, ems_num, inv_window_best, overall_dispo, case_dispo) |>
+      dplyr::distinct() 
+  )
+
+rm(temp_df)
+```
+
+Finally, we updated our MedStar response data to include the best matching investigation identified through temporal matching and the disposition of that investigation.
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(
+    inv_window_best = NA_integer_,
+    inv_window_best_dispo = NA_character_
+    ) |>
+  dplyr::rows_update(
+    t_df |> 
+      dplyr::select(-case_dispo) |>
+      dplyr::rename_at('overall_dispo', ~'inv_window_best_dispo'),
+    by = c('id', 'ems_num')
+    )
+
+rm(t_df)
+```
+
+### Map Creation
+
+We isolated our MedStar Response-APS Case/Investigation pair map data. 
+
+```{r}
+case_map <- dplyr::rows_update(
+  # First, extract investigations in the broader window
+  medstar |>
+    dplyr::filter(!is.na(invs_window)) |>
+    dplyr::select(id, resp_ts, ems_num, invs_window, inv_window_best) |>
+    # Pivot so each investigation has it's own row
+    dplyr::mutate(
+      inv_id = invs_window
+      ) |>
+    tidyr::separate_longer_delim(inv_id, delim = ', ') |>
+    # Mark if this investigation is the best match in the broader window
+    dplyr::mutate(
+      best_window = inv_id == inv_window_best
+    ) |>
+    # Remove list columns
+    dplyr::select(-c(inv_window_best, invs_window)) |>
+    # Mark that these values do not represent the narrower, exact match set
+    dplyr::mutate(
+      exact = F,
+      best_exact = F
+      ),
+  # Then, update flags for 'exact' and 'best_exact' for investigations in the 
+  # narrower, exact match set
+  medstar |>
+    dplyr::filter(!is.na(invs_exact)) |>
+    dplyr::select(id, resp_ts, ems_num, invs_exact, inv_exact_best) |>
+    # Pivot so each investigation has it's own row
+    dplyr::mutate(inv_id = invs_exact) |>
+    tidyr::separate_longer_delim(inv_id, delim = ', ') |>
+    # Mark if this investigation is the best match in the narrower, exact
+    # match set
+    dplyr::mutate(
+      best_exact = inv_id == inv_exact_best
+    ) |>
+    # Remove list columns
+    dplyr::select(-c(inv_exact_best, invs_exact)) |>
+    # Mark these rows as belonging to the exact match set
+    dplyr::mutate(
+      exact = T
+      ),
+  by = c('id', 'ems_num', 'inv_id'),
+  unmatched = 'ignore'
+  ) |>
+  # Ensure that investigation ID values are all numeric, not string
+  dplyr::mutate(inv_id = as.numeric(inv_id)) 
+```
+
+We added select values from the APS Investigation data to the map, to assist in filtering.
+
+```{r}
+case_map <- case_map |>
+  # Add placeholders for APS-sourced columns: 
+  # Case ID, Overall Investigation Disposition
+  dplyr::mutate(
+    overall_dispo = NA_character_,
+    case_id = NA_integer_
+    ) |>
+  # Extract values for each investigation from the APS Investigation data set
+  dplyr::rows_update(
+    aps |>
+      dplyr::select(inv_id, case_id, overall_dispo) |>
+      dplyr::distinct(),
+    by = 'inv_id',
+    unmatched = 'ignore'
+  ) |>
+  # Rename Investigation Overall Disposition to match SOP standards
+  dplyr::rename_at(
+    'overall_dispo', ~'inv_dispo'
+  ) |>
+  # Convert disposition to a factor
+  dplyr::mutate(inv_dispo = as.factor(inv_dispo)) |>
+  # Order columns
+  dplyr::relocate(
+    id, ems_num, resp_ts, case_id, inv_id, exact, inv_dispo, 
+    best_exact, best_window
+    ) |>
+  # Order rows
+  dplyr::arrange(
+    id, resp_ts, ems_num, 
+    # TRUE values on top
+    dplyr::desc(exact), dplyr::desc(best_exact), dplyr::desc(best_window), 
+    inv_id
+    )
+```
+
+## Intake-Response Linkage
+
+An APS Intake relating to an EMS report must occur after an EMS response. We identified the earliest MedStar Response for each subject in our data. We then filtered our APS Intake data to only include intakes that occurred *after* the earliest MedStar Response for each subject.
+
+```{r}
+temp_df <- medstar |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(resp_earliest = min(resp_date)) |>
+  dplyr::ungroup() |>
+  dplyr::select(id, resp_earliest) |>
+  dplyr::distinct()
+
+intakes <- intakes |>
+  dplyr::rowwise() |>
+  dplyr::filter(
+    intake_date > temp_df[temp_df$id == id,]$resp_earliest
+  ) |>
+  dplyr::ungroup()
+
+rm(temp_df)
+```
+
+We then extracted all potential APS Intakes that were within our 72 hour post-response window.
+
+```{r}
+medstar <- medstar |>
+  # Only search for IDs in the Intake data, to reduce data set search sizes.
+  dplyr::filter(id %in% intakes$id) |>
+  dplyr::mutate(
+    # Use date for minimum to cover the entire day, as APS only recorded the
+    # date and not the time. Use the actual time stamp for the maximum, to 
+    # give a response just before midnight a reasonable time window.
+    intake_window = lubridate::interval(
+      resp_date, resp_ts + lubridate::dhours(72)
+      )
+    ) |>
+  # Rename 'id' to 't_id' to avoid errors in filtering APS set
+  dplyr::rename_at('id', ~'t_id') |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    # Intakes with any reporter type
+    intake_any = paste(
+      dplyr::pull(
+        intakes |>
+          dplyr::filter(id == t_id) |>
+          dplyr::filter(intake_date %within% intake_window) |>
+          dplyr::select(intake_id) |>
+          dplyr::distinct()
+        ), collapse =', '
+      ),
+    # Intakes with a possible EMS reporter
+    intake_poss = paste(
+      dplyr::pull(
+        intakes |>
+          dplyr::filter(id == t_id) |>
+          dplyr::filter(reporter_possible) |>
+          dplyr::filter(intake_date %within% intake_window) |>
+          dplyr::select(intake_id) |>
+          dplyr::distinct()
+        ), collapse =', '
+      ),
+    # Intakes with an explicit EMS reporter
+    intake_ems = paste(
+      dplyr::pull(
+        intakes |>
+          dplyr::filter(id == t_id) |>
+          dplyr::filter(reporter_ems) |>
+          dplyr::filter(intake_date %within% intake_window) |>
+          dplyr::select(intake_id) |>
+          dplyr::distinct()
+        ), collapse =', '
+      )
+    ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    # Convert non-matches (empty strings) to missing values
+    intake_any = dplyr::na_if(intake_any,''),
+    intake_poss = dplyr::na_if(intake_poss,''),
+    intake_ems = dplyr::na_if(intake_ems,''),
+    # Get number of overlapping cases
+    num_intakes_any = ifelse(
+      !is.na(intake_any), 
+      stringr::str_count(intake_any, ',') + 1, 
+      0
+      ),
+    num_intakes_poss = ifelse(
+      !is.na(intake_poss), 
+      stringr::str_count(intake_poss, ',') + 1, 
+      0
+      ),
+    num_intakes_ems = ifelse(
+      !is.na(intake_ems), 
+      stringr::str_count(intake_ems, ',') + 1, 
+      0
+      )
+    ) |>
+  # Rename ID to 'id'
+  dplyr::rename_at('t_id', ~'id')
+```
+
+We identified patterns in the number of intakes matched to each MedStar response related to the reporter type match criteria.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Any reporter type
+paste0(
+  "With any reporter type: ",
+  # NO MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_any == 0)), big.mark = ','),
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_any == 0) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','),
+  " IDs) with no matches, ",
+  # ONE MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_any == 1)), big.mark = ','), 
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_any == 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), 
+  " IDs) with one match, and ",
+  # MORE THAN ONE MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_any > 1)), big.mark = ','), 
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_any > 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), 
+  " IDs) with more than one match."
+)
+
+# Possible EMS Reporter Type
+paste0(
+  "With a Possible EMS reporter type: ",
+  # NO MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_poss == 0)), big.mark = ','),
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_poss == 0) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','),
+  " IDs) with no matches, ",
+  # ONE MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_poss == 1)), big.mark = ','), 
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_poss == 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), 
+  " IDs) with one match, and ",
+  # MORE THAN ONE MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_poss > 1)), big.mark = ','), 
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_poss > 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), 
+  " IDs) with more than one match."
+)
+
+# Explicit EMS Reporter Type
+paste0(
+  "With an Explicit EMS reporter type: ",
+  # NO MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_ems == 0)), big.mark = ','),
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_ems == 0) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','),
+  " IDs) with no matches, ",
+  # ONE MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_ems == 1)), big.mark = ','), 
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_ems == 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), 
+  " IDs) with one match, and ",
+  # MORE THAN ONE MATCH
+  format(nrow(medstar |> dplyr::filter(num_intakes_ems > 1)), big.mark = ','), 
+  " responses (",
+  format(nrow(
+    medstar |> 
+      dplyr::filter(num_intakes_ems > 1) |> 
+      dplyr::select(id) |> 
+      dplyr::distinct()
+    ), big.mark = ','), 
+  " IDs) with more than one match."
+)
+
+# [1] "With any reporter type: 13,661 responses (2,632 IDs) with no matches, 
+# 1,357 responses (950 IDs) with one match, and 214 responses (161 IDs) with 
+# more than one match."
+# [1] "With a Possible EMS reporter type: 13,828 responses (2,662 IDs) with 
+# no matches, 1,249 responses (859 IDs) with one match, and 155 responses 
+# (122 IDs) with more than one match."
+# [1] "With an Explicit EMS reporter type: 14,546 responses (2,748 IDs) with 
+# no matches, 660 responses (464 IDs) with one match, and 26 responses 
+# (18 IDs) with more than one match."
+```
+
+We examined the relationship between a Response having a matched APS Case/Investigation and a matched APS Intake. We expected that for any Response that had a matched intake, there would be at least one broadly matching investigation. However, we expected it to be possible to have an intake and no direct overlap with an open APS Case/Investigation (as that intake may have triggered an investigation that opened after the response), or a matched APS Case/Investigation (direct or broadly temporally matched) without an intake within 72 hours of the response.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Number of responses with a matched intake, but no matched investigation
+paste0(
+  "Responses with 1+ Intake, but no Investigation: ",
+  format(
+    nrow(medstar |> dplyr::filter(!is.na(intake_any) & is.na(invs_window))),
+    big.mark = ','
+    ), 
+  " (",
+  format(
+    medstar |> 
+      dplyr::filter(!is.na(intake_any) & is.na(invs_window)) |>
+      dplyr::select(id) |> 
+      dplyr::distinct() |> 
+      nrow(),
+    big.mark = ','
+    ),
+  " IDs)."
+)
+
+# Number of responses with a matched intake, but no matched direct 
+# investigation
+paste0(
+  "Responses with 1+ Intake, but no Directly Matched Investigation: ",
+  format(
+    nrow(medstar |> dplyr::filter(!is.na(intake_any) & is.na(invs_exact))),
+    big.mark = ','
+    ), 
+  " (",
+  format(
+    medstar |> 
+      dplyr::filter(!is.na(intake_any) & is.na(invs_exact)) |>
+      dplyr::select(id) |> 
+      dplyr::distinct() |> 
+      nrow(),
+    big.mark = ','
+    ),
+  " IDs)."
+)
+
+# Number of responses with a matched investigation, but no matched intake
+paste0(
+  "Responses with 1+ Investigation, but no Intake: ",
+  format(
+    nrow(medstar |> dplyr::filter(is.na(intake_any) & !is.na(invs_window))),
+    big.mark = ','
+    ), 
+  " (",
+  format(
+    medstar |> 
+      dplyr::filter(is.na(intake_any) & !is.na(invs_window)) |>
+      dplyr::select(id) |> 
+      dplyr::distinct() |> 
+      nrow(),
+    big.mark = ','
+    ),
+  " IDs)."
+)
+
+# Number of responses with a direct matched investigation, but no matched 
+# intake
+paste0(
+  "Responses with 1+ Direct Matched Investigation, but no Intake: ",
+  format(
+    nrow(medstar |> dplyr::filter(is.na(intake_any) & !is.na(invs_exact))),
+    big.mark = ','
+    ), 
+  " (",
+  format(
+    medstar |> 
+      dplyr::filter(is.na(intake_any) & !is.na(invs_exact)) |>
+      dplyr::select(id) |> 
+      dplyr::distinct() |> 
+      nrow(),
+    big.mark = ','
+    ),
+  " IDs)."
+)
+
+# [1] "Responses with 1+ Intake, but no Investigation: 0 (0 IDs)."
+# [1] "Responses with 1+ Intake, but no Directly Matched Investigation: 667 
+# (564 IDs)."
+# [1] "Responses with 1+ Investigation, but no Intake: 3,947 (1,563 IDs)."
+# [1] "Responses with 1+ Direct Matched Investigation, but no Intake: 1,777 
+# (856 IDs)."
+```
+
+Our data matched our expected pattern. We performed an additional manual spot-check of MedStar response with a paired intake but without a directly matched investigation, which suggested that these intakes potentially reflected a report that incited a new APS case/investigation. We also explored the potential impact of expanding our temporal match criteria.
+
+```{r}
+checking <- case_map |>
+  # Extract ID, EMS Response Number, Case ID, Investigation ID, and Response
+  # Time stamp for all MedStar Response - APS Investigation/Case pairs
+  dplyr::mutate(key = paste(id, ems_num, sep = "_")) |>
+  dplyr::filter(key %in% dplyr::pull(
+    medstar |>
+      dplyr::filter(!is.na(invs_exact) & is.na(intake_any)) |>
+      dplyr::mutate(key = paste(id, ems_num, sep = "_")) |>
+      dplyr::select(key) |>
+      dplyr::distinct()
+    )
+  ) |>
+  dplyr::select(id, ems_num, key, case_id, inv_id, resp_ts, exact) |>
+  # Extract the investigation open date, close date, and close reason for
+  # each APS Case/Investigation
+  dplyr::mutate(
+    date_open = NA_Date_, date_close = NA_Date_, close_reason = NA_character_
+  ) |>
+  dplyr::rows_update(
+    aps |>
+      dplyr::select(inv_id, date_open, date_close, close_reason) |>
+      dplyr::distinct(),
+    by = 'inv_id',
+    unmatched = 'ignore'
+  ) |>
+  # Rename 'case_id' to 't_case' to avoid errors in filtering APS set
+  dplyr::rename_at('case_id', ~'t_case') |>
+  dplyr::group_by(t_case) |>
+  # Pull list of all intakes that match a given Case ID
+  dplyr::mutate(
+    intake_ids = paste(
+      intakes |>
+        dplyr::filter(case_id %in% t_case) |>
+        dplyr::select(intake_id) |>
+        dplyr::pull() |>
+        unique() |>
+        sort(),
+      collapse = ', '
+    )
+  ) |>
+  dplyr::ungroup() |>
+  # Return 'case_id' to its expected name
+  dplyr::rename_at('t_case', ~'case_id') |>
+  # Pivot longer, so each row is a unique combination of EMS Response, 
+  # APS Case/Investigation, and APS Intake
+  dplyr::mutate(
+    intake_ids = na_if(intake_ids, ''), 
+    intake_id = intake_ids
+    ) |>
+  tidyr::separate_longer_delim(intake_id, delim = ', ') |>
+  dplyr::mutate(intake_id = as.numeric(intake_id)) |>
+  dplyr::select(-intake_ids) |>
+  # Extract intake date and reporter type data for each APS intake
+  dplyr::mutate(
+    intake_date = NA_Date_, reporter_type = NA_character_, 
+    reporter_possible = NA, reporter_ems = NA
+    ) |>
+  dplyr::rows_update(
+    intakes |>
+      dplyr::select(
+        intake_id, intake_date, reporter_type, reporter_possible, reporter_ems
+        ) |>
+      dplyr::distinct(),
+    by = 'intake_id',
+    unmatched = 'ignore'
+  ) |>
+  # Calculate the time difference, in days, between the intake and the 
+  # EMS response, investigation opening date, and investigation closure date
+  dplyr::mutate(
+    intake_resp = as.numeric(
+      difftime(intake_date, lubridate::date(resp_ts), units = 'days')
+      ),
+    intake_open = as.numeric(
+      difftime(intake_date, date_open, units = 'days')
+      ),
+    intake_close = as.numeric(
+      difftime(intake_date, date_close, units = 'days')
+      )
+  ) |>
+  # Organize the output for manual review
+  dplyr::relocate(
+    id, ems_num, case_id, inv_id, exact, intake_id, intake_resp, intake_open, 
+    intake_close, intake_date, resp_ts, date_open, date_close, close_reason
+    ) |>
+  dplyr::arrange(
+    id, ems_num, case_id, inv_id, intake_resp, intake_open, intake_close
+    )
+```
+
+### Map Creation
+
+We isolated our MedStar Response-APS Intake pair map data. 
+
+```{r}
+intake_map <- medstar |>
+  # Isolate the subject ID, Response Number, Response Time, and list of 
+  # intakes for responses with a paired APS Intake
+  dplyr::filter(!is.na(intake_any)) |>
+  dplyr::select(id, ems_num, resp_ts, intake_any) |>
+  # Pivot longer so each row is a unique combination of MedStar Response and
+  # APS Intake
+  dplyr::rename_at('intake_any', ~'intake_id') |>
+  tidyr::separate_longer_delim(intake_id, delim = ', ') |>
+  dplyr::mutate(intake_id = as.numeric(intake_id)) |>
+  # Add Case ID, Intake Date, and Reporter Type data from Intake set
+  dplyr::mutate(
+    case_id = NA_integer_, 
+    reporter_type = NA_character_, 
+    reporter_possible = NA, 
+    reporter_ems = NA,
+    intake_date = NA_Date_
+    ) |>
+  dplyr::rows_update(
+    intakes |>
+      dplyr::select(
+        intake_id, case_id, reporter_type, reporter_possible, reporter_ems, 
+        intake_date
+        ) |>
+      dplyr::distinct(),
+    by = 'intake_id',
+    unmatched = 'ignore'
+  ) |>
+  # Flag intakes matched to more than one response for a subject
+  dplyr::mutate(
+    multi_resp = (duplicated(intake_id)|duplicated(intake_id, fromLast = T))
+  ) |>
+  # Convert reporter type to a factor
+  dplyr::mutate(reporter_type = as.factor(reporter_type)) |>
+  # Organize output
+  dplyr::relocate(
+    id, ems_num, resp_ts, case_id, intake_id, multi_resp, intake_date, 
+    reporter_type, reporter_possible, reporter_ems
+    ) |>
+  dplyr::arrange(
+    id, ems_num, case_id, 
+    dplyr::desc(reporter_possible), dplyr::desc(reporter_ems)
+    )
+```
+
+# Map Finalization
+
+## Validation
+
+We checked our maps prior to finalizing them for export. We first verified that our maps had our expected combination key values. If these values were present, the number of rows in the map would be equivalent to the unique combination of our key variables.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Intake Map (Subject ID, Response Number, Intake ID)
+nrow(intake_map) == nrow(
+  intake_map |> 
+    dplyr::select(id, ems_num, intake_id) |>
+    dplyr::distinct()
+  )
+
+# Case Map (Subject ID, Response Number, Investigation ID)
+nrow(case_map) == nrow(
+  case_map |>
+    dplyr::select(id, ems_num, inv_id) |>
+    dplyr::distinct()
+)
+
+# [1] TRUE
+# [1] TRUE
+```
+
+We then verified that each APS Case/Investigation was only paired with a single Subject ID, and each Case was only paired with one Investigation. This check was to ensure no loss of integrity in linkage between variables.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# Intake Map (Case ID to one Subject ID)
+length(unique(intake_map$case_id)) == nrow(
+  intake_map |>
+    dplyr::select(id, case_id) |>
+    dplyr::distinct()
+)
+
+# Case Map (Case ID to one Subject ID)
+length(unique(case_map$case_id)) == nrow(
+  case_map |>
+    dplyr::select(id, case_id) |>
+    dplyr::distinct()
+)
+
+# Case Map (Investigation ID to one Subject ID)
+length(unique(case_map$inv_id)) == nrow(
+  case_map |>
+    dplyr::select(id, inv_id) |>
+    dplyr::distinct()
+)
+
+# Case Map (Investigation ID to one Case ID)
+length(unique(case_map$inv_id)) == nrow(
+  case_map |>
+    dplyr::select(case_id, inv_id) |>
+    dplyr::distinct()
+)
+
+# [1] TRUE
+# [1] TRUE
+# [1] TRUE
+# [1] TRUE
+```
+
+Finally, we verified that all MedStar Responses present in the Response-Intake map were present in the Response-Case/Investigation Map.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# ID Numbers (in Intake Map, missing from Case Map)
+sum(!(intake_map$id %in% case_map$id)) == 0
+
+# Response Numbers (in Intake Map, missing from Case Map)
+sum(!(intake_map$ems_num %in% case_map$ems_num)) == 0
+
+# Case Numbers (in Intake Map, missing from Case Map)
+sum(!(intake_map$case_id %in% case_map$case_id)) == 0
+
+# ID and Response Number Combinations (in Intake Map, missing from Case Map)
+intake_map |>
+  dplyr::mutate(key = paste(id, ems_num, sep = '_')) |>
+  dplyr::filter(
+    !(key %in% dplyr::pull(
+      case_map |>
+        dplyr::mutate(key = paste(id, ems_num, sep = '_')) |>
+        dplyr::select(key) |>
+        dplyr::distinct()
+      )
+    )
+  ) |>
+  nrow() == 0
+
+# ID, Response, Case Number Combinations (in Intake Map, missing from Case Map)
+intake_map |>
+  dplyr::mutate(key = paste(id, ems_num, case_id, sep = '_')) |>
+  dplyr::filter(
+    !(key %in% dplyr::pull(
+      case_map |>
+        dplyr::mutate(key = paste(id, ems_num, case_id, sep = '_')) |>
+        dplyr::select(key) |>
+        dplyr::distinct()
+      )
+    )
+  ) |>
+  nrow() == 0
+
+# [1] TRUE
+# [1] TRUE
+# [1] TRUE
+# [1] TRUE
+# [1] TRUE
+```
+
+## Modification
+
+We added variables to our Response-Case/Investigation Map, indicating if a given MedStar Response-Case combination had a paired intake in our Intake Map and if the paired intakes included possibly EMS (broader matching) or explicitly EMS reporter types.
+
+```{r}
+case_map <- case_map |>
+  dplyr::mutate(
+    # If intake_paired is FALSE, have no value for reporter type columns
+    intake_paired = F,
+    intake_ems_poss = NA,
+    intake_ems_expl = NA
+  ) |>
+  dplyr::rows_update(
+    intake_map |>
+      # Consolidate reporter type columns to indicate if there's at least one
+      # intake matched to a given ID, Response, Case ID pair of the type
+      dplyr::select(id, ems_num, case_id, reporter_possible, reporter_ems) |>
+      dplyr::group_by(id, ems_num, case_id) |>
+      dplyr::mutate(
+        intake_paired = T,
+        intake_ems_poss = sum(reporter_possible) > 0,
+        intake_ems_expl = sum(reporter_ems) > 0
+        ) |>
+      dplyr::ungroup() |>
+      dplyr::select(-c(reporter_possible, reporter_ems)) |>
+      dplyr::distinct(),
+    by = c('id', 'ems_num', 'case_id')
+  )
+```
+
+# 💾 Save and Export Data
+
+We exported our maps.
+
+```{r}
+saveRDS(
+  case_map,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "04_medstar-records_to_aps-case-invs.rds"
+    )
+)
+
+saveRDS(
+  intake_map,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "05_medstar-records_to_aps-intakes.rds"
+    )
+)
+
+```
+
+# 🧹 Clean up
+
+```{r}
+rm(list=ls())
+```
