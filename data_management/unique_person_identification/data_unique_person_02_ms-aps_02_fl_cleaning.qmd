@@ -2453,6 +2453,73 @@ temp_ids <- dplyr::bind_rows(
   )
 ```
 
+We additionally had minor point-fixes to ID assignment specific to the MedStar data, wherein spot-checks of ID values identified a false match (spouses with similar names).
+
+```{r}
+# Correct values in the within-set data
+medstar <- medstar |>
+  # Add row number for PHI-free targeting of rows
+  dplyr::mutate(orig_row = dplyr::row_number()) |>
+  # Shift spousal mismatch originally in ID 428
+  dplyr::mutate(
+    id_ms = ifelse(
+      orig_row %in% c(24803, 24804, 24805, 24806, 24807, 24808, 24809), 
+      max(id_ms) + 1,
+      id_ms
+    )
+  ) |>
+  # Shift spousal mismatch originally in ID 4200
+  dplyr::mutate(
+    id_ms = ifelse(
+      orig_row %in% c(76766),
+      max(id_ms) + 1,
+      id_ms
+    )
+  ) |>
+  # Shift spousal mismatch originally in ID 2911
+  dplyr::mutate(
+    id_ms = ifelse(
+      orig_row %in% c(
+        42364, 42365, 42366, 42367, 42368, 42369, 42370, 42371, 42372, 42373, 
+        42374, 42375, 42376, 42377, 42378, 42379
+      ),
+      max(id_ms) + 1,
+      id_ms
+    )
+  ) |>
+  # Shift spousal mismatch originally in ID 13521
+  dplyr::mutate(
+    id_ms = ifelse(
+      orig_row %in% c(
+        22511
+      ),
+      max(id_ms) + 1,
+      id_ms
+    )
+  ) |>
+  dplyr::select(-orig_row)
+
+# Add new values to the between-set map
+new_vals <- 4
+
+temp_ids <- dplyr::bind_rows(
+  temp_ids,
+  medstar |>
+    dplyr::filter(
+      # Only rows with the new within-set IDs
+      id_ms %in% seq((max(id_ms) - (new_vals - 1)), max(id_ms))
+      ) |>
+    dplyr::select(id_ms, id) |>
+    dplyr::distinct() |>
+    dplyr::arrange(id_ms) |>
+    dplyr::mutate(
+      id_aps = NA_integer_,
+      # Add cross-set ID value by iterating from the maximum already present
+      id = seq(max(temp_ids$id) + 1, (max(temp_ids$id) + new_vals))
+      )
+  )
+```
+
 We added our cross-set identifiers into each set of identifier keys to generate our within-set maps.
 
 ```{r}
