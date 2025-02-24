@@ -1,0 +1,1460 @@
+---
+title: "APS-MedStar Cross-Set Subject Identification: Prep and FastLink"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## APS Data Background
+
+The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`. Final assignment of unique within-set subject IDs created 370,958 values of `aps_id`.
+
+This APS data file was cleaned/prepped for processing prior to fuzzy-matching in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_within_set_aps.qmd). Due to the significantly large size of the data (568,616 rows and 23 columns) the data had to be divided into 7 chunks for within-set fuzzy matching secondary to hardware limitations. This was performed in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_02_fl_chunk_generation.qmd). Initial within-set matching was performed in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_03_fl_chunk_cleaning.qmd). Folding the chunks into a single cohesive data set for full within-set ID assignment was performed in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_02_fl_chunk_generation.qmd).
+
+## MedStar Data Background
+
+The MedStar records were originally recorded in Filemaker Pro. Processing of this data was extensive and across multiple data files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). 
+
+The primary files of interest for subject-level interest included participant demographic data in the `participant_import.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd), and the within-set unique subject ID assignment in `participant_unique_ids.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+These files contained 92,160 observations of approximately 30 demographic variables. Final assignment of unique within-set subject IDs created 42,204 values of `unique_id`.
+
+## This File
+
+This file performs cleaning and preparation of the APS and MedStar data into compatible formats for fastLink pairing. It benchmarks the fastLink pairing process, including variable selection, and outputs the primary files for full processing and review.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ). 
+
+It is recommended that anyone orienting to the task start at the primary task notes document, which provides a high-level overview of the task data, parameters, and process: [notes_01_task_01_00_merging aps and medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_01_task_01_00_merging aps and medstar task.docx?d=w542529e69bd2411da7a2d7efe56269a5&csf=1&web=1&e=8ZF6Rg).
+
+Notes for the APS data are located in the [notes_00_data_aps.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_00_data_aps.docx?d=w854dec51d8b049bdab8b0018f3d4bfff&csf=1&web=1&e=DKCWsI) file. Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
+
+Notes relating to this specific step of processing are in the [notes_01_task_02_03_aps medstar cross-set fuzzy matching task notes.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_01_task_02_03_aps%20medstar%20cross-set%20fuzzy%20matching%20task%20notes.docx?d=w3b42007ccc7e49ef920fcf6c9ae7d548&csf=1&web=1&e=6njdEP) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# Summary
+
+Variables for matching were determined to be:
+
+-   Gender: unfortunately, there was no variable indicating sex or gender of subjects in the APS data set. As such, no variable could be selected or used for blocking and/or exact matching.
+
+-   Subject Name: First Name, Last Name (`name_first`, `name_last`)
+
+    -   Many middle name values were missing in the original data sets, or were otherwise widely inconsistent. Some entries utilized a single initial, an apparent nickname and/or pseudonym, or demonstrated multiple names as is practice in certain cultures. Isolation to first and last name was selected to produce the most consistent results.
+    -   Partial matching was utilized for name values. This increased true-matches between observations with human-recognizeable similar names, which otherwise had significant transpositions or typos.
+
+-   Subject Date of Birth: Year, Month, Day (`dob_year`,`dob_month`,`dob_day`)
+
+    -   This weighting allowed for slight typos in one field of date of birth to have limited influence, while entirely different dates of birth had increasingly significant influence. As our concern was to account for differences made by typographical errors and/or practices to account for missing information (such as a practice of utilizing "January 1" for month and date if only birth year is known or assumed), splitting date of birth not only assisted in providing adequate weight (balanced for the two values for name, and two values for address), but also limited artificial distances that would have been created through using direct date numerical differences (i.e., weighting "1955-01-01" vs "1954-01-01" and "1930-12-05" vs "1930-11-05" equal as single-digit differences, rather than giving the year difference ~12x the significance). This was most useful for familial relations with similar names and addresses, such as married couples cohabitating.
+
+-   Subject Address: House Number, Street Address, ZIP Code (`addr_num`, `addr_street`, `zip_code`),
+
+    -   Using all values for address overly weighted values
+    -   ZIP Code was useful for this data set, whereas it was found to be too broad in prior sets that were limited to a single state
+    -   While neighbors may live on the same street, they are not likely to also have similar names or dates of birth
+    -   Partial matching was utilized for Street Address values. This increased true-matches between observations with human-recognizeable similar values, which otherwise had significant transpositions or typos.
+    -   Using only three values avoided overly-weighting address for familial relations with similar names and addresses, and subjects which resided at the same multi-residence location (such as an apartment complex, senior living community, or nursing home)
+
+-   Partial Matching was utilized for Subject Name and Subject Address (with exception of House Number)
+
+    -   As mentioned in both name and address result listings, this choice increased true-matches between observations with human-recognizeable similar values, which had significant transpositions or typos.
+
+-   A threshold of 0.90 was established for "true matches", and a threshold of 0.45 was established for "false matches"
+
+    -   Matches between 0.45 and 0.90 (approximately 13.18% of the data) would benefit from manual verification and assignment.
+
+-   Our final fastLink output was produced with a lower threshold posterior probability of 0.45 for matches.
+
+-   Data was exported and saved to achieve consistency, as fastLink output returns slight variations in results with each execution even with identical input. Declaration of a consistent random seed value at the start of each fastLink was utilized to minimize these differences to increase reproducibility.
+
+    -   The fastLink output
+
+        -   `fl_out` --\> '01_cross_id_gen-fl_out.rds'
+
+    -   Packed APS data
+
+        -   `fl_out` --\> '01_cross_id_gen-aps_packed.rds'
+        
+    -   Packed MedStar data
+
+        -   `fl_out` --\> '01_cross_id_gen-ms_packed.rds'
+
+## Assumptions and Considerations
+
+-   Typographical errors may occur in any field, but are less likely to occur consistently
+
+-   Common First and Last Names are more likely to result in accidental mismatches
+
+    -   Hispanic naming conventions, which may include multiple family names and many relatively common names, may increase the probability these names are either mismatched or fail to match
+
+-   Names
+
+    -   First names may include nicknames or a middle name that the subject "goes by" in some observations, but their legal first name in others
+
+        -   As twins are unlikely, individuals that identical other than First Name are likely to refer to the same person
+
+    -   Individuals with hyphenated Last Names may go by either or both names
+
+        -   More likely in Female patients, due to name change conventions around marriage in the U.S.A.
+
+            -   The ability to keep a maiden name, hyphenate, or take a new last name [was not codified in the U.S.A until the 1980s](https://scholarship.law.wm.edu/wmjowl/vol17/iss1/6/), and as such is comparatively more common in younger women
+
+            -   [Informal polls have found that today, approximately 10% of women chose to hyphenate and 20% keep their maiden name in full.](https://time.com/3939688/maiden-names-married-women-report/) These rates are likely lower in older populations.
+
+        -   Men are both less likely to change their name at all based on name change conventions in the U.S.A, but also [face greater legal barriers in some states to obtaining name change on marriage](https://heinonline.org/HOL/LandingPage?handle=hein.journals/tclj24&div=10&id=&page=)
+
+    -   Two individuals with the First and Last Name at the same Address, but with birth dates greater than 12 years apart may potentially be parent and child using a Junior/Senior naming conventionpe
+
+        -   More likely in Male patients, due to naming conventions in the US
+
+        -   Birth Date considerations relating to the possibility of JR/SR relationships or other familial pairing apply
+
+-   Birth Dates
+
+    -   Slight differences in any one Birth Date value is likely to be a data entry error if all other fields are either identical or significantly similar
+
+    -   Month and Date values are most likely to be transposed in data entry errors
+
+-   Address
+
+    -   Address values may have been entered as a temporary location or the location where the reporter encountered the subject, rather than the subject's residential or mailing address
+
+    -   There are multiple multi-residence facilities, such as apartment complexes and healthcare facilities represented in the data - these addresses should be weighed less heavily as identifiers for differentiation
+
+    -   Individuals may move or be at a temporary location in an encounter
+
+        -   Healthcare facilities, homeless shelters, and businesses should be considered indicators that the patient's address should be weighed less heavily as an identifier
+
+        -   Multiple observations that appear to "alternate" between addresses are less likely to refer to the same individual
+
+        -   Reported addresses may not be accurate, if the reporter was either misinformed, misremembered, or guessed at the subject's residential location - if addresses are within 0.5 miles of each other, or otherwise appear sufficiently close on a map that a GPS error may have occurred, consideration should be given that it was an error rather than a truly different value
+
+-   Judgement should err on the side of separating observations if doubt exists that they refer to the same person
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r, warning = FALSE}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(fastLink)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   fastLink version 0.6.1
+-   janitor version 2.2.0
+
+## Functions
+
+```{r}
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+# Function that creates a modified version of table output, allowing
+# simplified manual review of unique values in a given column or set of
+# columns
+source(here::here("r", "get_unique_value_summary.R"))
+
+# Function that facilitates using fastlink to match a single data set
+# without limiting the returned data
+source(here::here("r", "single_df_fastlink.R"))
+       
+# Function that generates stacked pairs of the original data based on
+# fastLink's probabilistic matching
+source(here::here("r", "get_pair_data.R"))
+
+# Function that adds a potential Unique Subject ID to pairs
+source(here::here("r", "stack_ids.R"))
+```
+
+## Random Seed
+
+As fastLink utilized some randomness in its processing, we set a random seed, to be declared again at the start of any cell that utilized fastLink, to attempt to maximize reproducibility.
+
+```{r}
+doc_seed <- 42
+set.seed(doc_seed)
+```
+
+# 📥 Load Data
+
+We imported our APS and MedStar data sets, including subject identifier data and unique subject IDs, to facilitate creation of a unique cross-data ID for each subject.
+
+## APS Participant Identifier Data
+
+APS client data was originally in XLSX format. It had been cleaned and exported to an RDS file with 568,616 rows and 23 columns. The data was further modified by reducing to 378,604 unique combinations and the addition of flags in [the fastLink process of a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_02_fl_chunk_generation.qmd).
+
+```{r}
+path <- here::here(
+  "data","cleaned_rds_files", "record_linkage", "aps", 
+  "aps_01_prepped_for_fl.rds"
+  )
+
+informative_df_import(
+    "aps_par", path, overwrite = T
+  )
+
+ # 2025-01-16: APS PAR data imported with 378,604 rows and 26 columns.
+ # Data last modified on OneDrive: 2024-11-13 11:46:12
+```
+
+## APS Subject ID Data
+
+A map assigning APS within-set unique subject IDs to the provided `client_id` values were generated in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_02_fl_chunk_generation.qmd).
+
+```{r}
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "aps", 
+    "00_map-aps_id-to-client_id.rds"
+    )
+
+informative_df_import(
+    "aps_ids", path, overwrite = T
+  )
+
+ # 2025-01-16: APS IDS data imported with 378,418 rows and 2 columns.
+ # Data last modified on OneDrive: 2025-01-13 13:24:19
+```
+
+## MedStar Participant & Subject ID Data
+
+MedStar participant data was imported from Filemaker Pro in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd). A version of this data set with within-set unique subject IDs was generated in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+```{r}
+path <- here::here("data", "unique_id_creation", "participant_unique_id.rds")
+
+informative_df_import(
+    "medstar", path, overwrite = T
+  )
+
+ # 2025-01-16: MEDSTAR data imported with 92,160 rows and 105 columns.
+ # Data last modified on OneDrive: 2025-01-13 12:14:55
+```
+
+## Point-Fixes
+
+For fixes that required potential use of PHI, we utilized a CSV file.
+
+```{r}
+path <- here::here("data","medstar_fuzzy-prep-clean_point-fixes.csv")
+
+informative_df_import("point_fixes", path, show_col_types = F, overwrite = T)
+
+point_fixes <- point_fixes |>
+  janitor::clean_names()
+
+ # 2025-01-16: POINT FIXES data imported with 40 rows and 6 columns.
+ # Data last modified on OneDrive: 2025-01-13 16:19:37 
+```
+
+# Initial Data Structure
+
+## APS Data
+
+We integrated the APS participant data with IDs into a single data set.
+
+```{r}
+aps <- aps_par |>
+  dplyr::mutate(aps_id = NA_integer_) |>
+  dplyr::rows_update(
+    aps_ids,
+    by = 'client_id'
+  )
+
+rm(aps_par)
+rm(aps_ids)
+```
+
+The APS client data set contained 378,604 observations for 27 variables.
+
+```{r}
+paste0(nrow(aps), " rows and ", ncol(aps), " variables/columns.")
+# [1] "378604 rows and 27 variables/columns."
+```
+
+This included 370,958 unique `aps_id` values, which were unique to each subject.
+
+```{r}
+length(unique(aps$aps_id))
+# [1] 370958
+```
+
+### Modifications
+
+We removed columns that were useful for within-set matching, but would prevent potential reduction to a minimal data set of unique identifiers. We removed the original `client_id` (as our DETECT-created `aps_id` satisfied our unique subject ID criteria), `aps_row` (would be reassigned after reduction), `chunks` (only useful for within-set matching), and `flag_mult_clients` (as this was resolved with within-set matching). We then reduced our data set to only the 376,069 unique combinations of identifiers present in the data set.
+
+```{r}
+aps <- aps |>
+  dplyr::select(-c(client_id, aps_row, chunks, flag_mult_clients)) |>
+  dplyr::distinct()
+
+nrow(aps)
+# [1] 376067
+```
+
+We then reassigned our `aps_row` variable.
+
+```{r}
+aps <- aps |>
+  dplyr::mutate(
+    aps_row = dplyr::row_number()
+  )
+```
+
+We separated out house number, to facilitate additional weighting of address in fastLink fuzzy matching.
+
+```{r}
+aps <- aps |>
+  # Broadly separate house numbers
+  dplyr::mutate(
+    house_num = dplyr::case_when(
+  # Simple splits, where it's not a numeric street name only
+      stringr::str_detect(client_street_address, '^[0-9]') &
+        !stringr::str_detect(client_street_address, "^([0-9]+(st|th|nd|rd))") ~
+        stringr::str_match(client_street_address, '^([0-9a-z]+)')[,2],
+  # More complex splits, where it is a house number that starts with a letter
+      stringr::str_detect(client_street_address, '^[^0-9]') & 
+        stringr::str_detect(client_street_address, '^[a-z]+?[0-9]') &
+        !stringr::str_detect(client_street_address, '(vene|hwy69)') ~
+            stringr::str_match(client_street_address, '^([0-9a-z]+)')[,2],
+      TRUE ~ NA_character_
+    )
+  ) |>
+  # Revise specific rows which had typos
+  dplyr::mutate(
+    house_num = ifelse(
+      stringr::str_detect(house_num, "(routt|wal|m5018|old|corte|frank|fatt)"),
+      stringr::str_trim(stringr::str_remove(
+          house_num,
+          "((rout|wal|m50|ol|corte|frank|fatt).+?)$"
+        )),
+      house_num
+    ),
+  #Remove house number from street address
+  client_street_address = ifelse(
+    !is.na(house_num),
+    stringr::str_trim(stringr::str_remove(
+      client_street_address,
+      paste0("^(",house_num,")")
+    )),
+    client_street_address
+    )
+  )
+```
+
+## MedStar Data
+
+The MedStar subject data set contained 92,160 observations for 105 variables.
+
+```{r}
+paste0(nrow(medstar), " rows and ", ncol(medstar), " variables/columns.")
+# [1] "92160 rows and 105 variables/columns."
+```
+
+This included 42,204 unique `unique_id` values, which were unique to each subject.
+
+```{r}
+length(unique(medstar$unique_id))
+
+# [1] 42204
+```
+
+### Modifications
+
+We reduced our data set to columns which would be of particular value to between-set matching. We then reduced our data set to only the 50,740 unique combinations of identifiers present in the data set.
+
+```{r}
+medstar <- medstar |>
+  dplyr::select(
+    unique_id, name_first, name_last, name_middle_initial, name_suffix,
+    sex_2cat_f, dob, address, city, state, zip_code, x_address_original,
+    name_full
+    ) |>
+  distinct()
+
+nrow(medstar)
+# [1] 50740
+```
+
+We noted that several string variables in the MedStar data were not entirely in lowercase. We standardized these variables to be in lowercase with standardized white spaces to ensure compatibility with our APS data.
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(dplyr::across(c(
+      'name_first', 'name_last', 'name_middle_initial', 'name_suffix',
+      'address', 'city', 'state', 'x_address_original', 'name_full')
+      , 
+      ~stringr::str_replace_all(
+          stringr::str_trim(stringr::str_to_lower(.x), side = 'both'),
+        '( ){2,}', 
+        ''
+        ))
+  )
+```
+
+In checking name values, we found several unusual values. We corrected these entries.
+
+```{r}
+medstar <- medstar |>
+  # Resolve nicknames with (nickname) or "nickname" formatting
+  dplyr::mutate(
+  notes = NA_character_,
+  notes = dplyr::case_when(
+    stringr::str_detect(name_first, '"') ~ 
+      stringr::str_match(name_first, '(".+")')[,2],
+    stringr::str_detect(name_first, "''") ~
+      stringr::str_match(name_first, "(''.+'')")[,2],
+    stringr::str_detect(name_first, "\\(") ~
+      stringr::str_match(name_first, "(\\(.+\\))")[,2],
+    TRUE ~ notes
+  )) |>
+  dplyr::mutate(
+    name_first = ifelse(
+      !is.na(notes), stringr::str_remove(name_first, notes), name_first
+    ),
+    name_first = ifelse(
+      stringr::str_detect(name_first, "\\("),
+      stringr::str_trim(stringr::str_remove_all(name_first, "(\\(|\\))")),
+      name_first
+    )
+  ) |>
+  dplyr::mutate(
+    notes = NA_character_,
+    notes = ifelse(
+      stringr::str_detect(name_last, "\\("),
+      stringr::str_match(name_last, "(\\(.+\\))")[,2],
+      notes
+      ),
+    name_last = ifelse(
+      !is.na(notes), stringr::str_remove(name_last, notes), name_last
+    ),
+    name_last = ifelse(
+      stringr::str_detect(name_last, "\\("),
+      stringr::str_trim(stringr::str_remove_all(name_last, "(\\(|\\))")),
+      name_last
+    )
+  ) |>
+  dplyr::select(-notes) |>
+  # Comma based last, first entries with failed splits
+  dplyr::mutate(
+    name_last = ifelse(
+      stringr::str_detect(name_first, ",") & name_first != 't. a,',
+      stringr::str_trim(stringr::str_match(name_first, "^(.+?),")[,2]), 
+      name_last
+      ), 
+    name_first = ifelse(
+      stringr::str_detect(name_first, ",") & name_first != 't. a,',
+      stringr::str_trim(stringr::str_match(name_full, "^(.+?), (.+)$")[,3]),
+      name_first
+    )
+  ) |>
+  # Resolve "jr" in first or last name
+  dplyr::mutate(
+    name_suffix = dplyr::case_when(
+      stringr::str_detect(name_first, "(jr|jr.)$") ~ 'jr',
+      stringr::str_detect(name_last, "(jr|jr.)$") ~ 'jr',
+      stringr::str_detect(name_first, "(sr|sr.)$") ~ 'sr',
+      stringr::str_detect(name_last, "(sr|sr.)$") ~ 'sr',
+      TRUE ~ name_suffix
+      )
+  ) |>
+  dplyr::mutate(
+    name_first = ifelse(
+      stringr::str_detect(name_first, "(jr|jr.|sr|sr.)$"),
+      stringr::str_trim(stringr::str_remove(name_first, "(jr|jr.|sr|sr.)$")),
+      name_first
+    ),
+    name_last = ifelse(
+      stringr::str_detect(name_last, "(jr|jr.|sr|sr.)$"),
+      stringr::str_trim(stringr::str_remove(name_last, "(jr|jr.|sr|sr.)$")),
+      name_last
+    )
+  ) |>
+  # Convert all underscores to a white space
+  dplyr::mutate(
+    name_first = ifelse(
+      stringr::str_detect(name_first, "_"),
+      stringr::str_trim(stringr::str_replace_all(name_first, "_", " ")), 
+      name_first
+      ),
+    name_last = ifelse(
+      stringr::str_detect(name_last, "_"),
+      stringr::str_trim(stringr::str_replace_all(name_last, "_", " ")), 
+      name_last
+      )
+  ) |>
+  # Remove any other unexpected character
+  dplyr::mutate(
+    name_first = ifelse(
+      stringr::str_detect(name_first, "[^a-z '-]"),
+      stringr::str_trim(stringr::str_remove_all(name_first, "[^a-z '-]")), 
+      name_first
+      ),
+    name_last = ifelse(
+      stringr::str_detect(name_last, "[^a-z '-]"),
+      stringr::str_trim(stringr::str_remove_all(name_last, "[^a-z '-]")), 
+      name_last
+      )
+  ) 
+```
+
+In address values, we found several issues. There were multiple PO BOX values, homeless or other equivalents to a missing value, secondary address components remaining within the address field, intersections, and non-standardized common values. We applied fixes to reduce nonsignificant string distances.
+
+```{r}
+missing_equivalents <- c(
+  "homeless", "unknown", "unable to acquire", "pt unable to provide",
+  "unable to complete", "patient unable to provide", "refused", 
+  "unable to obtain"
+  )
+
+medstar <- medstar |>
+  # Separate PO Box Entries
+  dplyr::mutate(
+    addr_pobox = ifelse(
+      stringr::str_detect(address, '(o box|o\\. box|pobox|o\\.box|pob [0-9])'),
+      address,
+      NA_character_
+    )
+  ) |>
+  dplyr::mutate(
+    address = ifelse(!is.na(addr_pobox), NA_character_, address),
+    # Account for single value that has both POBOX and street address
+    address = ifelse(
+      !is.na(addr_pobox) & 
+        stringr::str_detect(addr_pobox, "([0-9]+ cr [0-9]+)"),
+      stringr::str_match(addr_pobox, "([0-9]+ cr [0-9]+)")[,2],
+      address
+      ),
+    addr_pobox = ifelse(
+      stringr::str_detect(addr_pobox, "([0-9]+ cr [0-9]+)"),
+      stringr::str_remove(addr_pobox, "( [0-9]+ cr [0-9]+)"),
+      addr_pobox
+      )
+    ) |>
+  # Standardize address fields, remove parentheses
+  dplyr::mutate(address = stringr::str_remove_all(address, "\\(")) |>
+  dplyr::mutate(address = stringr::str_replace_all(address, "( ){2,}", " ")) |>
+  dplyr::mutate(address = str_trim(address, side= 'both')) |>
+  # Treat single complex address
+  dplyr::mutate(
+    address = ifelse(
+      stringr::str_detect(address, '0-]'),
+      stringr::str_trim(stringr::str_remove(address, '(0-].+)$')),
+      address)
+  ) |>
+  # Apply point fixes
+  dplyr::mutate(new_addr = address, addr_name = NA_character_) |>
+  dplyr::rows_update(
+    point_fixes |>
+      dplyr::mutate(zip_code = stringr::str_pad(
+        as.character(zip_code), 5, pad = "0"
+        )
+      ),
+    by = 'address'
+  ) |>
+  dplyr::select(-address) |>
+  dplyr::rename_at(c('new_addr'), ~c('address')) |>
+  dplyr::mutate(
+    address = dplyr::case_when(
+      # Remove intersections
+      stringr::str_detect(address, "/") ~ NA_character_,
+      # Remove "homeless" and other missing equivalents
+      address %in% missing_equivalents ~ NA_character_,
+      # Remove apartments and other secondary units
+      stringr::str_detect(address, "#") ~
+        stringr::str_remove(address, "(#.+)$"),
+      stringr::str_detect(
+        address, 
+        "((apartment|building|room|trailer|unit| lot) [0-9a-z]+)$") ~
+        stringr::str_trim(
+          stringr::str_remove(
+            address, 
+            "((apartment|building|room|trailer|unit| lot) [0-9a-z]+)$"
+            )
+          ),
+      # Remove remaining nonstandard characters
+      stringr::str_detect(address, '[^0-9a-z -]') ~
+        stringr::str_trim(stringr::str_remove_all(address, '[^0-9a-z -]')),
+      TRUE ~ address
+    )
+  )|>
+  # Standardize common long form street values to short standardizations
+  dplyr::mutate(
+    address = dplyr::case_when(
+      stringr::str_detect(address, "county road") ~
+        stringr::str_replace(address, "county road", "cr"),
+      stringr::str_detect(address, "private road") ~
+        stringr::str_replace(address, "private road", "pvtr"),
+      stringr::str_detect(address, "highway") ~
+        stringr::str_replace(address, "highway", "hwy"),
+      stringr::str_detect(address, "freeway") ~
+        stringr::str_replace(address, "freeway", "freeway"),
+      TRUE ~ address
+    )
+  ) |>
+  # Standardize cardinal directions
+  dplyr::mutate(
+    address = dplyr::case_when(
+      stringr::str_detect(address, 'northwest[ -]') ~
+        stringr::str_replace_all(address, '(northwest)[ -]', 'nw '),
+      stringr::str_detect(address, 'northeast[ -]') ~
+        stringr::str_replace_all(address, '(northeast)[ -]', 'ne '),
+      stringr::str_detect(address, 'southwest[ -]') ~
+        stringr::str_replace_all(address, '(southwest)[ -]', 'sw '),
+      stringr::str_detect(address, 'southeast[ -]') ~
+        stringr::str_replace_all(address, '(southeast)[ -]', 'se '),
+      stringr::str_detect(address, 'north[ -]') ~
+        stringr::str_replace_all(address, '(north)[ -]', 'n '),
+      stringr::str_detect(address, 'south[ -]') ~
+        stringr::str_replace_all(address, '(south)[ -]', 's '),
+      stringr::str_detect(address, 'east[ -]') ~
+        stringr::str_replace_all(address, '(east)[ -]', 'e '),
+      stringr::str_detect(address, 'west[ -]') ~
+        stringr::str_replace_all(address, '(west)[ -]', 'w '),
+      TRUE ~ address
+      ),
+    address = dplyr::case_when(
+      stringr::str_detect(address, '[ -]northwest') ~
+        stringr::str_replace_all(address, '[ -](northwest)', ' nw'),
+      stringr::str_detect(address, '[ -]northeast') ~
+        stringr::str_replace_all(address, '[ -](northeast)', ' ne'),
+      stringr::str_detect(address, '[ -]southwest') ~
+        stringr::str_replace_all(address, '[ -](southwest)', ' sw'),
+      stringr::str_detect(address, '[ -]southeast') ~
+        stringr::str_replace_all(address, '[ -](southeast)', ' se'),
+      stringr::str_detect(address, '[ -]north') ~
+        stringr::str_replace_all(address, '[ -](north)', ' n'),
+      stringr::str_detect(address, '[ -]south') ~
+        stringr::str_replace_all(address, '[ -](south)', ' s'),
+      stringr::str_detect(address, '[ -]east') ~
+        stringr::str_replace_all(address, '[ -](east)', ' e'),
+      stringr::str_detect(address, '[ -]west') ~
+        stringr::str_replace_all(address, '[ -](west)', ' w'),
+      TRUE ~ address
+      )
+    )
+```
+
+We added a simple row number variable.
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(ms_row = dplyr::row_number())
+```
+
+We split our date of birth values into separate year, month, and day in preparation for fastLink fuzzy matching.
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(
+    dob_year = as.numeric(lubridate::year(dob)), 
+    dob_month = as.numeric(lubridate::month(dob)),
+    dob_day = as.numeric(lubridate::day(dob))
+  )
+```
+
+We also joined the `name_full` and `x_address_original` columns into a single notes field.
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(
+    notes = dplyr::case_when(
+      !is.na(name_full) & !is.na(x_address_original) ~
+        paste0("name: ", name_full, "; address:", x_address_original),
+      !is.na(name_full) & is.na(x_address_original) ~
+        paste0("name: ", name_full),
+      is.na(name_full) & !is.na(x_address_original) ~ 
+        paste0("address:", x_address_original),
+      TRUE ~ NA_character_
+    )
+  )
+```
+
+We isolated the first five digits of ZIP codes, to truncate values that were in 5+4 format.
+
+```{r}
+medstar <- medstar |> 
+  dplyr::mutate(
+    zip_code = stringr::str_match(zip_code, "([0-9]{5})")[,2]
+  )
+```
+
+Finally, we separated out house number to facilitate additional weighting of address in fastLink fuzzy matching.
+
+```{r}
+medstar <- medstar |>
+  dplyr::mutate(
+    addr_num = ifelse(
+      stringr::str_detect(address, '^[0-9]+'),
+      stringr::str_match(address, '^([0-9]+)')[,2],
+      NA_character_
+    )
+  ) |>
+  #Remove house number from street address
+  dplyr::mutate(
+    address = ifelse(
+      !is.na(addr_num),
+      stringr::str_trim(stringr::str_remove(
+        address,
+        paste0("^(", addr_num,")")
+        )),
+      address
+    )
+  )
+```
+
+## Standardization for Stacking
+
+We standardized our data sets to facilitate stacking for pairwise comparison.
+
+We reduced our APS data to shared columns with standardized names, adding missing columns as placeholders.
+
+```{r}
+aps <- aps |>
+  dplyr::select(
+    aps_id, aps_row, client_first_name, client_middle_name, client_last_name,
+    client_date_of_birth, client_dob_year, client_dob_month,
+    client_dob_day,
+    house_num, client_street_address, client_street_address_name, 
+    client_city, client_state, client_zip_code, client_pobox, 
+    client_county, client_notes, flag_issues, flag_unresolvable
+  ) |>
+  dplyr::mutate(
+    sex_2cat_f = NA, name_suffix = NA_character_,
+    ) |>
+  dplyr::rename_at(
+    c(
+      "aps_row", "aps_id",
+      "client_first_name", "client_middle_name", "client_last_name",
+      "client_date_of_birth", "client_dob_year", "client_dob_month",
+      "client_dob_day",
+      "house_num", "client_street_address", "client_street_address_name", 
+      "client_city", "client_state", "client_zip_code", "client_pobox", 
+      "client_county", "client_notes"
+      ), 
+    ~c(
+      "row", "id",
+      "name_first", "name_middle", "name_last",
+      "dob", "dob_year", "dob_month", 
+      "dob_day",
+      "addr_num", "addr_street", "addr_name", 
+      "city", "state", "zip_code", "addr_pobox", 
+      "county", "notes"
+      )
+  ) |>
+  dplyr::mutate(
+    dob = lubridate::date(dob),
+    zip_code = as.numeric(zip_code)
+  )
+```
+
+We similarly reduced our MedStar data set to shared columns with standardized names, adding missing columns as placeholders.
+
+```{r}
+medstar <- medstar |>
+  dplyr::select(-c('x_address_original', 'name_full')) |>
+  dplyr::mutate(
+    county = NA_character_, flag_issues = NA, flag_unresolvable = NA
+  ) |>
+  dplyr::rename_at(
+    c('unique_id', 'ms_row', 'name_middle_initial', 'address'), 
+    ~c('id', 'row', 'name_middle', 'addr_street')
+  ) |>
+  dplyr::mutate(
+    dob = lubridate::date(dob),
+    zip_code = as.numeric(zip_code)
+  )
+```
+
+We packed our data sets for processing.
+
+```{r}
+## Packing APS
+aps_pack <- list()
+aps_pack$df <- aps
+aps_pack$suffix <- 'aps'
+
+## Packing MedStar
+ms_pack <- list()
+ms_pack$df <- medstar
+ms_pack$suffix <- 'ms'
+```
+
+# Determination of Variables
+
+As there were 376,067 unique identifier combinations in our APS data set and 42,204 in the MedStar data set, we anticipated being able to process the entire pairwise comparison between data sets in a single fastLink chunk. However, we needed to determine our optimal variables for comparison. 
+
+## Initial Attempt
+
+Initial attempts to link records matched based on 10 identifying variables: Subject Name (First and Last), Subject DOB (Year, Month, and Day), and Subject Address (House Number, Street Address, City, State, and Zip).
+
+```{r, eval = F}
+## Defining Target Variables
+str_vars <- c(
+  'name_first', 'name_last', 'addr_num', 'addr_street', 'city', 'state'
+  )
+num_vars <- c(
+  'dob_year', 'dob_month', 'dob_day', 'zip_code'
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Packing APS
+aps_pack$ids <- c('row', 'id', match_vars)
+aps_pack$ids <- c(aps_pack$ids, setdiff(colnames(aps), aps_pack$ids))
+
+## Packing MedStar
+ms_pack$ids <- c('row', 'id', match_vars)
+ms_pack$ids <- c(ms_pack$ids, setdiff(colnames(medstar), ms_pack$ids))
+
+## Set seed
+set.seed(doc_seed)
+
+## fastLink 
+fl_out <- fastLink::fastLink(
+  # APS    
+      dfA = aps_pack$df,
+  # MedStar
+      dfB = ms_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+  # Do not deduplicate, return all
+      dedupe.matches = FALSE,
+      return.all = T
+)
+```
+
+This processing was terminated as the process invariably "hung" in step 2 of calculations.
+
+## Reduced Depth of Address Fields
+
+Our second attempt to link records matched based on 8 identifying variables (removal of City and State): Subject Name (First and Last), Subject DOB (Year, Month, and Day), and Subject Address (House Number, Street Address, and Zip).
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  'name_first', 'name_last', 'addr_num', 'addr_street'
+  )
+num_vars <- c(
+  'dob_year', 'dob_month', 'dob_day', 'zip_code'
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Packing APS
+aps_pack$ids <- c('row', 'id', match_vars)
+
+## Packing MedStar
+ms_pack$ids <- c('row', 'id', match_vars)
+
+## Set seed
+set.seed(doc_seed)
+
+## fastLink 
+fl_out <- fastLink::fastLink(
+  # APS
+      dfA = aps_pack$df,
+  # MedStar
+      dfB = ms_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+  # Do not deduplicate, return all
+      dedupe.matches = FALSE,
+      return.all = T
+)
+```
+
+Calculations managed to complete within 45 minutes without stalls or failure to achieve convergence. We generated our stacked pairs and IDs to evaluate the output.
+
+```{r}
+test_stack <- get_pair_data(
+  aps_pack, ms_pack, match_vars, fl_out
+  )
+
+test_id <- stack_ids(aps_pack, ms_pack, test_stack)
+```
+
+### Output Summary
+
+In addition to the relatively prodigious processing time (\> 45 minutes), this produced a large number of potential pairs (221,681 pairs; with 23,885 rows and 23,517 IDs from the APS data set and 39,817 rows and 33,054 IDs from the MedStar data set). Posterior probabilities ranged from 0.0001 to ~1. No entries had posterior probability of exactly 1.0, indicating a perfect match.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many unique pairs?
+format(nrow(test_stack), big.mark=',')
+
+# Number of unique APS ROWS?
+format(length(unique(test_stack$row_aps)), big.mark =',')
+
+# Number of unique APS IDS?
+format(length(unique(test_stack$id_aps)), big.mark =',')
+
+# Number of unique MEDSTAR ROWS?
+format(length(unique(test_stack$row_ms)), big.mark =',')
+
+# Number of unique MEDSTAR IDS?
+format(length(unique(test_stack$id_ms)), big.mark =',')
+
+# Get summary stats for the posterior probabilities, with min and max as focus
+paste0(
+  "Min: ", format(min(test_stack$posterior_probability), digits = 4),
+  "; Max: ", format(max(test_stack$posterior_probability), digits = 4)
+)
+
+# Any rows without a posterior probability?
+format(sum(is.na(test_stack$posterior_probability)), big.mark=',')
+
+# How many pairs with a posterior probability of 1 (perfect match)?
+format(sum(test_stack$posterior_probability == 1), big.mark=',')
+
+# [1] "221,681"
+# [1] "23,885"
+# [1] "23,517"
+# [1] "39,817"
+# [1] "33,054"
+# [1] "Min: 0.0001072; Max: 1"
+# [1] "0"
+# [1] "0"
+```
+
+Cursory examination for observations with posteriors just below 1.0 appeared to consist of true matches. Similarly, pairs at lower values of posterior probability appeared to be false matches.
+
+A total of 140,343,969 observations were generated in the ID-containing data set, reflecting 23,517 APS ID values and 33,054 MedStar ID values. There were 141,538 unique subject IDs created.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the ID generation set?
+format(nrow(test_id), big.mark=',')
+
+# How many unique APS ID values were in the ID set?
+format(length(unique(test_id$id_aps)), big.mark =',' )
+
+# How many unique MS ID values were in the ID set?
+format(length(unique(test_id$id_ms)), big.mark =',' )
+
+# How many unique subject ID values were created?
+format(length(unique(test_id$id)), big.mark=',')
+
+# [1] "140,343,969"
+# [1] "23,517"
+# [1] "33,054"
+# [1] "141,538"
+```
+
+We purged items no longer needed, for memory management.
+
+```{r}
+rm(test_stack)
+rm(test_id)
+```
+
+## Addition of Partial Matching
+
+Our third attempt to link records matched based on 8 identifying variables (removal of City and State): Subject Name (First and Last), Subject DOB (Year, Month, and Day), and Subject Address (House Number, Street Address, and Zip), with partial matching for all string variables except for House Number.
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  'name_first', 'name_last', 'addr_num', 'addr_street'
+  )
+num_vars <- c(
+  'dob_year', 'dob_month', 'dob_day', 'zip_code'
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Packing APS
+aps_pack$ids <- c('row', 'id', match_vars)
+
+## Packing MedStar
+ms_pack$ids <- c('row', 'id', match_vars)
+
+## Set seed
+set.seed(doc_seed)
+
+## fastLink 
+fl_out <- fastLink::fastLink(
+  # APS    
+      dfA = aps_pack$df,
+  # MedStar
+      dfB = ms_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+  # Partial matching
+      partial.match = setdiff(str_vars, 'addr_num'),
+  # Do not deduplicate, return all
+      dedupe.matches = FALSE,
+      return.all = T
+)
+```
+
+Calculations managed to complete within 45 minutes without stalls or failure to achieve convergence. We generated our stacked pairs and IDs to evaluate the output.
+
+```{r}
+test_stack <- get_pair_data(
+  aps_pack, ms_pack, match_vars, fl_out
+  )
+
+test_id <- stack_ids(aps_pack, ms_pack, test_stack)
+```
+
+```{r}
+saveRDS(fl_out,
+        "C:/Users/morri/Downloads/temp_fl-partial.rds")
+```
+
+### Output Summary
+
+In addition to the relatively prodigious processing time (\> 45 minutes), this produced a large number of potential pairs (131,968 pairs; with 16,597 rows and 16,308 IDs from the APS data set and 24,081 rows and 19,646 IDs from the MedStar data set). Posterior probabilities ranged from 0.00003 to ~1. No entries had posterior probabilities of exactly 1.0, indicating a perfect match.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many unique pairs?
+format(nrow(test_stack), big.mark=',')
+
+# Number of unique APS ROWS?
+format(length(unique(test_stack$row_aps)), big.mark =',')
+
+# Number of unique APS IDS?
+format(length(unique(test_stack$id_aps)), big.mark =',')
+
+# Number of unique MEDSTAR ROWS?
+format(length(unique(test_stack$row_ms)), big.mark =',')
+
+# Number of unique MEDSTAR IDS?
+format(length(unique(test_stack$id_ms)), big.mark =',')
+
+# Get summary stats for the posterior probabilities, with min and max as focus
+paste0(
+  "Min: ", format(min(test_stack$posterior_probability), digits = 4),
+  "Max: ", format(max(test_stack$posterior_probability), digits = 4)
+)
+
+# Any rows without a posterior probability?
+format(sum(is.na(test_stack$posterior_probability)), big.mark=',')
+
+# How many pairs with a posterior probability of 1 (perfect match)?
+format(sum(test_stack$posterior_probability == 1), big.mark=',')
+
+# [1] "131,966"
+# [1] "16,597"
+# [1] "16,308"
+# [1] "24,081"
+# [1] "19,646"
+# [1] "Min: 2.911e-05Max: 1"
+# [1] "0"
+# [1] "0"
+```
+
+Cursory examination for observations with posteriors just below 1.0 appeared to consist of true matches. Similarly, pairs at lower values of posterior probability appeared to be false matches.
+
+A total of 35,750,691 observations were generated in the ID-containing data set, reflecting 16,308 APS ID values and 19,646 MedStar ID values. There were 38,350 unique subject IDs created.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the ID generation set?
+format(nrow(test_id), big.mark=',')
+
+# How many unique APS ID values were in the ID set?
+format(length(unique(test_id$id_aps)), big.mark =',' )
+
+# How many unique MS ID values were in the ID set?
+format(length(unique(test_id$id_ms)), big.mark =',' )
+
+# How many unique subject ID values were created?
+format(length(unique(test_id$id)), big.mark=',')
+
+# [1] "35,750,691"
+# [1] "16,308"
+# [1] "19,646"
+# [1] "38,350"
+```
+
+# Determination of Posterior Probabilities 
+
+To review the range of posterior probabilities that would provide a maximal return for manual review, we had to examine our results in greater detail, across a broader range than the default lower threshold.
+
+## 0.90 - 0.95
+
+The 1,555,751 pairs (18,445 IDs) with posteriors between 0.90 - 0.95 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter((dplyr::between(posterior_probability,0.90,0.95)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+All pairs appeared to be valid.
+
+## 0.80 - 0.85
+
+The 2,354,613 pairs (18,502 IDs) with posteriors between 0.80 - 0.85 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter((dplyr::between(posterior_probability,0.80,0.85)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+Pairs appeared to be a mix of true and false matches. False matches were primarily due to similar, but human-recognizably different, name values at multi-family or medical facility addresses.
+
+## 0.75 - 0.80
+
+The 2,205,927 pairs (19,623 IDs) with posteriors between 0.75 - 0.80 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.75,0.80)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+Pairs appeared to be a mix of true and false matches.
+
+## 0.70 - 0.75
+
+The 5,276 pairs (2,723 IDs) with posteriors between 0.70 - 0.75 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.70,0.75)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+Pairs appeared to be a mix of true and false matches, with several matches made in rows with missing identifiers.
+
+## 0.65 - 0.70
+
+The 132,783 pairs (4,531 IDs) with posteriors between 0.65 - 0.70 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.65,0.70)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+Pairs appeared to be a mix of true and false matches, with several matches made in rows with missing identifiers.
+
+## 0.60 - 0.65
+
+The 604 pairs (511 IDs) with posteriors between 0.60 - 0.65 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.60,0.65)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+Pairs appeared to be primarily tenuous matches, appearing to be primarily attributable to due to common name values.
+
+## 0.55 - 0.60
+
+The 1,646 pairs (1,376 IDs) with posteriors between 0.55 - 0.60 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.55,0.60)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+Pairs appeared to be a mix of true and false matches, with several matches made in rows with missing identifiers.
+
+## 0.50 - 0.55
+
+The 4,954 pairs (2,864 IDs) with posteriors between 0.50 - 0.55 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.50,0.55)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+Pairs appeared to be a mix of true and false matches, though tenuous matches, with several matches made in rows with missing identifiers.
+
+## 0.45 - 0.50
+
+The 7,241 pairs (1,553 IDs) with posteriors between 0.45 - 0.50 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.45,0.50)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+Pairs appeared to be a mix of true and false matches, though tenuous matches, with several matches made in rows with missing identifiers.
+
+## 0.40 - 0.45
+
+The 6,498,718 pairs (21,433 IDs) with posteriors between 0.40 - 0.45 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.40,0.45)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+All pairs appeared to be false matches.
+
+## 0.35 - 0.40
+
+The 11,414 pairs (3,648 IDs) with posteriors between 0.35 - 0.40 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.35,0.40)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+All pairs appeared to be false matches.
+
+## 0.30 - 0.35
+
+The 3,294 pairs (1,908 IDs) with posteriors between 0.30 - 0.35 were examined.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.30,0.35)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+All pairs appeared to be false matches.
+
+## 0.25 - 0.30
+
+The 6,583 pairs (3,528 IDs) with posteriors between 0.25 - 0.30 were examined
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.25,0.30)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+All pairs appeared to be false matches.
+
+## 0.20 - 0.25
+
+The 4,165 pairs (2,491 IDs) with posteriors between 0.20 - 0.25 were examined
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.20,0.25)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+```
+
+All pairs appeared to be false matches.
+
+## Summary (0.45 - 0.90)
+
+There were 4,713,405 pairs (23,856 unique IDs) with reverse probabilities within the range of 0.45 - 0.90, which would require manual verification of proper pairing and ID. Despite how wide this range was, only 13.18% of potential pairs were likely to benefit from manual verification.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+checking <- test_id |>
+  dplyr::filter( (dplyr::between(posterior_probability,0.45,0.90)))
+
+format(nrow(checking), big.mark = ',')
+format(length(unique(checking$id)), big.mark = ',')
+paste0(format(nrow(checking)*100 / nrow(test_id), digits = 4),"%")
+```
+
+# fastLink Processing
+
+We performed our fastLink fuzzy-matching based on our benchmarked parameters.
+
+```{r}
+## Defining Target Variables
+str_vars <- c(
+  'name_first', 'name_last', 'addr_num', 'addr_street'
+  )
+num_vars <- c(
+  'dob_year', 'dob_month', 'dob_day', 'zip_code'
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Packing APS
+aps_pack$ids <- c('row', 'id', match_vars)
+
+## Packing MedStar
+ms_pack$ids <- c('row', 'id', match_vars)
+
+## Set seed
+set.seed(doc_seed)
+
+## fastLink 
+fl_out <- fastLink::fastLink(
+  # APS    
+      dfA = aps_pack$df,
+  # MedStar
+      dfB = ms_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+  # Partial matching
+      partial.match = setdiff(str_vars, 'addr_num'),
+  # Do not deduplicate, use threshold of 0.45
+      dedupe.matches = FALSE,
+      threshold.match = 0.45
+)
+```
+
+## 💾 Save and Export Data
+
+We exported our data, for further use.
+
+```{r}
+saveRDS(
+  fl_out,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
+    "01_cross_id_gen-fl_out.rds"
+    )
+)
+
+saveRDS(
+  aps_pack,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
+    "01_cross_id_gen-aps_packed.rds"
+    )
+)
+
+saveRDS(
+  ms_pack,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
+    "01_cross_id_gen-ms_packed.rds"
+    )
+)
+```
+
+# 🧹 Clean up
+
+```{r}
+rm(list=ls())
+```
+

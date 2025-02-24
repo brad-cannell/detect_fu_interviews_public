@@ -1,0 +1,2584 @@
+---
+title: "APS-MedStar Cross-Set Subject Identification: Manual Review"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## APS Data Background
+
+The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`. Final assignment of unique within-set subject IDs created 370,958 values of `aps_id`.
+
+This APS data file was cleaned/prepped for processing prior to fuzzy-matching in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_within_set_aps.qmd). Due to the significantly large size of the data (568,616 rows and 23 columns) the data had to be divided into 7 chunks for within-set fuzzy matching secondary to hardware limitations. This was performed in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_02_fl_chunk_generation.qmd). Initial within-set matching was performed in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_03_fl_chunk_cleaning.qmd). Folding the chunks into a single cohesive data set for full within-set ID assignment was performed in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_02_fl_chunk_generation.qmd).
+
+## MedStar Data Background
+
+The MedStar records were originally recorded in Filemaker Pro. Processing of this data was extensive and across multiple data files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). 
+
+The primary files of interest for subject-level interest included participant demographic data in the `participant_import.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd), and the within-set unique subject ID assignment in `participant_unique_ids.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+These files contained 92,160 observations of approximately 30 demographic variables. Final assignment of unique within-set subject IDs created 42,204 values of `unique_id`.
+
+## This File
+
+This file builds on [the previous Quarto document](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_02_ms-aps_01_fl_generation.qmd), which performed fastLink fuzzy-matching of subjects in the APS and MedStar data sets. This file documents the review of pairs and ID assignments for between-set subject-level matching.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ). 
+
+It is recommended that anyone orienting to the task start at the primary task notes document, which provides a high-level overview of the task data, parameters, and process: [notes_01_task_01_00_merging aps and medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_01_task_01_00_merging aps and medstar task.docx?d=w542529e69bd2411da7a2d7efe56269a5&csf=1&web=1&e=8ZF6Rg).
+
+Notes for the APS data are located in the [notes_00_data_aps.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_00_data_aps.docx?d=w854dec51d8b049bdab8b0018f3d4bfff&csf=1&web=1&e=DKCWsI) file. Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
+
+Notes relating to this specific step of processing are in the [notes_01_task_02_03_aps medstar cross-set fuzzy matching task notes.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_01_task_02_03_aps%20medstar%20cross-set%20fuzzy%20matching%20task%20notes.docx?d=w3b42007ccc7e49ef920fcf6c9ae7d548&csf=1&web=1&e=6njdEP) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# Summary
+
+This file resulted in the creation of three subject linkage maps:
+
+-   APS within-set Unique Subject Map (`data/cleaned_rds_files/record_linkage/maps/01_aps-client_id-to_id-aps.rds`), which connects `client_id` to our assigned `id_aps` values
+
+-   MedStar within-set Unique Subject Map (`data/cleaned_rds_files/record_linkage/maps/02_medstar-keys-to-id_ms.rds`), which connects `x_primary_key` and `medstar_internal_id` values to `id_ms` values.
+
+-   Between-set APS to MedStar Unique Subject Map (`data/cleaned_rds_files/record_linkage/maps/03_aps_to_ms-subject-links.rds`), which connects `id_aps` and `id_ms` values to a cross-set `id` value
+
+We had a total of 4,656 subjects linked between data sets.
+
+## Assumptions and Considerations
+
+-   Typographical errors may occur in any field, but are less likely to occur consistently
+
+-   Common First and Last Names are more likely to result in accidental mismatches
+
+    -   Hispanic naming conventions, which may include multiple family names and many relatively common names, may increase the probability these names are either mismatched or fail to match
+
+-   Names
+
+    -   First names may include nicknames or a middle name that the subject "goes by" in some observations, but their legal first name in others
+
+        -   As twins are unlikely, individuals that identical other than First Name are likely to refer to the same person
+
+    -   Individuals with hyphenated Last Names may go by either or both names
+
+        -   More likely in Female patients, due to name change conventions around marriage in the U.S.A.
+
+            -   The ability to keep a maiden name, hyphenate, or take a new last name [was not codified in the U.S.A until the 1980s](https://scholarship.law.wm.edu/wmjowl/vol17/iss1/6/), and as such is comparatively more common in younger women
+
+            -   [Informal polls have found that today, approximately 10% of women chose to hyphenate and 20% keep their maiden name in full.](https://time.com/3939688/maiden-names-married-women-report/) These rates are likely lower in older populations.
+
+        -   Men are both less likely to change their name at all based on name change conventions in the U.S.A, but also [face greater legal barriers in some states to obtaining name change on marriage](https://heinonline.org/HOL/LandingPage?handle=hein.journals/tclj24&div=10&id=&page=)
+
+    -   Two individuals with the First and Last Name at the same Address, but with birth dates greater than 12 years apart may potentially be parent and child using a Junior/Senior naming conventionpe
+
+        -   More likely in Male patients, due to naming conventions in the US
+
+        -   Birth Date considerations relating to the possibility of JR/SR relationships or other familial pairing apply
+
+-   Birth Dates
+
+    -   Slight differences in any one Birth Date value is likely to be a data entry error if all other fields are either identical or significantly similar
+
+    -   Month and Date values are most likely to be transposed in data entry errors
+
+-   Address
+
+    -   Address values may have been entered as a temporary location or the location where the reporter encountered the subject, rather than the subject's residential or mailing address
+
+    -   There are multiple multi-residence facilities, such as apartment complexes and healthcare facilities represented in the data - these addresses should be weighed less heavily as identifiers for differentiation
+
+    -   Individuals may move or be at a temporary location in an encounter
+
+        -   Healthcare facilities, homeless shelters, and businesses should be considered indicators that the patient's address should be weighed less heavily as an identifier
+
+        -   Multiple observations that appear to "alternate" between addresses are less likely to refer to the same individual
+
+        -   Reported addresses may not be accurate, if the reporter was either misinformed, misremembered, or guessed at the subject's residential location - if addresses are within 0.5 miles of each other, or otherwise appear sufficiently close on a map that a GPS error may have occurred, consideration should be given that it was an error rather than a truly different value
+
+-   Judgement should err on the side of separating observations if doubt exists that they refer to the same person
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r, warning = FALSE}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(fastLink)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   fastLink version 0.6.1
+-   janitor version 2.2.0
+
+## Functions
+
+```{r}
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+# Function that creates a modified version of table output, allowing
+# simplified manual review of unique values in a given column or set of
+# columns
+source(here::here("r", "get_unique_value_summary.R"))
+
+# Function that facilitates using fastlink to match a single data set
+# without limiting the returned data
+source(here::here("r", "single_df_fastlink.R"))
+       
+# Function that generates stacked pairs of the original data based on
+# fastLink's probabilistic matching
+source(here::here("r", "get_pair_data.R"))
+
+# Function that adds a potential Unique Subject ID to pairs
+source(here::here("r", "stack_ids.R"))
+```
+
+# 📥 Load Data
+
+## FastLink Object
+
+We loaded the output of our fastLink fuzzy matching.
+
+```{r}
+path <- here::here(
+  "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
+  "01_cross_id_gen-fl_out.rds"
+  )
+
+informative_df_import(
+    "fl_out", path, overwrite = T
+  )
+
+#  2025-01-31: FL OUT data imported with NULL rows and NULL columns.
+#  Data last modified on OneDrive: 2025-01-15 19:15:43 
+```
+
+## Packed APS Data
+
+We loaded our packed APS Data for generation of pair and identifier data.
+
+```{r}
+path <- here::here(
+  "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
+  "01_cross_id_gen-aps_packed.rds"
+  )
+
+informative_df_import(
+    "aps_pack", path, overwrite = T
+  )
+
+# 2025-01-31: APS PACK data imported with NULL rows and NULL columns.
+#  Data last modified on OneDrive: 2025-01-15 19:15:45 
+```
+
+We also loaded our original APS ID map, to facilitate generation of both a within-set and between-set subject-linkage map.
+
+A map assigning APS within-set unique subject IDs to the provided `client_id` values were generated in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_02_fl_chunk_generation.qmd).
+
+```{r}
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "aps", 
+    "00_map-aps_id-to-client_id.rds"
+    )
+
+informative_df_import(
+    "aps_id_map", path, overwrite = T
+  )
+
+# 2025-01-31: APS ID MAP data imported with 378,418 rows and 2 columns.
+#  Data last modified on OneDrive: 2025-01-13 13:24:19 
+```
+
+## Packed MedStar Data
+
+We loaded our packed MedStar Data for generation of pair and identifier data.
+
+```{r}
+path <- here::here(
+  "data", "cleaned_rds_files", "record_linkage", "aps_to_ms_processing", 
+  "01_cross_id_gen-ms_packed.rds"
+  )
+
+informative_df_import(
+    "ms_pack", path, overwrite = T
+  )
+
+# 2025-01-31: MS PACK data imported with NULL rows and NULL columns.
+#  Data last modified on OneDrive: 2025-01-15 19:15:46 
+```
+
+We also loaded the original MedStar data set, with the within-set unique subject ID assignments, to facilitate generation of both a within-set and between-set subject-linkage map.
+
+MedStar participant data was imported from Filemaker Pro in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd). A version of this data set with within-set unique subject IDs was generated in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+```{r}
+path <- here::here("data", "unique_id_creation", "participant_unique_id.rds")
+
+informative_df_import(
+    "medstar", path, overwrite = T
+  )
+
+# 2025-01-31: MEDSTAR data imported with 92,160 rows and 105 columns.
+#  Data last modified on OneDrive: 2025-01-13 12:14:55 
+```
+
+# Constants
+
+We named our constants: the variables utilized for fuzzy matching, the manual verification posterior probability range (0.45 - 0.90), the names of all gamma columns, and which variables we wished to include in our side-by-side pair data sets.
+
+```{r}
+## Fuzzy-Matching Variables
+str_vars <- c(
+  'name_first', 'name_last', 'addr_num', 'addr_street'
+  )
+num_vars <- c(
+  'dob_year', 'dob_month', 'dob_day', 'zip_code'
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Gamma column names
+gamma_cols <- paste(match_vars, "gamma", sep = "_")
+
+## Manual review posterior probability range
+posteriors = c(0.45, 0.90)
+```
+
+We converted our fastLink output into stacked pairs for review.
+
+```{r}
+temp_pairs <- get_pair_data(
+  aps_pack, ms_pack, match_vars, fl_out
+  )
+```
+
+# Review of Initial Pairs
+
+Our initial pair data consisted of 29,934 pairs; while all pairs contained unique combinations of rows, only 24,198 had unique combinations of ID values. Posterior probabilities ranged from 0.4508 to ~ 1. No pairs were missing a value for row or ID. There were 367,918 APS rows (362,975 IDs) and 37,929 MedStar rows (32,165 IDs) omitted from the pair data, likely due to failure to obtain a match with a posterior above the lower threshold.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many pairs were made?
+format(
+  nrow(temp_pairs |> dplyr::select(pair) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# How many unique pairs were in this set (by Rows)?
+format(
+  nrow(temp_pairs |> dplyr::select(row_aps, row_ms) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# How many unique pairs were in this set (by IDS)?
+format(
+  nrow(temp_pairs |> dplyr::select(id_aps, id_ms) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Range of posterior probability values
+paste0(
+  "Min: ",
+  format(min(
+    temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5),
+  "; Max: ",
+  format(max(
+    temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5)
+  )
+
+# Are there any pairs missing a value for row?
+format(
+  nrow(temp_pairs |> dplyr::filter(is.na(row_aps)|is.na(row_ms))),
+  big.mark = ','
+  )
+
+# Are there any pairs missing a value for ID?
+format(
+  nrow(temp_pairs |> dplyr::filter(is.na(id_aps)|is.na(id_ms))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from APS Data: ",
+  format(
+    length(setdiff(aps_pack$df$row, temp_pairs$row_aps)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from MS Data: ",
+  format(
+    length(setdiff(ms_pack$df$row, temp_pairs$row_ms)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from APS Data: ",
+  format(
+    length(setdiff(aps_pack$df$id, temp_pairs$id_aps)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from MS Data: ",
+  format(
+    length(setdiff(ms_pack$df$id, temp_pairs$id_ms)), 
+    big.mark = ','
+    )
+)
+
+# [1] "29,934"
+# [1] "29,934"
+# [1] "24,198"
+# [1] "Min: 0.4508; Max: 1"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from APS Data: 367,918; Missing Rows from MS Data: 37,929"
+# [1] "Missing IDs from APS Data: 362,975; Missing IDs from MS Data: 32,165"
+```
+
+### Within Posterior Probability Range
+
+We examined all pairs within the manual review posterior probability range of 0.45 - 0.90. This resulted in manual review of 14,237 pairs.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking <- temp_pairs |>
+  dplyr::filter(
+    dplyr::between(posterior_probability, posteriors[1], posteriors[2])
+    )
+
+# Number of rows in this subset
+format(nrow(checking), big.mark = ',')
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+# [1] "14,237"
+# [1] "3,311 APS Rows (3,252 IDs), 5,748 MS Rows (4,875 IDs)"
+```
+
+In examining our gamma values for our matching variables, we found several trends:
+
+-   The vast majority (13,409) failed to match at all on first name (gamma = 0)
+-   The vast majority (13,080) failed to match at all on last name (gamma = 0)
+-   The vast majority (13,348) failed to match on birth month (gamma = 0)
+-   The vast majority (7,108) failed to match on birth day (gamma = 0)
+-   It was approximately 50/50 if a subject matched on birth year (gamma = 0, gamma = 2)
+-   The vast majority (12,962) significantly matched on house number (gamma = 2)
+-   The vast majority (13,664) significantly matched on street address (gamma = 2)
+-   The vast majority (13,747) significantly matched on zip code (gamma = 2)
+
+```{r, warning = F}
+get_unique_value_summary(
+  checking |>
+    dplyr::select(dplyr::all_of(gamma_cols))
+  )
+```
+
+We initiated our list of pairs to drop, which we would build during our processing.
+
+```{r}
+drop_pairs <- c()
+```
+
+#### Address Failures
+
+##### ZIP Code (Non-Matches)
+
+We first examined pair with non-matching ZIP Codes (Gamma == 0). 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(zip_code_gamma != 2)
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "64"
+# [1] "Min: 0.4508; Max: 0.89224"
+# [1] "58 APS Rows (58 IDs), 58 MS Rows (54 IDs)"
+```
+
+44 of the 64 pairs were found to be a true match. As such, we added the remaining 20 pairs to our drop list.
+
+```{r}
+keep_pairs <- c(
+  702, 2181, 2289, 3298, 3460, 3887, 4215, 4846, 5259, 6010, 6479, 7947, 8001, 
+  8559, 9900, 10821, 11014, 11371, 11372, 11373, 11374, 12980, 14811, 15250, 
+  15962, 17313, 18491, 19881, 22320, 22347, 22626, 22918, 22979, 25641, 
+  26305, 26306, 27221, 27295, 27298, 27775, 28018, 28646, 29879, 29882
+  )
+
+drop_pairs <- unique(c(
+  drop_pairs, 
+  setdiff(checking_cols$pair, keep_pairs)
+  ))
+
+length(drop_pairs)
+# [1] 20
+```
+
+##### ZIP Code (Missing)
+
+We first examined pairs missing at least one ZIP Code value (Gamma == `NA`). 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(is.na(zip_code_gamma))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "426"
+# [1] "Min: 0.49038; Max: 0.89715"
+# [1] "311 APS Rows (304 IDs), 353 MS Rows (306 IDs)"
+```
+
+Only 1 of the 426 pairs were found to be a true match. As such, we added the remaining 425 pairs to our drop list.
+
+```{r}
+keep_pairs <- c(9219)
+
+drop_pairs <- unique(c(
+  drop_pairs, 
+  setdiff(checking_cols$pair, keep_pairs)
+  ))
+
+length(drop_pairs)
+# [1] 445
+```
+
+##### Street Address (Weak Matches)
+
+We examined remaining pairs with weakly matching street address values (Gamma == 1).
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(addr_street_gamma == 1) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "15"
+# [1] "Min: 0.58809; Max: 0.89693"
+# [1] "12 APS Rows (12 IDs), 15 MS Rows (14 IDs)"
+```
+
+Only one of the 15 pairs was found to be a true match. As such, we added the remaining 14 pairs to our drop list.
+
+```{r}
+keep_pairs <- c(11693)
+
+drop_pairs <- unique(c(
+  drop_pairs, 
+  setdiff(checking_cols$pair, keep_pairs)
+  ))
+
+length(drop_pairs)
+# [1] 459
+```
+
+##### Street Address (Non-Matches)
+
+We examined remaining pairs with non-matching street address values (Gamma == 0).
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(addr_street_gamma == 0) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "81"
+# [1] "Min: 0.50913; Max: 0.88657"
+# [1] "73 APS Rows (73 IDs), 78 MS Rows (72 IDs)"
+```
+
+44 of the 81 pairs were found to be a true match. As such, we added the remaining 37 pairs to our drop list.
+
+```{r}
+keep_pairs <- c(
+  928, 1246, 2264, 2584, 2919, 3303, 4543, 4944, 5567, 6805, 6945, 7669, 9399, 
+  9598, 10277, 10809, 11065, 12016, 12614, 14727, 15769, 15785, 17101, 17151, 
+  17438, 17459, 17692, 19464, 20157, 21122, 21141, 21956, 22466, 22920, 23136, 
+  24037, 26148, 26701, 26929, 27313, 28789, 28804, 29357, 29721
+  )
+
+drop_pairs <- unique(c(
+  drop_pairs, 
+  setdiff(checking_cols$pair, keep_pairs)
+  ))
+
+length(drop_pairs)
+# [1] 496
+```
+
+##### Street Address (Missing)
+
+We examined remaining pairs missing at least one street address value (Gamma == `NA`).
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(is.na(addr_street_gamma)) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "5"
+# [1] "Min: 0.73801; Max: 0.83199"
+# [1] "5 APS Rows (5 IDs), 5 MS Rows (5 IDs)"
+```
+
+Only 1 of the 5 pairs were found to be a true match. As such, we added the remaining 4 pairs to our drop list.
+
+```{r}
+keep_pairs <- c(5133)
+
+drop_pairs <- unique(c(
+  drop_pairs, 
+  setdiff(checking_cols$pair, keep_pairs)
+  ))
+
+length(drop_pairs)
+# [1] 500
+```
+
+##### House Number (Non-Matches)
+
+We examined remaining pairs with non-matching house number values (Gamma == 0).
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(addr_num_gamma == 0) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma) |
+      (addr_street_gamma < 2) | is.na(addr_street_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "731"
+# [1] "Min: 0.48571; Max: 0.89579"
+# [1] "468 APS Rows (457 IDs), 636 MS Rows (540 IDs)"
+```
+
+None of the 731 pairs were found to be a true match. As such, we added all of these pairs to our drop list.
+
+```{r}
+drop_pairs <- unique(c(drop_pairs, checking_cols$pair))
+
+length(drop_pairs)
+# [1] 1231
+```
+
+##### House Number (Missing)
+
+We examined remaining pairs missing at least one house number value (Gamma == `NA`).
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(is.na(addr_num_gamma)) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma) |
+      (addr_street_gamma < 2) | is.na(addr_street_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "2"
+# [1] "Min: 0.52079; Max: 0.81829"
+# [1] "2 APS Rows (2 IDs), 2 MS Rows (2 IDs)"
+```
+
+Neither of the 2 pairs were found to be a true match. As such, we added both of these pairs to our drop list.
+
+```{r}
+drop_pairs <- unique(c(drop_pairs, checking_cols$pair))
+
+length(drop_pairs)
+# [1] 1233
+```
+
+#### Name Failures
+
+##### Last Name (Weak Matches)
+
+There were no remaining pairs with weakly matching last name values (Gamma == 1). 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(name_last_gamma == 1) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma) |
+      (addr_street_gamma < 2) | is.na(addr_street_gamma) |
+      (addr_num_gamma < 2) | is.na(addr_num_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+# [1] "0"
+```
+
+##### Last Name (Non Matches)
+
+We examined remaining pairs with non-matching last name values (Gamma == 0).
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(name_last_gamma == 0) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma) |
+      (addr_street_gamma < 2) | is.na(addr_street_gamma) |
+      (addr_num_gamma < 2) | is.na(addr_num_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "12,913"
+# [1] "Min: 0.67569; Max: 0.8122"
+# [1] "2,491 APS Rows (2,451 IDs), 4,745 MS Rows (4,041 IDs)"
+```
+
+None of the 12,913 pairs were found to be a true match. As such, we added these 12,913 pairs to our drop list.
+
+```{r}
+drop_pairs <- unique(c(drop_pairs, checking_cols$pair))
+
+length(drop_pairs)
+# [1] 14146
+```
+
+##### Last Name (Missing)
+
+There were no remaining pairs missing at least one last name value (Gamma == `NA`).
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(is.na(name_last_gamma)) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma) |
+      (addr_street_gamma < 2) | is.na(addr_street_gamma) |
+      (addr_num_gamma < 2) | is.na(addr_num_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# [1] "0"
+```
+
+##### Remaining Pairs
+
+There were no remaining pairs within the manual verification posterior probability range.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    (zip_code_gamma == 0) | is.na(zip_code_gamma) |
+      (addr_street_gamma < 2) | is.na(addr_street_gamma) |
+      (addr_num_gamma < 2) | is.na(addr_num_gamma) |
+      (name_last_gamma < 2) | is.na(name_last_gamma)
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+# [1] "0"
+```
+
+### Examination of Pairs Above Probability Range
+
+We performed a brief examination of pairs above our posterior probability threshold of 0.90, as an additional QC measure. This examination provided a manual review of 12,067 pairs which were not missing any identifier values and were identical at all identifier values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking <- temp_pairs |>
+  dplyr::filter(
+    posterior_probability >= posteriors[2]
+    ) |>
+  dplyr::filter(
+    !(
+      !is.na(name_first_aps) & !is.na(name_first_ms) &
+      (name_first_aps == name_first_ms) &
+        !is.na(name_last_aps) & !is.na(name_last_ms) &
+        (name_last_aps == name_last_ms) &
+        !is.na(dob_year_aps) & !is.na(dob_year_ms) &
+        (dob_year_aps == dob_year_ms) &
+        !is.na(dob_month_aps) & !is.na(dob_month_ms) &
+        (dob_month_aps == dob_month_ms) &
+        !is.na(dob_day_aps) & !is.na(dob_day_ms) &
+        (dob_day_aps == dob_day_ms) &
+        !is.na(addr_num_aps) & !is.na(addr_num_ms) &
+        (addr_num_aps == addr_num_ms) &
+        !is.na(addr_street_aps) & !is.na(addr_street_ms) &
+        (addr_street_aps == addr_street_ms) &
+        !is.na(zip_code_aps) & !is.na(zip_code_ms) &
+        (zip_code_aps == zip_code_ms)
+    )
+  )
+
+# Number of rows in this subset
+format(nrow(checking), big.mark = ',')
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "12,067"
+# [1] "5,038 APS Rows (4,940 IDs), 7,755 MS Rows (6,210 IDs)"
+```
+
+#### Pairs Missing Any Identifier
+
+We first examined rows with missingness in one or more of identifiers. This section reviewed 1,158 pairs.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(
+    is.na(addr_street_aps) | is.na(addr_street_ms) | 
+      is.na(zip_code_aps) | is.na(zip_code_ms) |
+      is.na(name_last_aps) | is.na(name_last_ms) |  
+      is.na(name_first_aps) | is.na(name_first_ms) |
+      is.na(dob_year_aps) | is.na(dob_year_ms)
+  )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "1,158"
+# [1] "379 APS Rows (375 IDs), 1,102 MS Rows (939 IDs)"
+```
+
+After examination, we determined that pairs missing address values had 230 likely true pairs, pairs missing name values only had one additional likely true pair, and rows missing DOB values had 18 additional likely true pairs. We directly called the pairs we wished to keep from rows missing name or DOB values, and used code to call pairs to keep from rows missing address values (those with identical dates of birth).
+
+
+Only 249 of the 1,158 pairs were found to be a true match. As such, we added the remaining 909 pairs to our drop list.
+
+```{r}
+# Missingness in address fields
+keep_pairs <- checking |>
+  dplyr::filter(
+    # Select for missing address values
+    (
+      is.na(addr_street_aps) | is.na(addr_street_ms) | 
+      is.na(zip_code_aps) | is.na(zip_code_ms)
+     )
+  ) |>
+  dplyr::filter(
+    # Ensure other identifiers are not missing
+    !is.na(name_first_aps) & !is.na(name_first_ms) 
+    & !is.na(name_last_aps) & !is.na(name_last_ms) 
+    & !is.na(dob_year_aps) & !is.na(dob_month_aps)
+  ) |>
+  dplyr::filter(
+    # Select for identical date of birth
+    (dob_year_aps == dob_year_ms) &
+      (dob_month_aps == dob_month_ms) &
+      (dob_day_aps == dob_day_ms)
+  ) |>
+  dplyr::select(pair) |>
+  dplyr::pull()
+
+keep_pairs <- c(
+  keep_pairs,
+  # Missingness in name fields
+  17378,
+  # Missingness in DOB fields
+  10634, 16441, 27873, 4394, 4395, 6948, 8844, 8845, 10529, 11835, 
+  7852, 12247, 14901, 16043, 7504, 7349, 24649, 26296
+)
+
+
+drop_pairs <- unique(c(
+  drop_pairs, 
+  setdiff(checking_cols$pair, keep_pairs)
+  ))
+
+length(drop_pairs)
+# [1] 15055
+```
+
+#### Pairs With All Identifiers
+
+We then examined rows with no missingness in any identifiers. This section reviewed 10,906 pairs.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(
+    !is.na(addr_num_aps) & !is.na(addr_num_ms) &
+      !is.na(addr_street_aps) & !is.na(addr_street_ms) &
+      !is.na(zip_code_aps) & !is.na(zip_code_ms) &
+      !is.na(name_last_aps) & !is.na(name_last_ms) &  
+      !is.na(name_first_aps) & !is.na(name_first_ms) &
+      !is.na(dob_year_aps) & !is.na(dob_year_ms)
+  )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Number of rows and IDS from each set
+paste0(
+  format(length(unique(checking_cols$row_aps)), big.mark = ','), 
+  " APS Rows (",
+  format(length(unique(checking_cols$id_aps)), big.mark = ','), 
+  " IDs), ",
+  format(length(unique(checking_cols$row_ms)), big.mark = ','), 
+  " MS Rows (",
+  format(length(unique(checking_cols$id_ms)), big.mark = ','), 
+  " IDs)"
+)
+
+# [1] "10,906"
+# [1] "4,731 APS Rows (4,639 IDs), 7,221 MS Rows (5,764 IDs)"
+```
+
+We found that pairs with differences in either a single identifier, within a single identifier set, or with an identical date of birth were mostly true pairs. This covered 3,024 pairs.
+
+```{r}
+# Initiate list of pairs
+pair_list <- c()
+
+# Extract pairs with a single-identifier difference
+t_pairs <- checking_cols |>
+  dplyr::mutate(
+    diff_first = (name_first_aps != name_first_ms),
+    diff_last = (name_last_aps != name_last_ms),
+    diff_year = (dob_year_aps != dob_year_ms),
+    diff_month = (dob_month_aps != dob_month_ms),
+    diff_day = (dob_day_aps != dob_day_ms),
+    diff_num = (addr_num_aps != addr_num_ms),
+    diff_street = (addr_street_aps != addr_street_ms),
+    diff_zip = (zip_code_aps != zip_code_ms)
+  ) %>%
+  dplyr::mutate(
+    total_diff = rowSums(select(., starts_with("diff_")))
+  ) |>
+  dplyr::filter(
+    total_diff == 1
+  ) |>
+  dplyr::select(pair) |>
+  dplyr::pull()
+
+pair_list <- unique(c(pair_list, t_pairs))
+
+# Extract pairs with a within-set identifier difference
+t_pairs <- checking_cols |>
+  dplyr::filter(
+    !pair %in% pair_list
+  ) |>
+  dplyr::filter(
+    # Name difference only
+    ( ((name_first_aps != name_first_ms) | (name_last_aps != name_last_ms)) &
+      (
+       (dob_year_aps == dob_year_ms) & (dob_month_aps == dob_month_ms) & 
+         (dob_day_aps == dob_day_ms)
+      ) &
+     (
+      (addr_num_aps == addr_num_ms) & (addr_street_aps == addr_street_ms) & 
+        (zip_code_aps == zip_code_ms) 
+      ) 
+    ) |
+   # DOB difference only
+    ( ((name_first_aps == name_first_ms) & (name_last_aps == name_last_ms)) &
+      (
+       (dob_year_aps != dob_year_ms) | (dob_month_aps != dob_month_ms) | 
+         (dob_day_aps != dob_day_ms)
+      ) &
+     (
+      (addr_num_aps == addr_num_ms) & (addr_street_aps == addr_street_ms) & 
+        (zip_code_aps == zip_code_ms) 
+      ) 
+    ) |
+   # Address difference only
+    ( ((name_first_aps == name_first_ms) & (name_last_aps == name_last_ms)) &
+      (
+       (dob_year_aps == dob_year_ms) & (dob_month_aps == dob_month_ms) & 
+         (dob_day_aps == dob_day_ms)
+      ) &
+     (
+      (addr_num_aps != addr_num_ms) | (addr_street_aps != addr_street_ms) | 
+        (zip_code_aps != zip_code_ms) 
+      ) 
+    )
+  ) |>
+  dplyr::select(pair) |>
+  dplyr::pull()
+
+pair_list <- unique(c(pair_list, t_pairs))
+
+# Extract pairs with mismatch in name and address fields, but same DOB
+t_pairs <- checking_cols |>
+  dplyr::filter(
+    !pair %in% pair_list
+  ) |>
+  dplyr::filter(
+     (dob_year_aps == dob_year_ms) & (dob_month_aps == dob_month_ms) & 
+       (dob_day_aps == dob_day_ms)
+  ) |>
+  dplyr::select(pair) |>
+  dplyr::pull()
+
+pair_list <- unique(c(pair_list, t_pairs))
+
+format(length(pair_list), big.mark = ',')
+# "3,024"
+```
+
+We added 29 of these 3,024 pairs to our drop list.
+
+```{r}
+drop_pairs <- unique(c(
+   drop_pairs, 
+   c(
+    2662, 5241, 6059, 6311, 6758, 7409, 7580, 8921, 9017, 9496, 9497, 9745, 
+    9812, 10509, 11533, 14246, 16376, 17607, 17790, 18758, 19221, 20723, 22875, 
+    23528, 23755, 26198, 26386, 28109, 29676
+   )
+  ))
+
+length(drop_pairs)
+# [1] 15084
+```
+
+The remaining pairs were predominantly false matches. We identified 281 pairs we wished to keep. We added the remaining 7,601 pairs to our drop list.
+
+```{r}
+keep_list <- c(
+  88, 614, 617, 668, 770, 911, 1009, 1294, 1358, 1366, 1367, 1492, 1793, 
+  1949, 1950, 1986, 1987, 1988, 2042, 2168, 2290, 2291, 2554, 2817, 2872, 
+  2920, 3318, 3517, 3556, 3844, 4089, 4136, 4285, 4463, 4503, 4505, 4508, 
+  4902, 4954, 5190, 5197, 5226, 5263, 5347, 5516, 5526, 5547, 5743, 5744, 
+  5779, 5886, 5944, 5965, 5966, 5967, 6118, 6182, 6184, 6253, 6650, 6741,
+  6850, 6910, 7373, 7760, 7884, 7920, 7932, 8143, 8144, 8169, 8216, 8500, 
+  8611, 8613, 8892, 8899, 8974, 8976, 9302, 9353, 9359, 9415, 9451, 9490, 
+  10045, 10071, 10208, 10419, 10561, 10640, 10673, 10744, 10811, 10840, 
+  10841, 10879, 10897, 10912, 10948, 10997, 11031, 11097, 11210, 11339, 
+  11549, 11557, 11928, 12149, 12150, 12171, 12216, 12296, 12403, 12689, 
+  12771, 12853, 13503, 13757, 13791, 14012, 14079, 14101, 14161, 14452, 
+  14480, 14559, 14687, 14704, 14726, 14920, 14921, 14932, 14933, 15514, 
+  15581, 15736, 15833, 15841, 15845, 16015, 16054, 16077, 16114, 16228, 
+  16262, 16263, 16452, 16557, 16568, 16614, 16625, 16852, 17084, 17183, 
+  17272, 17848, 17880, 17949, 18181, 18183, 18184, 18185, 18196, 18221, 
+  18308, 18586, 18724, 18731, 19029, 19194, 19389, 19390, 19730, 19905, 
+  20029, 20217, 20366, 20387, 20450, 20480, 20694, 20703, 20721, 20799, 
+  20851, 20951, 21001, 21005, 21007, 21028, 21114, 21128, 21170, 21213, 
+  21243, 21251, 21268, 21352, 21353, 21616, 21744, 21958, 21966, 22216, 
+  22459, 22480, 22526, 22530, 22742, 22892, 22941, 23004, 23154, 23166, 
+  23170, 23229, 23300, 23377, 23557, 23601, 23774, 23861, 23862, 23908, 
+  24008, 24047, 24181, 24234, 24278, 24311, 24862, 24933, 25136, 25213, 
+  25216, 25619, 26167, 26618, 26686, 26912, 26942, 26944, 27070, 27072, 
+  27138, 27262, 27382, 27444, 27530, 27637, 27868, 27892, 28005, 
+  28141, 28144, 28162, 28181, 28367, 28380, 28453, 28748, 28770, 28999, 
+  29000, 29001, 29013, 29067, 29106, 29176, 29249, 29257, 29311, 29441, 
+  29512, 29518, 29728, 29861, 29863, 29870, 29872
+  )
+
+drop_pairs <- unique(c(
+   drop_pairs, 
+   checking_cols |> 
+     dplyr::filter(!pair %in% pair_list) |> 
+     dplyr::filter(!pair %in% keep_list) |> 
+     dplyr::select(pair) |> 
+     dplyr::pull()
+  ))
+
+length(drop_pairs)
+# [1] 22684
+```
+
+### Review of Multiply-Matching Within-Set ID Values
+
+As multiply-matching within-set ID values potentially represented failed or false within-set matches, we performed a brief manual review of these pairings.
+
+```{r}
+# Obtain ID values with multiple paired IDs in the other set of values.
+counts <- temp_pairs |>
+  dplyr::select(id_ms, id_aps) |>
+  dplyr::distinct() |>
+  dplyr::group_by(id_aps) |>
+  dplyr::mutate(count_ms = n_distinct(id_ms)) |>
+  dplyr::ungroup() |>
+  dplyr::group_by(id_ms) |>
+  dplyr::mutate(count_aps = n_distinct(id_aps)) |>
+  dplyr::ungroup() |>
+  dplyr::filter(count_ms > 1 | count_aps > 1)
+
+# Obtain the within-set APS IDs that had more than one MedStar ID pair, to
+# check MedStar IDs for failed or false matches.
+aps_ids <- counts |> 
+  dplyr::filter(count_ms > 1) |> 
+  dplyr::select(id_aps) |>
+  dplyr::distinct() |> 
+  dplyr::pull()
+
+# Obtain the within-set MedStar IDs that had more than one APS ID pair, to
+# check APS IDs for failed or false matches.
+ms_ids <- counts |> 
+  dplyr::filter(count_aps > 1) |> 
+  dplyr::select(id_ms) |>
+  dplyr::distinct() |> 
+  dplyr::pull()
+
+
+# Print a human-legible summary
+# ---------------------------------------------------------------------------
+paste0(
+  "Isolated ", 
+  format(length(aps_ids), big.mark = ','), 
+  " APS IDs (matched between ", 
+  min(counts[counts$count_ms != 1,]$count_ms), 
+  " and ", 
+  max(counts[counts$count_ms != 1,]$count_ms), 
+  " times, mean of ", 
+  format(
+   counts |> 
+     dplyr::select(id_aps, count_ms) |> 
+     dplyr::distinct() |> 
+     dplyr::filter(id_aps %in% aps_ids) |>
+     dplyr::select(count_ms) |> 
+     dplyr::pull() |> 
+     mean(),
+   digits = 4
+   ), 
+  " times); and ",
+  format(length(ms_ids), big.mark = ','), 
+  " MedStar IDs (matched between ",
+  min(counts[counts$count_aps != 1,]$count_aps), 
+  " and ",
+  max(counts[counts$count_aps != 1,]$count_aps), 
+  " times, mean of ", 
+  format(
+   counts |> 
+     dplyr::select(id_ms, count_aps) |> 
+     dplyr::distinct() |> 
+     dplyr::filter(id_ms %in% ms_ids) |>
+     dplyr::select(count_aps) |> 
+     dplyr::pull() |> 
+     mean(),
+   digits = 4
+   ), " times)"
+)
+
+# [1] "Isolated 3,048 APS IDs (matched between 2 and 147 times, mean of 6.32
+# times); and 4,463 MedStar IDs (matched between 2 and 55 times, mean of 
+# 4.173 times)"
+```
+
+#### MedStar Corrections
+
+We identified several fixes to our ID assignments in the MedStar data. We consolidated 36 IDs into 18 IDs to correct for failed matches. We also split 4 IDs into 8 IDs to correct for false matches. There were 2 additional fixes that required a combination of splitting and merging, consolidating 5 IDs into 4 IDs.
+
+```{r}
+# MS ID CORRECTIONS
+revise_ms_ids <- tibble::tibble(
+  row_ms = c(
+    # JOIN IDS
+    # =======================================================================
+    # 7310 (5)
+    33969, 35364, 35365, 33970, 35366,
+    # 7852 (3)
+    6628, 6456, 6768, 
+    # 7529 (2)
+    32108, 31958, 
+    # 8985 (3)
+    31222, 31221, 13742,  
+    # 22523 (2)
+    17455, 17540, 
+    # 8692 (3)
+    8318, 8319, 981, 
+    # 18696 (5)
+    32994, 32995, 32996, 32997, 32938, 
+    # 9648 (3)
+    15896, 15897, 15828, 
+    # 13438 (4)
+    14219, 31783, 32121, 32122, 
+    # 34710 (2) 
+    7262, 15462,
+    # 14659 (3)
+    9250, 9251, 8210, 
+    # 8518 (3)
+    30592, 30593, 30594,
+    # 3503 (3)
+    12064, 12065, 12066,
+    # 23521 (3)
+    2940, 3082, 45540,
+    # 7285 (3)
+    5378, 5379, 5495,
+    # 23151 (5)
+    32601, 10880, 11433, 11482, 11483,
+    # 2353 (2) 
+    40031, 40032,
+    # 2421 (4) 
+    50518, 50524, 50525, 5608,
+
+    
+    
+    # SPLIT IDS
+    # =======================================================================
+    # 7610 to 7610 and 42204
+    24220, 24243, 
+    # 18904 to 18904 and 42205
+    16912, 32878, 
+    # 17196 to 17196 and 42206
+    24197, 24204,  
+    # 34312 to 34312 and 42207
+    40383, 18236,
+    # 4471 move one row (10333) to 21697
+    46281, 10333, 10331, 10332,
+    # merge 2338 and 25638 with one row (23152) of 19001
+    20724, 20733, 23152, 23110, 23111
+  ),
+  
+  id_ms = c(
+    # JOIN IDS
+    # =======================================================================
+    rep(7310, 5), rep(7852, 3), rep(7529, 2), rep(8985, 3), rep(22523, 2),
+    rep(8692, 3), rep(18696, 5), rep(9648, 3), rep(13438, 4), rep(34710, 2),
+    rep(14659, 3), rep(8518, 3), rep(3503, 3), rep(23521, 3), rep(7285, 3),
+    rep(23151, 5), rep(2353, 2), rep(2421, 4),
+    
+    # SPLIT IDS
+    # ========================================================================
+    7610, 42204, 18904, 42205, 17196, 42206, 34312, 42207, 4471, 
+    rep(21697, 3), rep(2338, 3), rep(19001, 2)
+  ),
+  
+  original_id = c(
+    # JOIN IDS
+    # ========================================================================
+    rep(7310, 3), rep(26653, 2), 7852, rep(28574, 2), 7529, 14640, 
+    rep(8985, 2), 16140, 22523, 27107, rep(8692, 2), 13412, rep(18696, 4), 
+    30543, rep(9648, 2), 38025, 13438, rep(15876, 3), 34710, 35104, 
+    rep(14659, 2), 15271, rep(8518, 2), 20193, rep(3503, 2), 30053, 
+    rep(23521, 2), 38337, rep(7285, 2), 12200, 23151, rep(26355, 4), 2353, 
+    4846, rep(2421, 3), 20656, 
+    
+    # SPLIT IDS
+    # =======================================================================
+    rep(7610, 2), rep(18904, 2), rep(17196, 2), rep(34312, 2), rep(4471, 2),
+    rep(21697, 2), 2338, 25638, rep(19001, 3)
+  )
+)
+```
+
+We applied these fixes to our pair data and primary data frame.
+
+```{r}
+# Revise Pair Data
+temp_pairs <- dplyr::rows_update(
+  temp_pairs,
+  revise_ms_ids |>
+    dplyr::select(row_ms, id_ms),
+  by = 'row_ms',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+
+ms_pack$df <- dplyr::rows_update(
+    ms_pack$df,
+    revise_ms_ids |>
+      dplyr::select(row_ms, id_ms) |>
+      dplyr::rename_at(
+        c('row_ms', 'id_ms'), 
+        ~c('row', 'id')
+        ),
+    by = 'row'
+  )
+
+```
+
+#### APS Corrections
+
+We identified several fixes to our ID assignments in the APS data, which notably only required merges. We consolidated 139 IDs into 69 IDs to correct for failed matches.
+
+```{r}
+revise_aps_ids <- tibble::tibble(
+  row_aps = c(
+    # JOIN IDS
+    # =======================================================================
+    # 51771 (2)
+    136678, 62391,
+    # 5133 (2)
+    19221, 34675,
+    # 8560 (3)
+    31909, 211065, 12409, 
+    # 12967 (2)
+    48241, 375316, 
+    # 17160 (2)
+    62316, 245717,
+    # 17842 (2)
+    64295, 171441,
+    # 27793 (2)
+    86228, 17830, 
+    # 36616 (2)
+    104670, 78414,
+    # 37095 (2)
+    105685, 25812,
+    # 39096 (2)
+    109946, 107051,
+    # 44906 (2)
+    122222, 168709,
+    # 46668 (2)
+    125930, 10285,
+    # 51428 (2)
+    135953, 338639,
+    # 52015 (2)
+    137191, 202190,
+    # 52870 (2)
+    138999, 122692,
+    # 60029 (2)
+    154105, 190974,
+    # 60102 (2)
+    154260, 293993, 
+    # 70956 (2)
+    177219, 163581, 
+    # 74438 (2)
+    184585, 307666, 
+    # 78358 (2)
+    192869, 146967, 
+    # 79504 (2)
+    195289, 297087, 
+    # 79908 (2)
+    196135, 279298, 
+    # 80179 (2)
+    196713, 166199, 
+    # 83860 (3)
+    204532, 294161, 303051,
+    # 84746 (2)
+    206422, 249467, 
+    # 91482 (2)
+    220830, 217518, 
+    # 94727 (2)
+    227748, 316620, 
+    # 100171 (2)
+    239300, 246729, 
+    # 100855 (2)
+    240771, 362387,
+    # 102746 (2)
+    244776, 332069, 
+    # 103671 (2)
+    246752, 219923, 
+    # 105904 (2)
+    251439, 285509, 
+    # 111695 (2)
+    263699, 233480, 
+    # 113108 (2)
+    266717, 335685, 
+    # 116150 (2)
+    273205, 139192, 
+    # 118596 (2)
+    278396, 228622, 
+    # 123033 (2)
+    287813, 163307, 
+    # 124881 (2)
+    291715, 60783, 
+    # 127052 (2)
+    296349, 332262, 
+    # 127810 (2)
+    297940, 203333, 
+    # 131660 (2)
+    306146, 42999, 
+    # 135104 (2)
+    313512, 301009, 
+    # 138201 (2)
+    320129, 202603, 
+    # 141332 (2)
+    326794, 251672, 
+    # 141444 (2)
+    327026, 123284, 
+    # 143005 (2)
+    330346, 354141, 
+    # 143261 (2)
+    330896, 310781, 
+    # 143947 (2)
+    332386, 12505, 
+    # 144415 (2)
+    333365, 3601, 
+    # 144488 (2)
+    333517, 359030, 
+    # 149721 (2)
+    344658, 344655, 
+    # 149759 (2)
+    344737, 351492, 
+    # 153027 (2)
+    351706, 312851, 
+    # 163145 (2)
+    373237, 267120, 
+    # 164131 (2)
+    375372, 236817, 
+    # 168466 (3)
+    15470, 366609, 298334,
+    # 169078 (3)
+    17794, 369704, 369621,
+    # 179899 (4)
+    57649, 171391, 281508, 111012, 
+    # 257779 (3)
+    225040, 326633, 145726, 
+    # 259125 (2)
+    228634, 227929,
+    # 269637 (3)
+    250303, 325790, 354947,
+    # 101767 (2)
+    242697, 294455,
+    # 314429 (2)
+    35379, 356385,
+    # 180318 (2)
+    59010, 165150, 
+    # 178654 (3)
+    53418, 87531, 172184,
+    # 116433 (2)
+    273798, 194263,
+    # 58856 (2)
+    162048, 346422,
+    # 19841 (2)
+    69350, 264297,
+    # 79788 (2)
+    195884, 269317
+  ),
+
+  id_aps = c(
+    # JOIN IDS
+    # =======================================================================
+    rep(51771, 2), rep(5133, 2), rep(8560, 3), rep(12967, 2), rep(17160, 2),
+    rep(17842, 2), rep(27793, 2), rep(36616, 2), rep(37095, 2), rep(39096, 2),
+    rep(44906, 2), rep(46668, 2), rep(51428, 2), rep(52015, 2), rep(52870, 2),
+    rep(60029, 2), rep(60102, 2), rep(70956, 2), rep(74438, 2), rep(78358, 2),
+    rep(79504, 2), rep(79908, 2), rep(80179, 2), rep(83860, 3), rep(84746, 2),
+    rep(91482, 2), rep(94727, 2), rep(100171, 2),  rep(100855, 2),  
+    rep(102746, 2),  rep(103671, 2),  rep(105904, 2),  rep(111695, 2), 
+    rep(113108, 2),  rep(116150, 2),  rep(118596, 2),  rep(123033, 2), 
+    rep(124881, 2),  rep(127052, 2),  rep(127810, 2),  rep(131660, 2), 
+    rep(135104, 2),  rep(138201, 2),  rep(141332, 2),  rep(141444, 2), 
+    rep(143005, 2),  rep(143261, 2),  rep(143947, 2),  rep(144415, 2), 
+    rep(144488, 2),  rep(149721, 2),  rep(149759, 2),  rep(153027, 2), 
+    rep(163145, 2),  rep(164131, 2), rep(168466, 3),  rep(169078, 3),  
+    rep(179899, 4),  rep(257779, 3), rep(259125, 2),  rep(269637, 3), 
+    rep(101767, 2), rep(314429, 2), rep(180318, 2), rep(178654, 3), 
+    rep(116433, 2), rep(58856, 2), rep(19841, 2), rep(79788, 2)
+  ),
+
+  original_id = c(
+    # JOIN IDS
+    # =======================================================================
+    51771, 181424, 5133, 173557, rep(8560, 2), 167639, 12967, 328546, 17160,
+    103191, 17842, 232510, 27793, 169088, 36616, 188303, 37095, 171204, 39096,
+    201948, 44906, 231212, 46668, 167091, 51428, 311274, 52015, 247048, 52870,
+    209382, 60029, 241736, 60102, 290255, 70956, 228790, 74438, 296695, 78358,
+    220901, 79504, 291709, 79908, 283314, 80179, 230036, rep(83860, 2), 
+    294501, 84746, 269247, 91482, 254248, 94727, 136557, 100171, 267959, 
+    100855, 322465, 102746, 308175, 103671, 255365, 105904, 286250, 111695,
+    261726, 113108, 309890, 116150, 217218, 118596, 259446, 123033, 228660,
+    124881, 180882, 127052, 143890, 127810, 247594, 131660, 175784, 135104,
+    293545, 138201, 247243, 141332, 270291, 141444, 209664, 143005, 318561,
+    143261, 298160, 143947, 167667, 144415, 165406, 144488, 320891, 149721,
+    314088, 149759, 317319, 153027, 299131, 163145, 277586, 164131, 263293,
+    rep(168466, 2), 127996, rep(169078, 2), 161446, rep(179899, 3), 39597,
+    rep(257779, 2), 56070, 259125, 330295, rep(269637, 2), 154527, 101767, 
+    290477, 314429, 155203, 180318, 65231, 178654, 371876, 371877, 116433, 
+    243292, 58856, 314918, 19841, 276246, 79788, 278611
+  )
+)
+```
+
+We applied these fixes to our pair data and primary data frame.
+
+```{r}
+# Revise Pair Data
+temp_pairs <- dplyr::rows_update(
+  temp_pairs,
+  revise_aps_ids |>
+    dplyr::select(row_aps, id_aps),
+  by = 'row_aps',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+
+aps_pack$df <- dplyr::rows_update(
+    aps_pack$df,
+    revise_aps_ids |>
+      dplyr::select(row_aps, id_aps) |>
+      dplyr::rename_at(
+        c('row_aps', 'id_aps'), 
+        ~c('row', 'id')
+        ),
+    by = 'row'
+  )
+```
+
+### Regenerating ID Assignments
+
+We reduced our pairs, excluding all pairs we previously determined were false matches. We used this reduced set to re-generate ID assignments.
+
+```{r}
+temp_pairs <- temp_pairs |>
+  dplyr::filter(!(pair %in% drop_pairs))
+
+temp_ids <- stack_ids(aps_pack, ms_pack, temp_pairs)
+```
+
+There were 7,412 observations in the ID set, creating 4,709 unique IDs. There were no pairs were missing values for `row_aps`, `row_ms`, `id_aps`, or `row_aps` variables. There were 371,106 APS Rows (366,074 IDs) and 43,922 MedStar Rows (37,293 IDs) missing from this ID set, likely due to a failure to pair. 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many observations in the ID set?
+format(nrow(temp_ids), big.mark = ',')
+
+# How many unique IDs were generated?
+format(length(unique(temp_ids$id)), big.mark = ',')
+
+# Are there any pairs missing an ID value?
+format(sum(is.na(temp_ids$id)), big.mark = ',')
+
+# Are there any rows missing a value for source row?
+format(
+  nrow(temp_ids |> dplyr::filter(is.na(row_aps)|is.na(row_ms))),
+  big.mark = ','
+  )
+
+# Are there any rows missing a value for source ID?
+format(
+  nrow(temp_ids |> dplyr::filter(is.na(id_aps)|is.na(id_ms))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS/MS data for this chunk are missing from the
+# ID data (likely due to no kept match)
+paste0(
+  "Missing Rows from APS Data: ",
+  format(
+    length(setdiff(aps_pack$df$row, temp_ids$row_aps)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from MS Data: ",
+  format(
+    length(setdiff(ms_pack$df$row, temp_ids$row_ms)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS/MS data for this chunk are missing from the
+# ID data (likely due to no match kept match)
+paste0(
+  "Missing IDs from APS Data: ",
+  format(
+    length(setdiff(aps_pack$df$id, temp_ids$id_aps)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from MS Data: ",
+  format(
+    length(setdiff(ms_pack$df$id, temp_ids$id_ms)), 
+    big.mark = ','
+    )
+)
+
+# [1] "7,412"
+# [1] "4,709"
+# [1] "0"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from APS Data: 371,106; Missing Rows from MS Data: 43,992"
+# [1] "Missing IDs from APS Data: 366,074; Missing IDs from MS Data: 37,293"
+```
+
+### Cleaning IDs
+
+#### Source IDs in More than one Cross-Set ID
+
+A single within-set subject ID matching into multiple cross-set ID values was likely to represent either failed or false matches, and required examination. We had 87 ID values impacted by this phenomenon: 87 rows due to a MedStar ID matching with multiple APS IDs, and 61 APS IDs due to matching with multiple MedStar IDs.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+temp_ids <- temp_ids |>
+  dplyr::group_by(id_aps) |>
+  dplyr::mutate(n_ids_aps = dplyr::n_distinct(id)) |>
+  dplyr::ungroup() |>
+  dplyr::group_by(id_ms) |>
+  dplyr::mutate(n_ids_ms = dplyr::n_distinct(id)) |>
+  dplyr::ungroup()
+
+# Number of IDs (total)
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_ms > 1 | n_ids_aps > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+
+# Number of IDs impacted due to MedStar IDs across sets
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_ms > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+
+# Number of IDs impacted due to APS IDs across sets
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_aps > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+
+# [1] "87"
+# [1] "87"
+# [1] "61"
+```
+
+Investigation revealed 32 distinct clusters. We were able to resolve cluster 7 (IDs 1462, 1463, 454) by dropping three specific pairs (8844, 8845, 10529). We the dropped 55 IDs, which would become redundant after merging within-set IDs.
+
+```{r}
+drop_pairs <- c(8844, 8845, 10529)
+drop_ids <- c(
+  1017, 1345, 3002, 3169, 1902, 2831, 1286, 1047, 1279, 1795,
+  345, 739, 738, 487, 537, 2457, 2037, 742, 743, 1744, 1431,
+  3440, 3594, 624, 623, 593, 2734, 2823, 2859, 2870, 921, 922,
+  1970, 931, 1166, 1983, 973, 576, 3743, 3374, 545, 459, 
+  903, 1454, 1080, 1219, 1920, 2211, 2381, 2881, 3453, 4254,
+  4429, 1463, 454
+)
+
+temp_pairs <- temp_pairs |>
+  dplyr::filter(!pair %in% drop_pairs)
+
+temp_ids <- temp_ids |>
+  dplyr::filter(!pair %in% drop_pairs) |>
+  dplyr::filter(!id %in% drop_ids)
+```
+
+
+##### Merging Within-Set IDs
+
+Resolution required merging several IDs. We merged 18 APS IDS into 9 APS IDs, and 20 MedStar IDS into 9 MedStar IDs.
+
+```{r}
+# ADD APS REVISIONS
+revise_aps_ids <- dplyr::bind_rows(
+  revise_aps_ids,
+  tibble::tibble(
+  row_aps = c(
+    # JOIN IDS
+    # =======================================================================
+    # 6199 (2)
+    23247, 170541,
+    # 116150 (1 row here, 3 total in group)
+    # (orig ID 116150, row 273205), (orig. ID 217218, row 139192)
+    # already in set from previous fixes
+    50082,
+    # 63505 (2)
+    161494, 296846,
+    # 89692 (2)
+    217006, 28026,
+    # 122914 (2)
+    287536, 287198,
+    # 126111 (3)
+    294343, 193829, 246852,
+    # 141332 (1 row here, 3 total in group)
+    # (orig ID 141332, row 326794), (orig. ID 270291, row 251672)
+    # already in set from previous fixes
+    237526,
+    # 153924 (2)
+    353652, 374417,
+    # 159841 (2)
+    366225, 103990,
+    # 9223 (2)
+    34493, 202849,
+    # 57411 (2)
+    148571, 42885,
+    # 151225 (2)
+    347869, 287657,
+    # 160605 (2)
+    367829, 240921,
+    # 98018 (2)
+    234746, 34141,
+    # 309153 (2)
+    334122, 344731,
+    # 182768 (3)
+    66092, 37204, 216738,
+    # 196083 (2)
+    94745, 126493,
+    # 74035 (2)
+    183713, 352136,
+    # 215698 (2)
+    135964, 132881,
+    # 215097 (2)
+    134719, 187610,
+    # 342111 (2)
+    366220, 363873,
+    # 86341 (3)
+    209855, 244688, 238011,
+    # 197983 (2)
+    98694, 219175,
+    # 251147 (2)
+    210887, 268239,
+    # 47609 (2)
+    127907, 205822
+  ),
+  
+  id_aps = c(
+    # JOIN IDS
+    # =======================================================================
+    rep(6199, 2), 116150, rep(63505, 2), rep(89692, 2), rep(122914, 2), 
+    rep(126111, 3),  141332, rep(153924, 2), rep(159841, 2),
+    rep(9223, 2), rep(57411, 2), rep(151225, 2), rep(160605, 2),
+    rep(98018, 2), rep(309153, 2), rep(182768, 3), rep(196083, 2), 
+    rep(74035, 2), rep(215698, 2), rep(215097, 2), rep(342111, 2), 
+    rep(86341, 3), rep(197983, 2), rep(251147, 2), rep(47609, 2)
+  ),
+  
+  original_id = c(
+    # JOIN IDS
+    # ========================================================================
+    6199, 232087, 13486, 63505, 127285, 89692, 171802, 122914, 287050, 
+    126111, rep(243086, 2), 263628, 153924, 328120, 159841, 200495, 9223, 83063, 57411, 175749, 151225, 287272, 160605,
+    337836, 98018, 9135, 309153, 149756, 182768, 9987, 253883,
+    196083, 46937, 74035, 317624, 215698, 49970, 215097, 75880,
+    342111, 342038, rep(86341, 2), 263855, 197983, 90703,
+    251147, 278095, 47609, 248757
+  )
+  )
+)
+
+# ADD MEDSTAR REVISIONS
+revise_ms_ids <- dplyr::bind_rows(
+  revise_ms_ids,
+  tibble::tibble(
+  row_ms = c(
+    # JOIN IDS
+    # =======================================================================
+    # 5763 (2)
+    11134, 11133,
+    # 3503 (1 row here, 4 total in group)
+    # (orig ID 3503, rows 12064, 12065), (orig. ID 3500, row 312066)
+    # already in set from previous fixes
+    12063,
+    # 9491 (3)
+    377, 964, 963,
+    # 1985 (7)
+    5563, 5564, 5565, 5566, 5567, 5568, 5569,
+    # 4269 (5)
+    24032, 25584, 25585, 25586, 27888,
+    # 40615 (2)
+    9883, 10292,
+    # 27275 (2)
+    16225, 16224,
+    # 474 (5)
+    9056, 9057, 9058, 9059, 9055,
+    # 8971 (3)
+    35025, 35024, 35026,
+    # 2094 (3)
+    13816, 13818, 13817,
+    # 14715 (2)
+    39761, 39762,
+    # 3055 (3)
+    18081, 17907, 17908,
+    # 647 (10)
+    4195, 4196, 4197, 4198, 4199, 4200, 4201, 4202, 4203, 4326,
+    # 10451 (8)
+    2903, 2904, 2905, 2906, 2907, 2908, 2909, 3081
+  ),
+  
+  id_ms = c(
+    # JOIN IDS
+    # =======================================================================
+    rep(5763, 2), 3503, rep(9491, 3), rep(1985, 7), rep(4269, 5), 
+    rep(40615, 2), rep(27275, 2), rep(474, 5), rep(8971, 3),
+    rep(2094, 3), rep(14715, 2), rep(3055, 3), rep(647, 10),
+    rep(10451, 8)
+  ),
+  
+  original_id = c(
+    # JOIN IDS
+    # ========================================================================
+    5763, 18969, 12239, rep(9491, 2), 15766, rep(1985, 6), 
+    25318, rep(4269, 4), 34754, 40615, 41995, 27275, 36955, rep(474, 3), 
+    25184, 32562, 8971, 22430, 41694, rep(2094, 2), 6523, 14715,
+    22754, 3055, rep(6040, 2), rep(647, 9), 10703, 
+    rep(10451, 4), rep(35819, 4)
+  )
+  )
+)
+```
+
+We applied these fixes to our data frames.
+
+```{r}
+# APPLY APS FIXES
+## Revise ID Data
+temp_ids <- dplyr::rows_update(
+  temp_ids,
+  revise_aps_ids |>
+    dplyr::select(row_aps, id_aps),
+  by = 'row_aps',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+## Revise Pair Data
+temp_pairs <- dplyr::rows_update(
+  temp_pairs,
+  revise_aps_ids |>
+    dplyr::select(row_aps, id_aps),
+  by = 'row_aps',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+## Revise packed data frame
+aps_pack$df <- dplyr::rows_update(
+    aps_pack$df,
+    revise_aps_ids |>
+      dplyr::select(row_aps, id_aps) |>
+      dplyr::rename_at(
+        c('row_aps', 'id_aps'), 
+        ~c('row', 'id')
+        ),
+    by = 'row'
+  )
+
+# APPLY MEDSTAR FIXES
+## Revise ID Data
+temp_ids <- dplyr::rows_update(
+  temp_ids,
+  revise_ms_ids |>
+    dplyr::select(row_ms, id_ms),
+  by = 'row_ms',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+## Revise Pair Data
+temp_pairs <- dplyr::rows_update(
+  temp_pairs,
+  revise_ms_ids |>
+    dplyr::select(row_ms, id_ms),
+  by = 'row_ms',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+## Revise packed data frame
+ms_pack$df <- dplyr::rows_update(
+    ms_pack$df,
+    revise_ms_ids |>
+      dplyr::select(row_ms, id_ms) |>
+      dplyr::rename_at(
+        c('row_ms', 'id_ms'), 
+        ~c('row', 'id')
+        ),
+    by = 'row'
+  )
+```
+
+We verified that post-fix, we no longer had any within-set IDs appearing in more than one cross-set ID.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+temp_ids <- temp_ids |>
+  dplyr::group_by(id_aps) |>
+  dplyr::mutate(n_ids_aps = dplyr::n_distinct(id)) |>
+  dplyr::ungroup() |>
+  dplyr::group_by(id_ms) |>
+  dplyr::mutate(n_ids_ms = dplyr::n_distinct(id)) |>
+  dplyr::ungroup()
+
+# Number of IDs (total)
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_ms > 1 | n_ids_aps > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+# [1] "0"
+```
+
+#### Cross-Set IDs with More than One Within-Set ID
+
+A single cross-set ID containing multiple within-set ID values was likely to represent false matches, and required examination. 
+We had 336 ID values impacted by this phenomenon: 212 due to multiple MedStar IDs and 132 due to multiple APS IDs (8 due to both).
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+temp_ids <- temp_ids |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(n_ids_aps = dplyr::n_distinct(id_aps)) |>
+  dplyr::mutate(n_ids_ms = dplyr::n_distinct(id_ms)) |>
+  dplyr::ungroup()
+
+# Number of IDs (total)
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_ms > 1 | n_ids_aps > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+
+# Number of IDs impacted due to multiple MedStar IDs within a single ID
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_ms > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+
+# Number of IDs impacted due to multiple APS IDs within a single ID
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_aps > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+
+# Number of IDs impacted due to multiple IDs from BOTH sets in a single ID
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_aps > 1 & n_ids_ms > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+
+# [1] "336"
+# [1] "212"
+# [1] "132"
+# [1] "8"
+```
+
+Investigation revealed all but one ID appeared to consist of true matches. We dropped the single pair.
+
+```{r}
+drop_pairs <- c(11600)
+
+temp_pairs <- temp_pairs |>
+  dplyr::filter(!pair %in% drop_pairs)
+
+temp_ids <- temp_ids |>
+  dplyr::filter(!pair %in% drop_pairs)
+
+temp_ids <- temp_ids |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(n_ids_aps = dplyr::n_distinct(id_aps)) |>
+  dplyr::mutate(n_ids_ms = dplyr::n_distinct(id_ms)) |>
+  dplyr::ungroup()
+```
+
+We then merged our IDs.
+
+```{r}
+## MEDSTAR FIXES
+revise_ms_ids <- dplyr::bind_rows(
+  revise_ms_ids,
+  dplyr::rows_update(
+    # Extract original ID to rows
+    ms_pack$df |>
+      dplyr::select(id, row) |>
+      dplyr::filter(
+        id %in% dplyr::pull(temp_ids |> 
+          dplyr::filter(n_ids_ms > 1) |>
+          dplyr::select(id_ms) |> 
+          dplyr::distinct()
+          )
+        ) |>
+      dplyr::mutate(id_ms = id) |>
+      dplyr::rename_at(c('id', 'row'), ~c('original_id', 'row_ms')),
+    # Extract original ID to new ID pairs
+    temp_ids |> 
+      dplyr::filter(n_ids_ms > 1) |>
+      dplyr::select(id, id_ms) |>
+      dplyr::rename_at('id_ms', ~'original_id') |>
+      dplyr::group_by(id) |>
+      dplyr::mutate(id_ms = min(original_id)) |>
+      dplyr::ungroup() |>
+      dplyr::select(-id) |> 
+      dplyr::distinct(),
+    by = 'original_id'
+    )
+  )
+
+## APS FIXES
+revise_aps_ids <- dplyr::bind_rows(
+  dplyr::rows_update(
+    # Extract original ID to rows
+    aps_pack$df |>
+      dplyr::select(id, row) |>
+      dplyr::filter(
+        id %in% dplyr::pull(temp_ids |> 
+          dplyr::filter(n_ids_aps > 1) |>
+          dplyr::select(id_aps) |> 
+          dplyr::distinct()
+          )
+        ) |>
+      dplyr::mutate(id_aps = id) |>
+      dplyr::rename_at(c('id', 'row'), ~c('original_id', 'row_aps')),
+    # Extract original ID to new ID pairs
+    temp_ids |> 
+      dplyr::filter(n_ids_aps > 1) |>
+      dplyr::select(id, id_aps) |>
+      dplyr::rename_at('id_aps', ~'original_id') |>
+      dplyr::group_by(id) |>
+      dplyr::mutate(id_aps = min(original_id)) |>
+      dplyr::ungroup() |>
+      dplyr::select(-id) |> 
+      dplyr::distinct(),
+    by = 'original_id'
+    )
+  )
+```
+
+We applied these fixes to our data frames.
+
+```{r}
+# APPLY APS FIXES
+## Revise ID Data
+temp_ids <- dplyr::rows_update(
+  temp_ids,
+  revise_aps_ids |>
+    dplyr::select(row_aps, id_aps),
+  by = 'row_aps',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+## Revise Pair Data
+temp_pairs <- dplyr::rows_update(
+  temp_pairs,
+  revise_aps_ids |>
+    dplyr::select(row_aps, id_aps),
+  by = 'row_aps',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+## Revise packed data frame
+aps_pack$df <- dplyr::rows_update(
+    aps_pack$df,
+    revise_aps_ids |>
+      dplyr::select(row_aps, id_aps) |>
+      dplyr::rename_at(
+        c('row_aps', 'id_aps'), 
+        ~c('row', 'id')
+        ),
+    by = 'row'
+  )
+
+# APPLY MEDSTAR FIXES
+## Revise ID Data
+temp_ids <- dplyr::rows_update(
+  temp_ids,
+  revise_ms_ids |>
+    dplyr::select(row_ms, id_ms),
+  by = 'row_ms',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+## Revise Pair Data
+temp_pairs <- dplyr::rows_update(
+  temp_pairs,
+  revise_ms_ids |>
+    dplyr::select(row_ms, id_ms),
+  by = 'row_ms',
+  # Map has rows that were not paired, to apply to all data sets
+  unmatched = 'ignore'
+  )
+## Revise packed data frame
+ms_pack$df <- dplyr::rows_update(
+    ms_pack$df,
+    revise_ms_ids |>
+      dplyr::select(row_ms, id_ms) |>
+      dplyr::rename_at(
+        c('row_ms', 'id_ms'), 
+        ~c('row', 'id')
+        ),
+    by = 'row'
+  )
+```
+
+We then verified that this resolved the issue in our data set.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+temp_ids <- temp_ids |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(n_ids_aps = dplyr::n_distinct(id_aps)) |>
+  dplyr::mutate(n_ids_ms = dplyr::n_distinct(id_ms)) |>
+  dplyr::ungroup()
+
+# Number of IDs (total)
+format(
+  temp_ids |> 
+    dplyr::filter(n_ids_ms > 1 | n_ids_aps > 1) |> 
+    dplyr::select(id) |> 
+    dplyr::distinct() |>
+    nrow(), 
+  big.mark = ','
+  )
+
+# [1] "0"
+```
+
+# Finalization of Maps
+
+We trimmed our ID data set into only our desired columns: the between set ID, and each within-set ID. We also trimmed our data to a unique combination of these values. This resulted in 4,654 unique cross-data set IDs.
+
+```{r}
+temp_ids <- temp_ids |>
+  dplyr::select(id, id_ms, id_aps) |>
+  dplyr::distinct()
+
+length(unique(temp_ids$id))
+# [1] 4654
+```
+
+In order to join our within-set IDs to the cross-set IDs, we had to apply the ID revisions to our original data sets. In particular, we required revision of specific MedStar within-set IDs that had been split or otherwise finagled.
+
+```{r}
+medstar <- medstar |>
+  # Add row number for PHI-free targeting of rows
+  dplyr::mutate(orig_row = dplyr::row_number())
+
+medstar <- dplyr::rows_update(
+    medstar |>
+      dplyr::mutate(id_ms = unique_id),
+    revise_ms_ids |>
+      # Do NOT apply fixes for split or finagled original IDs
+      dplyr::filter(
+        !original_id %in% c(7610, 18904, 17196, 34312, 4471, 19001)
+      ) |> 
+      dplyr::select(original_id, id_ms) |>
+      dplyr::distinct() |>
+      dplyr::rename_at(
+        c('original_id'), 
+        ~c('unique_id')
+        ),
+    by = 'unique_id'
+  ) |>
+  dplyr::mutate(
+    # Point-fix specific rows that were split or finagled
+    id_ms = dplyr::case_when(
+      orig_row == 44554 ~ 42204,
+      orig_row == 44580 ~ 42208,
+      orig_row == 60025 ~ 42205,
+      orig_row == 44538 ~ 42206,
+      orig_row == 33922 ~ 42207,
+      orig_row == 19249 ~ 21697,
+      orig_row == 42620 ~ 2338,
+      TRUE ~ id_ms
+    )
+  )
+
+# Reduce MedStar to desired columns (ID, KEYS)
+medstar <- medstar |> 
+  dplyr::select(id_ms, x_primary_key, medstar_internal_id) |>
+  dplyr::mutate(id = NA_integer_)
+```
+
+In comparison, updating our APS data was much simpler as it was all merges based on within-set ID.
+
+```{r}
+aps_id_map <- dplyr::rows_update(
+  aps_id_map |>
+    dplyr::mutate(id_aps = aps_id) |>
+    dplyr::rename_at('aps_id', ~'original_id'),
+  revise_aps_ids |>
+    dplyr::select(-row_aps) |>
+    dplyr::distinct(),
+  by = 'original_id'
+  ) |>
+  dplyr::select(-original_id)
+```
+
+We then added any non-matched within-set IDs to our ID map, for completion.
+
+```{r}
+temp_ids <- dplyr::bind_rows(
+  temp_ids,
+  # Add MedStar within-set IDs that are not matched
+  medstar |> 
+    dplyr::filter(!id_ms %in% temp_ids$id_ms) |>
+    dplyr::select(id_ms) |>
+    dplyr::distinct() |>
+    dplyr::mutate(
+      id = max(temp_ids$id) + dplyr::row_number(),
+      id_aps = NA_integer_
+      )
+  )
+
+temp_ids <- dplyr::bind_rows(
+  temp_ids,
+  # Add APS within-set IDs that are not matched
+  aps_id_map |> 
+    dplyr::filter(!id_aps %in% temp_ids$id_aps) |>
+    dplyr::select(id_aps) |>
+    dplyr::distinct() |>
+    dplyr::mutate(
+      id = max(temp_ids$id) + dplyr::row_number(),
+      id_ms = NA_integer_
+      )
+  )
+```
+
+We additionally had minor point-fixes to ID assignment specific to the MedStar data, wherein spot-checks of ID values identified a false match (spouses with similar names).
+
+```{r}
+# Correct values in the within-set data
+medstar <- medstar |>
+  # Add row number for PHI-free targeting of rows
+  dplyr::mutate(orig_row = dplyr::row_number()) |>
+  # Shift spousal mismatch originally in ID 428
+  dplyr::mutate(
+    id_ms = ifelse(
+      orig_row %in% c(24803, 24804, 24805, 24806, 24807, 24808, 24809), 
+      max(id_ms) + 1,
+      id_ms
+    )
+  ) |>
+  # Shift spousal mismatch originally in ID 4200
+  dplyr::mutate(
+    id_ms = ifelse(
+      orig_row %in% c(76766),
+      max(id_ms) + 1,
+      id_ms
+    )
+  ) |>
+  # Shift spousal mismatch originally in ID 2911
+  dplyr::mutate(
+    id_ms = ifelse(
+      orig_row %in% c(
+        42364, 42365, 42366, 42367, 42368, 42369, 42370, 42371, 42372, 42373, 
+        42374, 42375, 42376, 42377, 42378, 42379
+      ),
+      max(id_ms) + 1,
+      id_ms
+    )
+  ) |>
+  # Shift spousal mismatch originally in ID 13521
+  dplyr::mutate(
+    id_ms = ifelse(
+      orig_row %in% c(
+        22511
+      ),
+      max(id_ms) + 1,
+      id_ms
+    )
+  ) |>
+  dplyr::select(-orig_row)
+
+# Add new values to the between-set map
+new_vals <- 4
+
+temp_ids <- dplyr::bind_rows(
+  temp_ids,
+  medstar |>
+    dplyr::filter(
+      # Only rows with the new within-set IDs
+      id_ms %in% seq((max(id_ms) - (new_vals - 1)), max(id_ms))
+      ) |>
+    dplyr::select(id_ms, id) |>
+    dplyr::distinct() |>
+    dplyr::arrange(id_ms) |>
+    dplyr::mutate(
+      id_aps = NA_integer_,
+      # Add cross-set ID value by iterating from the maximum already present
+      id = seq(max(temp_ids$id) + 1, (max(temp_ids$id) + new_vals))
+      )
+  )
+```
+
+We added our cross-set identifiers into each set of identifier keys to generate our within-set maps.
+
+```{r}
+ms_ids <- dplyr::rows_update(
+  medstar |>
+    dplyr::mutate(
+      id = NA_integer_),
+  temp_ids |>
+    dplyr::filter(!is.na(id_ms)) |>
+    dplyr::select(-id_aps),
+  by = 'id_ms'
+)
+
+aps_id_map <- dplyr::rows_update(
+  aps_id_map |>
+    dplyr::mutate(
+      id = NA_integer_),
+  temp_ids |>
+    dplyr::filter(!is.na(id_aps)) |>
+    dplyr::select(-id_ms),
+  by = 'id_aps'
+)
+```
+
+
+## 💾 Save and Export Data
+
+We exported our subject-linkage maps, for later use.
+
+```{r}
+saveRDS(
+  aps_id_map,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "01_aps-client_id-to_id-aps.rds"
+    )
+)
+
+saveRDS(
+  ms_ids,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "02_medstar-keys-to-id_ms.rds"
+    )
+)
+
+saveRDS(
+  temp_ids,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "03_aps_to_ms-subject-links.rds"
+    )
+)
+```
+
+# 🧹 Clean up
+
+```{r}
+rm(list=ls())
+```
+
+

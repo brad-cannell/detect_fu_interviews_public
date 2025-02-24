@@ -143,8 +143,8 @@ get_pair_data <- function(dfA_pack, dfB_pack, match_vars, fastlink_out){
   # the pair's posterior probability)
   
   potential_matches <- tibble::tibble(
-    row_a = fastlink_out$matches$inds.b,
-    row_b = fastlink_out$matches$inds.a,
+    row_a = fastlink_out$matches$inds.a,
+    row_b = fastlink_out$matches$inds.b,
     posterior_probability = fastlink_out$posterior
   )
   
@@ -183,8 +183,8 @@ get_pair_data <- function(dfA_pack, dfB_pack, match_vars, fastlink_out){
     stacked_potential_matches,
     potential_matches |>
       dplyr::select(dplyr::all_of(ends_with("gamma"))) |>
-      dplyr::mutate(row_num = row_number()) |>
-      dplyr::slice(rep(row_number(), 2)) |>
+      dplyr::mutate(row_num = dplyr::row_number()) |>
+      dplyr::slice(rep(dplyr::row_number(), 2)) |>
       dplyr::arrange(row_num) |>
       dplyr::select(-row_num)
   )
@@ -230,16 +230,22 @@ get_pair_data <- function(dfA_pack, dfB_pack, match_vars, fastlink_out){
     )
   }
   
-  # If dfA and dfB have the same name for their unique row ID variable, 
-  # add "a" and "b" suffixes to original unique row id names
-  if (identical(dfA_ids[1], dfB_ids[1])){
+  # If dfA and dfB packing was identical, add "a" and "b" suffixes to 
+  # original unique row id names
+  if (identical(dfA_pack, dfB_pack)){
     dfA_vars[1] <- paste(dfA_ids[1], "a", sep = "_")
     dfB_vars[1] <- paste(dfB_ids[1], "b", sep = "_")
   }
   
+  # Otherwise, add suffix to row id names
+  if (!identical(dfA_pack, dfB_pack)){
+    dfA_vars[1] <- paste(dfA_ids[1], dfA_suffix, sep = "_")
+    dfB_vars[1] <- paste(dfB_ids[1], dfB_suffix, sep = "_")
+  }
+  
   # Reordered the paired data
   pair_data <- pair_data |>
-    rename_at(
+    dplyr::rename_at(
       c('dfA_id', 'dfB_id'),
       ~c(dfA_vars[1], dfB_vars[1])
     )

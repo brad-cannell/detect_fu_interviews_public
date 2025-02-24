@@ -32,13 +32,17 @@
 
 stack_ids <- function(dfA_pack, dfB_pack, paired_matches){
   
-  dfA_id <- dfA_pack$ids[1]
-  dfB_id <- dfB_pack$ids[1]
-  
-  # If A and B have identical IDs, add an "a" and "b" suffix to differentiate
-  if (dfA_pack$ids[1] == dfB_pack$ids[1]) {
+  # If dfA_pack and dfB_pack are identical, add "a" and "b" to ID suffixes
+  if (identical(dfA_pack, dfB_pack)){
+    
     dfA_id <- paste(dfA_pack$ids[1], "a", sep = "_")
     dfB_id <- paste(dfB_pack$ids[1], "b", sep = "_")
+    
+  }
+  # Otherwise, just use their packed suffixes
+  if (!identical(dfA_pack, dfB_pack)){
+    dfA_id <- paste(dfA_pack$ids[1], dfA_pack$suffix, sep = "_")
+    dfB_id <- paste(dfB_pack$ids[1], dfB_pack$suffix, sep = "_")
   }
   
   id_vars <- c(dfA_id, dfB_id)
@@ -59,7 +63,7 @@ stack_ids <- function(dfA_pack, dfB_pack, paired_matches){
     dplyr::ungroup()
   
   # Process slightly differently if identical input data frames
-  if (dfA_pack$ids[1] == dfB_pack$ids[1]) {
+  if (identical(dfA_pack, dfB_pack)) {
     
     # Reduce to unique sets of matching rows
     # i.e. 1,2,3 is the same as 3,2,1
@@ -83,7 +87,7 @@ stack_ids <- function(dfA_pack, dfB_pack, paired_matches){
     # This will become the unique id
     matches <- matches |>
       dplyr::mutate(
-        id = row_number(),
+        id = dplyr::row_number(),
         dfA_row = purrr::map( # Turn back into list
           match_rows,
           ~ scan(text = ., what = 0L, sep = ",", quiet = TRUE)
@@ -104,7 +108,7 @@ stack_ids <- function(dfA_pack, dfB_pack, paired_matches){
   }
   
   # Otherwise use Dr. Cannell's initial processing with slight modification
-  if (dfA_pack$ids[1] != dfB_pack$ids[1]) {
+  if (!identical(dfA_pack, dfB_pack)) {
     
     # Reduce to unique sets of matching rows
     # i.e. 1,2,3 is the same as 3,2,1
@@ -133,7 +137,7 @@ stack_ids <- function(dfA_pack, dfB_pack, paired_matches){
     # This will become the unique id
     matches <- matches |>
       dplyr::mutate(
-        id = row_number(),
+        id = dplyr::row_number(),
         dfA_row = purrr::map( # Turn back into list
           dfA_matchesB,
           ~ scan(text = ., what = 0L, sep = ",", quiet = TRUE)

@@ -7,12 +7,9 @@
 #'   factor. The first column will be the list of all possible values found in
 #'   the input data frame column(s), with counts for each column processed.
 #'   
-<<<<<<< HEAD
-=======
 #'   Dependencies: dplyr
 #'   
 #'   Built: R (4.2.2); dplyr (1.1.1)
->>>>>>> origin/main
 #'
 #' @param .df A data frame or vectorized column from a data frame ($ or [['']])
 #' @param ... Specified column names. May be strings or symbols. 
@@ -160,7 +157,7 @@ get_unique_value_summary <- function(.df, ... ) {
     
     # adds count of missing values in each column
     
-    table<- add_row(table, col_value = NA, freq = sum(is.na(.df[i])))
+    table<- tibble::add_row(table, col_value = NA, freq = sum(is.na(.df[i])))
     
     # read names of columns to "value" and the name of the target column(s)
     
@@ -168,13 +165,13 @@ get_unique_value_summary <- function(.df, ... ) {
     
     # joins table's summary counts to complete the count values
     
-    unique_summary <- left_join(unique_summary,table, by="col_value")
+    unique_summary <- dplyr::left_join(unique_summary,table, by="col_value")
   }
   
   # Replace any missing values in counts with 0 (does not remove it from value)
   
   unique_summary <- unique_summary |>
-    dplyr::mutate_at(vars(-c(col_value)), ~replace(., is.na(.), 0))
+    dplyr::mutate_at(dplyr::vars(-c(col_value)), ~replace(., is.na(.), 0))
   
   # Sort data frame by 'value'
   unique_summary <- unique_summary |> 
