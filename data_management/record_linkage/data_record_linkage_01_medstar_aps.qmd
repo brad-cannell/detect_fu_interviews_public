@@ -83,7 +83,6 @@ We connected our APS and MedStar records in three ways, based on matching subjec
 suppressPackageStartupMessages({
   library(tidyverse)
   library(here)
-  library(fastLink)
   library(janitor, include.only = "clean_names")
 })
 ```
@@ -95,7 +94,6 @@ This file was created with:
 -   R version 4.4.1 ("Race for Your Life").
 -   tidyverse version 2.0.0, including all attached packages
 -   here version 1.0.1
--   fastLink version 0.6.1
 -   janitor version 2.2.0
 
 ## Functions
@@ -132,6 +130,14 @@ informative_df_import(
 
 aps <- aps |>
   janitor::clean_names()
+
+# Warning: Expecting numeric in G276 / R276C7: got 'blank'
+# Warning: Expecting numeric in G51328 / R51328C7: got 'blank'
+# Warning: Expecting numeric in G64351 / R64351C7: got 'blank'
+# Warning: Expecting numeric in G92207 / R92207C7: got 'blank'
+# Warning: Expecting numeric in C145086 / R145086C3: got 'blank'
+#  2025-02-14: APS data imported with 571,407 rows and 8 columns.
+#  Data last modified on OneDrive: 2024-03-21 18:47:51 
 ```
 
 We also loaded our APS within-set subject linkage map, connecting our generated values of `id_aps` to `client_id` values that appear across the MedStar data sets.
@@ -146,7 +152,8 @@ informative_df_import(
     "aps_ids", path, overwrite = T
   )
 
-
+ # 2025-02-14: APS IDS data imported with 378,418 rows and 3 columns.
+ # Data last modified on OneDrive: 2025-01-31 18:44:59 
 ```
 
 We also loaded our APS participant data, in case any subject ID assignments required verification.
@@ -161,6 +168,8 @@ informative_df_import(
     "aps_par", path, overwrite = T
   )
 
+ # 2025-02-14: APS PAR data imported with 378,604 rows and 26 columns.
+ # Data last modified on OneDrive: 2024-11-13 11:46:12
 ```
 
 We loaded our APS Allegation (outcomes) data.
@@ -181,6 +190,9 @@ informative_df_import(
 
 allegations <- allegations |>
   janitor::clean_names()
+
+ # 2025-02-14: ALLEGATIONS data imported with 926,197 rows and 6 columns.
+ # Data last modified on OneDrive: 2024-06-14 12:02:14 
 ```
 
 We loaded our APS Intakes data.
@@ -201,6 +213,10 @@ informative_df_import(
 
 intakes <- intakes |>
   janitor::clean_names()
+
+# Warning: Expecting numeric in C169722 / R169722C3: got 'blank'
+#  2025-02-14: INTAKES data imported with 664,280 rows and 5 columns.
+#  Data last modified on OneDrive: 2024-03-21 18:42:20 
 ```
 
 ## MedStar Response Data
@@ -214,7 +230,8 @@ informative_df_import(
     "medstar", path, overwrite = T
   )
 
-
+ # 2025-02-14: MEDSTAR data imported with 92,160 rows and 105 columns.
+ # Data last modified on OneDrive: 2025-01-13 12:14:55 
 ```
 
 We also loaded our MedStar within-set subject linkage map, connecting our generated values of `id_ms` to `x_primary_key` and `medstar_internal_id` values that appear across the MedStar data sets. 
@@ -228,6 +245,9 @@ path <- here::here(
 informative_df_import(
     "ms_ids", path, overwrite = T
   )
+
+ # 2025-02-14: MS IDS data imported with 92,160 rows and 4 columns.
+ # Data last modified on OneDrive: 2025-01-31 18:45:00 
 ```
 
 ## Subject-Linkage Maps
@@ -243,6 +263,9 @@ path <- here::here(
 informative_df_import(
     "aps_to_ms", path, overwrite = T
   )
+
+ # 2025-02-14: APS TO MS data imported with 408,122 rows and 3 columns.
+ # Data last modified on OneDrive: 2025-01-31 18:45:00 
 ```
 
 We extracted a list of the 4,654 cross-set ID values shared in both data sets.
