@@ -1,0 +1,2617 @@
+---
+title: "Analyses Section 1: Demographics and Associations"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## This File
+
+This file performs the initial explorations and analyses of demographics within the MedStar 5-year follow-up data, internally referred to as "Section 1: Demographics and Associations".
+
+## MedStar Data Background
+
+The MedStar records were originally recorded in Filemaker Pro. Processing of this data was extensive and across multiple data files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki).
+
+The primary files of interest for subject-level interest included participant demographic data in the `participant_import.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd), and the original within-set unique subject ID assignment in `participant_unique_ids.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+These files originally contained 92,160 observations of approximately 30 demographic variables. Refinement of unique subject ID assignments in subject-linkage to APS resulted in 41,955 values of `ms_id`.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ).
+
+Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r}
+#| label: imports-libraries
+#| warning: FALSE
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   janitor version 2.2.0
+-   stats version 4.4.1
+
+## Functions
+
+```{r}
+#| label: imports-functions
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+# Function that creates a modified version of table output, allowing
+# simplified manual review of unique values in a given column or set of
+# columns
+source(here::here("r", "get_unique_value_summary.R"))
+
+# Function that creates a text-based, human-legible summary statistic table
+# for a numeric column
+source(here::here("r", "get_cont_summary.R"))
+# Function that wraps "get_cont_summary()" to process multiple groups at once.
+source(here::here("r", "get_group_cont_summary.R"))
+
+# Function that creates a text-based, human-legible summary statistic table
+# for a categorical column
+source(here::here("r", "get_cat_summary.R"))
+# Function that wraps "get_cat_summary()" to process multiple groups at once.
+source(here::here("r", "get_group_cat_summary.R"))
+
+## Function that performs 2-Category Chi-Square and Fisher Exact and produces
+## a human-legible summary table
+source(here::here("r", "get_chi_fisher.R"))
+
+## Function that performs 2-category T-Test and Wilcox Rank-Sum test and 
+## produces a human-legible summary table
+source(here::here("r", "get_twos_num_stats.R"))
+```
+
+# 📥 Load Data
+
+## MedStar Data
+
+We loaded our MedStar record-level data.
+
+```{r}
+#| label: load-ms-records
+# Load MedStar Record Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_01_record-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_records", path, overwrite = T
+  )
+
+ # 2025-03-05: MS RECORDS data imported with 91,700 rows and 126 columns.
+ # Data last modified on OneDrive: 2025-03-05 12:27:24 
+```
+
+We loaded our MedStar subject-level data.
+
+```{r}
+#| label: load-ms-records
+# Load MedStar Subject Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_02_subj-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_subjs", path, overwrite = T
+  )
+
+ # 2025-03-05: MS SUBJS data imported with 41,612 rows and 75 columns.
+ # Data last modified on OneDrive: 2025-03-05 12:27:24 
+```
+
+# Analyses
+
+We set the order we wanted to present Sex, Race, and Hispanic Ethnicity Values in our summary tables.
+
+```{r}
+#| label: set-value-orders
+# Set order of values when presented in summary table functions
+## Sex value order
+sex_val_list = list(
+    male = 'Male', female = 'Female', uta = 'Unable to Assess', 
+    missing = 'Missing (NA)'
+    )
+
+## Race value order
+race_val_list = list(
+  white = "White", black = "Black or African American", asian = "Asian", 
+  nhpi = "Native Hawaiian or Other Pacific Islander", 
+  aian = "American Indian or Alaska Native", 
+  mena = "Middle Eastern or North African", 
+  other = "Other Race", multiracial = "Multiracial", missing = "Missing (NA)"
+  )
+
+## Hispanic Ethnicity value order
+hispanic_val_list = list(
+  hispanic = 'Hispanic or Latino', nonhispanic = 'Not Hispanic or Latino', 
+  missing = 'Missing (NA)'
+  )
+```
+
+## Section 1: Demographics and Associations
+
+### Overall Demographics
+
+#### Table 1.1: Response-Level (#sec1-t1-demo-overall-resp)
+
+We wished to examine overall demographics within our data at the response level. We stored this internally as Table 1.1. We performed statistical tests for in comparison with [US Census data for Fort Worth, 2022](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210).
+
+```{r}
+#| label: sec1-t1-demo-overall-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop)
+```
+
+We briefly examined the screening performance, positive screen counts, and screens with recorded intent to report in this section.
+
+```{r}
+#| label: sec1-t1-demo-overall-resp-overview
+# Present Screened, Positive Screen, and Report Intent Counts for Section
+## Name columns of interest
+t_vars <- c('dt_screened', 'dt_positive', 'dt_aps_reported')
+
+## Generate table counting TRUE/FALSE values
+count_table <- tibble::tibble(
+  ### Start with the variable names 
+  var_name = t_vars
+  ) |>
+  ### Add counts of the True, False, and Missing values
+  dplyr::bind_cols(
+    t_df |>
+      dplyr::select(dplyr::all_of(t_vars)) |>
+      #### Convert boolean/logical values to character, so NA is not omitted
+      dplyr::mutate(dplyr::across(
+        dplyr::everything(), 
+        ~dplyr::case_when(
+          is.na(.x) ~ "Missing",
+          .x ~ "True",
+          TRUE ~ "False"
+        ))
+      ) |>
+      #### Get counts of the values into the table
+      purrr::map_df(table)
+  ) |>
+  ### Add a row-wise total
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    total = sum(dplyr::c_across(False:Missing), na.rm = T)
+    ) |>
+  dplyr::ungroup()
+
+## Present table
+count_table
+```
+
+##### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t1-demo-all-resp-age-summ
+# Get Summary Statistics for Age, Response-Level
+get_cont_summary(t_df$age_calc) |>
+  dplyr::rename_at('summary_text', ~'Overall (All Responses)')
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t1-demo-all-resp-age-hist-f0-1
+# Figure 0.1: Distribution of Age, Overall, Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df, 
+  ggplot2::aes(
+    x = age_calc, y = ggplot2::after_stat(density),
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age, Overall, Response-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)") +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs", 
+    "f0-1_age-overall-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+There was no subset of the US Census that provided age values for those above 65, which would be required for statistical testing.
+
+##### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t1-demo-all-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list
+  )
+
+## Display table
+obs |>
+  dplyr::select(value_name, text)
+```
+
+We performed Chi-Square and Fisher's Exact test to compare these values to the US Census Data.
+
+```{r}
+#| label: sec1-t1-demo-all-resp-sex-stats
+# Chi-Square and Fisher's Exact test, Census Comparison
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, n) |>
+  dplyr::filter(value_name != "TOTAL") |>
+  ## Add Census Percentages:
+  ## Male, Female, UTA, Missing
+  dplyr::mutate(
+    ## Percentages from US Census: 
+    ## (Male, Female, UTA, Missing)
+    probs = c(0.512, (1-0.512), 0, 0),
+    ## Predicted counts from percentages
+    preds = sum(n) * probs),
+  .counts_a_var = 'n',
+  .counts_b_var = 'preds',
+  .probs_b_var = 'probs',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+
+##### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t1-demo-all-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list
+  )
+
+## Display table
+obs |>
+  dplyr::select(value_name, text)
+```
+
+We performed Chi-Square and Fisher's Exact test to compare these values to the US Census Data.
+
+```{r}
+#| label: sec1-t1-demo-all-resp-race-stats
+# Chi-Square and Fisher's Exact test, Census Comparison
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, n) |>
+  dplyr::filter(value_name != "TOTAL") |>
+  ## Add Census Percentages:
+  ## White, Black, Asian, NHPI, AIAN, MENA, Other, Multiracial, Missing
+  dplyr::mutate(
+    ## Percentages from US Census: 
+    ## (White, Black, Asian, NHPI, AIAN, MENA, Other, Multiracial, Missing)
+    probs = c(0.558, 0.188, 0.049, 0.001, 0.005, 0, 0.113, 0.086, 0),
+    ## Predicted counts from percentages
+    preds = sum(n) * probs),
+  .counts_a_var = 'n',
+  .counts_b_var = 'preds',
+  .probs_b_var = 'probs',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+Of note, "Middle Eastern or North African" was not provided in Census Data. We performed additional sensitivity testing when combining this category into "Other Race".
+
+```{r}
+#| label: sec1-t1-demo-all-resp-race-stats-menaomit
+# Chi-Square and Fisher's Exact test, Census Comparison, MENA/Other Combined
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, n) |>
+    ## Combine MENA into Other
+    dplyr::mutate(
+      n = ifelse(
+        value_name == "Other Race",
+        obs[obs$value_name == "Other Race",]$n + 
+          obs[obs$value_name == "Middle Eastern or North African",]$n,
+        n
+      )
+    ) |>
+    dplyr::filter(
+      !value_name %in% c("TOTAL", "Middle Eastern or North African")
+      ) |>
+    ## Add Census Percentages:
+    ### White, Black, Asian, NHPI, AIAN, MENA/Other, Multiracial, Missing
+    dplyr::mutate(
+      ### Percentages from US Census: 
+      ### (White, Black, Asian, NHPI, AIAN, MENA/Other, Multiracial, Missing)
+      probs = c(0.558, 0.188, 0.049, 0.001, 0.005, 0.113, 0.086, 0),
+      ### Predicted counts from percentages
+      preds = sum(n) * probs
+      ),
+  .counts_a_var = 'n',
+  .counts_b_var = 'preds',
+  .probs_b_var = 'probs',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t1-demo-all-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list
+  )
+
+## Display table
+obs |>
+  dplyr::select(value_name, text)
+```
+
+We performed Chi-Square and Fisher's Exact test to compare these values to the US Census Data.
+
+```{r}
+#| label: sec1-t1-demo-all-resp-ethn-stats
+# Chi-Square and Fisher's Exact test, Census Comparison
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, n) |>
+  dplyr::filter(value_name != "TOTAL") |>
+  ## Add Census Percentages:
+  ## Hispanic, Non-Hispanic, Missing
+  dplyr::mutate(
+    ## Percentages from US Census: 
+    ## (Hispanic, Non-Hispanic, Missing)
+    probs = c(0.353, (1-0.353), 0),
+    ## Predicted counts from percentages
+    preds = sum(n) * probs),
+  .counts_a_var = 'n',
+  .counts_b_var = 'preds',
+  .probs_b_var = 'probs',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+
+#### Table 1.2: Subject-Level (#sec1-t2-demo-overall-subj)
+
+We wished to examine overall demographics within our data at the subject level. We stored this internally as Table 1.2. We performed statistical tests for in comparison with [US Census data for Fort Worth, 2022](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210).
+
+```{r}
+#| label: sec1-t2-demo-overall-subj-subset
+# Take response-level subset for the following analyses
+t_df <- ms_subjs
+```
+
+We briefly examined the screening performance, positive screen counts, and screens with recorded intent to report in this section.
+
+```{r}
+#| label: sec1-t2-demo-overall-subj-overview
+# Present Screened, Positive Screen, and Report Intent Counts for Section
+## Name columns of interest
+t_vars <- c('dt_screened', 'dt_positive', 'dt_aps_reported')
+
+## Generate table counting TRUE/FALSE values
+count_table <- tibble::tibble(
+  ### Start with the variable names 
+  var_name = t_vars
+  ) |>
+  ### Add counts of the True, False, and Missing values
+  dplyr::bind_cols(
+    t_df |>
+      dplyr::select(dplyr::all_of(t_vars)) |>
+      #### Convert boolean/logical values to character, so NA is not omitted
+      dplyr::mutate(dplyr::across(
+        dplyr::everything(), 
+        ~dplyr::case_when(
+          is.na(.x) ~ "Missing",
+          .x ~ "True",
+          TRUE ~ "False"
+        ))
+      ) |>
+      #### Get counts of the values into the table
+      purrr::map_df(table)
+  ) |>
+  ### Add a row-wise total
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    total = sum(dplyr::c_across(False:Missing), na.rm = T)
+    ) |>
+  dplyr::ungroup()
+
+## Present table
+count_table
+```
+
+We also calculated summary statistics for the number of responses for each subject.
+
+```{r}
+#| label: sec1-t2-demo-overall-subj-numresps
+get_cont_summary(t_df$num_resps) |>
+  dplyr::rename_at('summary_text', ~'Responses per Subject')
+```
+
+##### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t2-demo-all-subj-age-summ
+# Get Summary Statistics for Age, Subject-Level
+get_cont_summary(t_df$age_avg) |>
+  dplyr::rename_at('summary_text', ~'Overall (All Responses)')
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t2-demo-all-subj-age-hist-f0-2
+# Figure 0.2: Distribution of Age, Overall, Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df, 
+  ggplot2::aes(
+    x = age_avg, y = ggplot2::after_stat(density),
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age, Overall, Subject-Level",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)") +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs", 
+    "f0-2_age-overall-subj-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+There was no subset of the US Census that provided age values for those above 65, which would be required for statistical testing.
+
+##### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t2-demo-all-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list
+  )
+
+## Display table
+obs |>
+  dplyr::select(value_name, text)
+```
+
+We performed Chi-Square and Fisher's Exact test to compare these values to the US Census Data.
+
+```{r}
+#| label: sec1-t2-demo-all-subj-sex-stats
+# Chi-Square and Fisher's Exact test, Census Comparison
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, n) |>
+  dplyr::filter(value_name != "TOTAL") |>
+  ## Add Census Percentages:
+  ## Male, Female, UTA, Missing
+  dplyr::mutate(
+    ## Percentages from US Census: 
+    ## (Male, Female, UTA, Missing)
+    probs = c(0.512, (1-0.512), 0, 0),
+    ## Predicted counts from percentages
+    preds = sum(n) * probs),
+  .counts_a_var = 'n',
+  .counts_b_var = 'preds',
+  .probs_b_var = 'probs',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+
+##### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t2-demo-all-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list
+  )
+
+## Display table
+obs |>
+  dplyr::select(value_name, text)
+```
+
+We performed Chi-Square and Fisher's Exact test to compare these values to the US Census Data.
+
+```{r}
+#| label: sec1-t2-demo-all-subj-race-stats
+# Chi-Square and Fisher's Exact test, Census Comparison
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, n) |>
+  dplyr::filter(value_name != "TOTAL") |>
+  ## Add Census Percentages:
+  ## White, Black, Asian, NHPI, AIAN, MENA, Other, Multiracial, Missing
+  dplyr::mutate(
+    ## Percentages from US Census: 
+    ## (White, Black, Asian, NHPI, AIAN, MENA, Other, Multiracial, Missing)
+    probs = c(0.558, 0.188, 0.049, 0.001, 0.005, 0, 0.113, 0.086, 0),
+    ## Predicted counts from percentages
+    preds = sum(n) * probs),
+  .counts_a_var = 'n',
+  .counts_b_var = 'preds',
+  .probs_b_var = 'probs',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+Of note, "Middle Eastern or North African" was not provided in Census Data. We performed additional sensitivity testing when combining this category into "Other Race".
+
+```{r}
+#| label: sec1-t2-demo-all-subj-race-stats-menaomit
+# Chi-Square and Fisher's Exact test, Census Comparison, MENA/Other Combined
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, n) |>
+    ## Combine MENA into Other
+    dplyr::mutate(
+      n = ifelse(
+        value_name == "Other Race",
+        obs[obs$value_name == "Other Race",]$n + 
+          obs[obs$value_name == "Middle Eastern or North African",]$n,
+        n
+      )
+    ) |>
+    dplyr::filter(
+      !value_name %in% c("TOTAL", "Middle Eastern or North African")
+      ) |>
+    ## Add Census Percentages:
+    ### White, Black, Asian, NHPI, AIAN, MENA/Other, Multiracial, Missing
+    dplyr::mutate(
+      ### Percentages from US Census: 
+      ### (White, Black, Asian, NHPI, AIAN, MENA/Other, Multiracial, Missing)
+      probs = c(0.558, 0.188, 0.049, 0.001, 0.005, 0.113, 0.086, 0),
+      ### Predicted counts from percentages
+      preds = sum(n) * probs
+      ),
+  .counts_a_var = 'n',
+  .counts_b_var = 'preds',
+  .probs_b_var = 'probs',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t2-demo-all-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list
+  )
+
+## Display table
+obs |>
+  dplyr::select(value_name, text)
+```
+
+We performed Chi-Square and Fisher's Exact test to compare these values to the US Census Data.
+
+```{r}
+#| label: sec1-t2-demo-all-subj-ethn-stats
+# Chi-Square and Fisher's Exact test, Census Comparison
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, n) |>
+  dplyr::filter(value_name != "TOTAL") |>
+  ## Add Census Percentages:
+  ## Hispanic, Non-Hispanic, Missing
+  dplyr::mutate(
+    ## Percentages from US Census: 
+    ## (Hispanic, Non-Hispanic, Missing)
+    probs = c(0.353, (1-0.353), 0),
+    ## Predicted counts from percentages
+    preds = sum(n) * probs),
+  .counts_a_var = 'n',
+  .counts_b_var = 'preds',
+  .probs_b_var = 'probs',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+### By Screening Performance
+
+#### Table 1.3: Response-Level (#sec1-t3-demo-screen-resp)
+
+We wished to examine demographic differences between responses that did and did not receive a DETECT screening. We stored this internally as Table 1.3.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    dt_screened = dplyr::case_when(
+      dt_screened ~ 't',
+      !dt_screened ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Screened', f = 'Not Screened')
+```
+
+
+##### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-age-summ
+# Get Summary Statistics for Age by Screening Status, Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "dt_screened",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-age-hist-f0-3
+# Figure 0.3: Distribution of Age by Screening Status, Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      dt_screened = factor(
+        dt_screened, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = dt_screened, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Screening Status, Response-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Screening Status"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs",
+    "f0-3_age-screen-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Screening Status
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      dt_screened = dplyr::case_when(
+        dt_screened == 't' ~ T,
+        dt_screened == 'f' ~ F
+      )
+    ),
+  .var_name = 'age_calc',
+  .binary_var = 'dt_screened'
+)
+```
+
+##### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "dt_screened",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+##### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "dt_screened",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+
+##### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "dt_screened",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t3-demo-screen-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+#### Table 1.4: Subject-Level (#sec1-t4-demo-screen-subj)
+
+We wished to examine demographic differences between subjects that did and did not receive a DETECT screening. We stored this internally as Table 1.4.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-subset
+# Take response-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    dt_screened = dplyr::case_when(
+      dt_screened ~ 't',
+      !dt_screened ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Screened', f = 'Not Screened')
+```
+
+
+##### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-age-summ
+# Get Summary Statistics for Age by Screening Status, Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "dt_screened",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-age-hist-f0-4
+# Figure 0.4: Distribution of Age by Screening Status, Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      dt_screened = factor(
+        dt_screened, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = dt_screened, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Screening Status, Subject-Level",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Screening Status"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs",
+    "f0-4_age-screen-subj-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Screening Status
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      dt_screened = dplyr::case_when(
+        dt_screened == 't' ~ T,
+        dt_screened == 'f' ~ F
+      )
+    ),
+  .var_name = 'age_avg',
+  .binary_var = 'dt_screened'
+)
+```
+
+##### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "dt_screened",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+##### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "dt_screened",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "dt_screened",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t4-demo-screen-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+### By Screening Result (Positive/Negative)
+
+#### Table 1.5: Response-Level (#sec1-t5-demo-result-resp)
+
+We wished to examine demographic differences between responses that received positive and negative DETECT screening outcomes, with a "positive" outcome defined as a "yes" response to at least one DETECT Tool question item. We stored this internally as Table 1.5.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    dt_positive = dplyr::case_when(
+      dt_positive ~ 't',
+      !dt_positive ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Positive Screen', f = 'Negative Screen')
+```
+
+
+##### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-age-summ
+# Get Summary Statistics for Age by Screening Result, Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "dt_positive",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t5-demo-result-resp-age-hist-f0-5
+# Figure 0.5: Distribution of Age by Screening Result, Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      dt_positive = factor(
+        dt_positive, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = dt_positive, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Screening Result, Response-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Screening Result"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs",
+    "f0-5_age-result-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Screening Result
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      dt_positive = dplyr::case_when(
+        dt_positive == 't' ~ T,
+        dt_positive == 'f' ~ F
+      )
+    ),
+  .var_name = 'age_calc',
+  .binary_var = 'dt_positive'
+)
+```
+
+##### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "dt_positive",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+##### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "dt_positive",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "dt_positive",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t5-demo-result-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+#### Table 1.6: Subject-Level (#sec1-t6-demo-result-subj)
+
+We wished to examine demographic differences between subjects that received positive and negative DETECT screening outcomes, with a "positive" outcome defined as a "yes" response to at least one DETECT Tool question item at at least one screening. We stored this internally as Table 1.6.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-subset
+# Take response-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Filter to only subjects with at least one screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    dt_positive = dplyr::case_when(
+      dt_positive ~ 't',
+      !dt_positive ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Positive Screen', f = 'Negative Screen')
+```
+
+
+##### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-age-summ
+# Get Summary Statistics for Age by Screening Result, Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "dt_positive",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t6-demo-result-subj-age-hist-f0-6
+# Figure 0.6: Distribution of Age by Screening Result, Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      dt_positive = factor(
+        dt_positive, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = dt_positive, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Screening Result, Subject-Level",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Screening Result"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs",
+    "f0-6_age-result-subj-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Screening Status
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      dt_positive = dplyr::case_when(
+        dt_positive == 't' ~ T,
+        dt_positive == 'f' ~ F
+      )
+    ),
+  .var_name = 'age_avg',
+  .binary_var = 'dt_positive'
+)
+```
+
+##### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "dt_positive",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+##### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "dt_positive",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "dt_positive",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t6-demo-result-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+### By Reporting Intent
+
+#### All Screenings
+
+##### Table 1.7: Response-Level (#sec1-t7-demo-intent-all-resp)
+
+We wished to examine demographic differences between responses that did and did not have a DETECT Tool recorded intent to report. We stored this internally as Table 1.7.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    dt_aps_reported = dplyr::case_when(
+      dt_aps_reported ~ 't',
+      !dt_aps_reported ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Intent to Report', f = 'No Intent')
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-age-summ
+# Get Summary Statistics for Age by Intent to Report, Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-age-hist-f0-7
+# Figure 0.7: Distribution of Age by Intent to Report, Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      dt_aps_reported = factor(
+        dt_aps_reported, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = dt_aps_reported, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Intent to Report, Response-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Intent to Report"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs",
+    "f0-7_age-intent-all-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intent to Report
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      dt_aps_reported = dplyr::case_when(
+        dt_aps_reported == 't' ~ T,
+        dt_aps_reported == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "dt_aps_reported"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t7-demo-intent-all-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Table 1.8: Subject-Level (#sec1-t8-demo-intent-all-subj)
+
+We wished to examine demographic differences between subjects that did and did not have a DETECT Tool recorded intent to report. We stored this internally as Table 1.8.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-subset
+# Take response-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Filter to only subjects with at least one screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    dt_aps_reported = dplyr::case_when(
+      dt_aps_reported ~ 't',
+      !dt_aps_reported ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Intent to Report', f = 'No Intent')
+```
+
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-age-summ
+# Get Summary Statistics for Age by Intent to Report, Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-age-hist-f0-8
+# Figure 0.8: Distribution of Age by Intent to Report, Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      dt_aps_reported = factor(
+        dt_aps_reported, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = dt_aps_reported, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Intent to Report, Subject-Level",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Intent to Report"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs",
+    "f0-8_age-intent-all-subj-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Screening Status
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      dt_aps_reported = dplyr::case_when(
+        dt_aps_reported == 't' ~ T,
+        dt_aps_reported == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "dt_aps_reported"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t8-demo-intent-all-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+#### Table 1.9: Positive Screenings, Response-Level (#sec1-t9-demo-intent-pos-resp)
+
+We wished to examine demographic differences between responses with positive DETECT screenings that did and not have a DETECT Tool recorded intent to report. We stored this internally as Table 1.9.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only positive DETECT screenings
+  dplyr::filter(dt_positive) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    dt_aps_reported = dplyr::case_when(
+      dt_aps_reported ~ 't',
+      !dt_aps_reported ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Intent to Report', f = 'No Intent')
+```
+
+##### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-age-summ
+# Get Summary Statistics for Age by Intent to Report, Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-age-hist-f0-9
+# Figure 0.9: Distribution of Age by Intent to Report, Positive Screenings, 
+# Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      dt_aps_reported = factor(
+        dt_aps_reported, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = dt_aps_reported, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title = paste0(
+      "Distribution of Age by Intent to Report, Positive Screenings,",
+      " Response-Level"
+      ),
+    x = "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Intent to Report"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs",
+    "f0-9_age-intent-pos-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intent to Report
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      dt_aps_reported = dplyr::case_when(
+        dt_aps_reported == 't' ~ T,
+        dt_aps_reported == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "dt_aps_reported"
+)
+```
+
+##### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+##### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t9-demo-intent-pos-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+#### Table 1.10: Positive Screenings, Response-Level (#sec1-t10-demo-intent-neg-resp)
+
+We wished to examine demographic differences between responses with negative DETECT screenings that did and not have a DETECT Tool recorded intent to report. We stored this internally as Table 1.10.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only negative DETECT screenings
+  dplyr::filter(!dt_positive) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    dt_aps_reported = dplyr::case_when(
+      dt_aps_reported ~ 't',
+      !dt_aps_reported ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Intent to Report', f = 'No Intent')
+```
+
+##### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-age-summ
+# Get Summary Statistics for Age by Intent to Report, Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-age-hist-f0-10
+# Figure 0.9: Distribution of Age by Intent to Report, Negative Screenings, 
+# Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      dt_aps_reported = factor(
+        dt_aps_reported, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = dt_aps_reported, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title = paste0(
+      "Distribution of Age by Intent to Report, Negative Screenings,",
+      " Response-Level"
+      ),
+    x = "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Intent to Report"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = here::here(
+    "data", "APS-MedStar Analysis Tables", "figs",
+    "f0-10_age-intent-neg-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intent to Report
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      dt_aps_reported = dplyr::case_when(
+        dt_aps_reported == 't' ~ T,
+        dt_aps_reported == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "dt_aps_reported"
+)
+```
+
+##### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+##### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "dt_aps_reported",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t10-demo-intent-neg-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+# 🧹 Clean up
+
+```{r}
+#| label: end-cleanup
+rm(list=ls())
+```
+
