@@ -250,7 +250,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs", 
+    "data", "figs", 
     "f0-1_age-overall-resp-hist.png"
     ),
   plot = plot
@@ -541,7 +541,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs", 
+    "data", "figs", 
     "f0-2_age-overall-subj-hist.png"
     ),
   plot = plot
@@ -811,7 +811,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs",
+    "data", "figs",
     "f0-3_age-screen-resp-hist.png"
     ),
   plot = plot
@@ -1041,7 +1041,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs",
+    "data", "figs",
     "f0-4_age-screen-subj-hist.png"
     ),
   plot = plot
@@ -1276,7 +1276,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs",
+    "data", "figs",
     "f0-5_age-result-resp-hist.png"
     ),
   plot = plot
@@ -1507,7 +1507,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs",
+    "data", "figs",
     "f0-6_age-result-subj-hist.png"
     ),
   plot = plot
@@ -1743,7 +1743,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs",
+    "data", "figs",
     "f0-7_age-intent-all-resp-hist.png"
     ),
   plot = plot
@@ -1974,7 +1974,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs",
+    "data", "figs",
     "f0-8_age-intent-all-subj-hist.png"
     ),
   plot = plot
@@ -2212,7 +2212,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs",
+    "data", "figs",
     "f0-9_age-intent-pos-resp-hist.png"
     ),
   plot = plot
@@ -2450,7 +2450,7 @@ plot <- ggplot2::ggplot(
 ## Save plot
 ggplot2::ggsave(
   filename = here::here(
-    "data", "APS-MedStar Analysis Tables", "figs",
+    "data", "figs",
     "f0-10_age-intent-neg-resp-hist.png"
     ),
   plot = plot
