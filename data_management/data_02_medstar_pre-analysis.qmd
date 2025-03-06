@@ -998,7 +998,7 @@ ms_resps <- ms_resps |>
 
 ### Subject Level
 
-We performed further consolidation at the subject level, taking an "ever true" approach. We calculated if a subject was ever screened, if screening was ever positive, and if there was ever any recorded reporting intent. We also calculated if each item was ever completed (and ever recieved a "yes", "no", or "uta" response) for each subject.
+We performed further consolidation at the subject level, taking an "ever true" approach. We calculated if a subject was ever screened, if screening was ever positive, and if there was ever any recorded reporting intent. We also calculated if each item was ever completed (and ever received a "yes", "no", or "uta" response) for each subject.
 
 ```{r}
 #| label: clean-dt-q-vars-subj
