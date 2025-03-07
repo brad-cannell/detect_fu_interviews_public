@@ -1,0 +1,238 @@
+---
+title: "Analyses Section 3: Agreement"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## This File
+
+This file performs the initial explorations and analyses of agreement between outcome variables within the MedStar 5-year follow-up data, internally referred to as "Section 3: Agreement".
+
+## MedStar Data Background
+
+The MedStar records were originally recorded in Filemaker Pro. Processing of this data was extensive and across multiple data files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki).
+
+The primary files of interest for subject-level interest included participant demographic data in the `participant_import.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd), and the original within-set unique subject ID assignment in `participant_unique_ids.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+These files originally contained 92,160 observations of approximately 30 demographic variables. Refinement of unique subject ID assignments in subject-linkage to APS resulted in 41,955 values of `ms_id`.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ).
+
+Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r}
+#| label: imports-libraries
+#| warning: FALSE
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   janitor version 2.2.0
+-   stats version 4.4.1
+
+## Functions
+
+```{r}
+#| label: imports-functions
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+# Function that creates a modified version of table output, allowing
+# simplified manual review of unique values in a given column or set of
+# columns
+source(here::here("r", "get_unique_value_summary.R"))
+
+# Function that creates a text-based, human-legible summary statistic table
+# for a numeric column
+source(here::here("r", "get_cont_summary.R"))
+# Function that wraps "get_cont_summary()" to process multiple groups at once.
+source(here::here("r", "get_group_cont_summary.R"))
+
+# Function that creates a text-based, human-legible summary statistic table
+# for a categorical column
+source(here::here("r", "get_cat_summary.R"))
+# Function that wraps "get_cat_summary()" to process multiple groups at once.
+source(here::here("r", "get_group_cat_summary.R"))
+
+## Function that performs 2-Category Chi-Square and Fisher Exact and produces
+## a human-legible summary table
+source(here::here("r", "get_chi_fisher.R"))
+
+## Function that performs 2-category T-Test and Wilcox Rank-Sum test and 
+## produces a human-legible summary table
+source(here::here("r", "get_twos_num_stats.R"))
+
+## Function that extracts response pattern tables from DETECT variables
+source(here::here("r", "get_dt_resp_pattern.R"))
+
+## Function that performs Chi-Square and Fisher's Exact on DETECT Response
+## Patterns, by Item
+source(here::here("r", "get_dt_rp_chi_fisher.R"))
+```
+
+# 📥 Load Data
+
+## MedStar Data
+
+We loaded our MedStar record-level data.
+
+```{r}
+#| label: load-ms-records
+# Load MedStar Record Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_01_record-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_records", path, overwrite = T
+  )
+
+# [Placeholder]
+```
+
+We loaded our MedStar subject-level data.
+
+```{r}
+#| label: load-ms-records
+# Load MedStar Subject Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_02_subj-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_subjs", path, overwrite = T
+  )
+
+# [Placeholder]
+```
+
+# Analyses
+
+We set the order and labels for values in categorical variables. PLACEHOLDER
+
+```{r}
+#| label: set-value-orders
+# Set order and labels for values in categorical variables that may be used
+# in plots
+
+## Sex value order
+sex_val_list = list(
+    male = 'Male', female = 'Female', uta = 'Unable to Assess', 
+    missing = 'Missing (NA)'
+    )
+
+## Race value order
+race_val_list = list(
+  white = "White", black = "Black or African American", asian = "Asian", 
+  nhpi = "Native Hawaiian or Other Pacific Islander", 
+  aian = "American Indian or Alaska Native", 
+  mena = "Middle Eastern or North African", 
+  other = "Other Race", multiracial = "Multiracial", missing = "Missing (NA)"
+  )
+
+## Hispanic Ethnicity value order
+hispanic_val_list = list(
+  hispanic = 'Hispanic or Latino', nonhispanic = 'Not Hispanic or Latino', 
+  missing = 'Missing (NA)'
+  )
+
+## DETECT Tool Variable Item Order
+dt_item_list <- list(
+  dt_env_odor = "Unusual odor (e.g., urine, feces)", 
+  dt_env_hoard = paste0(
+    "Inside of the home is in extreme disarray or there is hoarding"
+    ), 
+  dt_env_concern = paste0(
+    "Living environment poses a health or safety concern (e.g., fire hazard,",
+    " insect or rodent infestation, or urine or feces present)"
+    ), 
+  dt_pt_isolated = "Is the patient or older adult isolated in the home?", 
+  dt_pt_hygiene = paste0(
+    "Does the patient or older adult have poor personal hygiene",
+    " (including soiled in urine or feces)?"
+    ), 
+  dt_pt_clothes = paste0(
+    "Is the patient or older adult inadequately clothed or wearing",
+    " dirty, torn, or soiled clothing?"
+    ), 
+  dt_pt_needs = paste0(
+    "Does the patient or older adult have unmet needs for assistance",
+    " with eating, toileting, transferring, dressing, or bathing?"
+    ), 
+  dt_pt_depress = paste0(
+    "Does the patient or older adult appear depressed, anxious, or ",
+    "emotionally distressed for reasons other than their immediate medical",
+    " condition?"
+    ), 
+  dt_pt_med_hoard = paste0(
+    "Does the patient or older adult appear to be hoarding or saving old",
+    " medications?"), 
+  dt_pt_med_diff = paste0(
+    "Does the patient or older adult have difficulties taking their",
+    " prescribed medications as directed?"
+    ), 
+  dt_cg_lack = paste0(
+    "If caregiver is present, they appear to lack knowledge of the",
+    " patient or older adult’s medical needs"
+    ), 
+  dt_cg_uneng = paste0(
+    "If caregiver is present, they appear unengaged and inattentive in",
+    " caring for the patient or older adult"
+    ), 
+  dt_cg_frust = paste0(
+    "If caregiver is present, they appear frustrated, tired, angry, or ",
+    "burdened by the patient or older adult"
+    ), 
+  dt_cg_anx = paste0(
+    "If caregiver is present, they appear overly concerned ",
+    "(e.g., anxious, hovering)")
+  )
+```
+
+## Section 3: Agreement
+
+### Placeholder
+
+#### Table/Figure 1: Placeholder (#sec3-tf1-placeholder)
+
+Placeholder text
+
+```{r}
+#| label: sec3-tf1-placeholder-chunk
+
+# Placeholder chunk to remind of labeling conventions
+```
+
+# 🧹 Clean up
+
+```{r}
+#| label: end-cleanup
+rm(list=ls())
+```
