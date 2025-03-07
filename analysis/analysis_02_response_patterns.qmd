@@ -58,30 +58,9 @@ This file was created with:
 # Function to reduce code repetition in informative imports of data
 source(here::here("r", "informative_df_import.R"))
 
-# Function that creates a modified version of table output, allowing
-# simplified manual review of unique values in a given column or set of
-# columns
-source(here::here("r", "get_unique_value_summary.R"))
-
-# Function that creates a text-based, human-legible summary statistic table
-# for a numeric column
-source(here::here("r", "get_cont_summary.R"))
-# Function that wraps "get_cont_summary()" to process multiple groups at once.
-source(here::here("r", "get_group_cont_summary.R"))
-
-# Function that creates a text-based, human-legible summary statistic table
-# for a categorical column
-source(here::here("r", "get_cat_summary.R"))
-# Function that wraps "get_cat_summary()" to process multiple groups at once.
-source(here::here("r", "get_group_cat_summary.R"))
-
 ## Function that performs 2-Category Chi-Square and Fisher Exact and produces
 ## a human-legible summary table
 source(here::here("r", "get_chi_fisher.R"))
-
-## Function that performs 2-category T-Test and Wilcox Rank-Sum test and 
-## produces a human-legible summary table
-source(here::here("r", "get_twos_num_stats.R"))
 
 ## Function that extracts response pattern tables from DETECT variables
 source(here::here("r", "get_dt_resp_pattern.R"))
@@ -111,7 +90,8 @@ informative_df_import(
     "ms_records", path, overwrite = T
   )
 
-# [Placeholder]
+ # 2025-03-07: MS RECORDS data imported with 91,700 rows and 126 columns.
+ # Data last modified on OneDrive: 2025-03-05 12:27:24 
 ```
 
 We loaded our MedStar subject-level data.
@@ -130,7 +110,8 @@ informative_df_import(
     "ms_subjs", path, overwrite = T
   )
 
-# [Placeholder]
+ # 2025-03-07: MS SUBJS data imported with 41,612 rows and 75 columns.
+ # Data last modified on OneDrive: 2025-03-05 12:27:24 
 ```
 
 ## Prior Study Response Patterns
@@ -182,7 +163,11 @@ pat_pilot <- pat_pilot |>
     names_glue = "{.value}_{item_name}"
     )
 
-# [Placeholder]
+### Set count of total responses
+total_pilot <- 1247
+
+ # 2025-03-07: PAT PILOT data imported with 26 rows and 12 columns.
+ # Data last modified on OneDrive: 2025-03-06 14:34:28 
 ```
 
 We loaded the DETECT Tool response patterns from the 1 Year Study interval.
@@ -228,7 +213,11 @@ pat_year <- pat_year |>
     names_glue = "{.value}_{item_name}"
     )
 
-# [Placeholder]
+### Set count of total responses
+total_year <- 24007
+
+ # 2025-03-07: PAT YEAR data imported with 14 rows and 12 columns.
+ # Data last modified on OneDrive: 2025-03-06 14:48:35 
 ```
 
 # Analyses
@@ -290,14 +279,6 @@ dt_item_list <- list(
     "(e.g., anxious, hovering)")
   )
 ```
-
-
-```{r}
-# PLACEHOLDER
-total_pilot <- 1247
-total_year <- 24007
-```
-
 
 ## Section 2: DETECT-Tool Response Patterns
 
@@ -1318,5 +1299,3 @@ stats
 #| label: end-cleanup
 rm(list=ls())
 ```
-
-# BOTTOM
