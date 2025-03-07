@@ -111,7 +111,7 @@ informative_df_import(
 We loaded our MedStar subject-level data.
 
 ```{r}
-#| label: load-ms-records
+#| label: load-ms-subjs
 # Load MedStar Subject Level Data
 ## Path to data
 path <- here::here(
