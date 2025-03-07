@@ -445,7 +445,6 @@ get_chi_fisher(
   )
 ```
 
-
 #### Table 1.2: Subject-Level (#sec1-t2-demo-overall-subj)
 
 We wished to examine overall demographics within our data at the subject level. We stored this internally as Table 1.2. We performed statistical tests for in comparison with [US Census data for Fort Worth, 2022](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210).
