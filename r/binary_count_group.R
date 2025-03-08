@@ -5,7 +5,7 @@
 #'   total number of records within a grouping variable. Useful for
 #'   frequency counts by a time group. 
 #'    
-#'   Dependencies: dplyr, stats, get_cont_summary()
+#'   Dependencies: dplyr, stats
 #'   
 #'   Built: R (4.4.1); dplyr (1.1.4); stats (4.4.1)
 #'
