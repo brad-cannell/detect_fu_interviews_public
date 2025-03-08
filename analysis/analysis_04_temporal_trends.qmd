@@ -38,6 +38,8 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(here)
   library(janitor, include.only = "clean_names")
+  library(ggplot2)
+  library(patchwork)
 })
 ```
 
@@ -50,6 +52,8 @@ This file was created with:
 -   here version 1.0.1
 -   janitor version 2.2.0
 -   stats version 4.4.1
+-   ggplot2 version 3.5.1
+-   patchwork version 1.3.0
 
 ## Functions
 
@@ -165,54 +169,20 @@ hispanic_val_list = list(
 
 ## DETECT Tool Variable Item Order
 dt_item_list <- list(
-  dt_env_odor = "Unusual odor (e.g., urine, feces)", 
-  dt_env_hoard = paste0(
-    "Inside of the home is in extreme disarray or there is hoarding"
-    ), 
-  dt_env_concern = paste0(
-    "Living environment poses a health or safety concern (e.g., fire hazard,",
-    " insect or rodent infestation, or urine or feces present)"
-    ), 
-  dt_pt_isolated = "Is the patient or older adult isolated in the home?", 
-  dt_pt_hygiene = paste0(
-    "Does the patient or older adult have poor personal hygiene",
-    " (including soiled in urine or feces)?"
-    ), 
-  dt_pt_clothes = paste0(
-    "Is the patient or older adult inadequately clothed or wearing",
-    " dirty, torn, or soiled clothing?"
-    ), 
-  dt_pt_needs = paste0(
-    "Does the patient or older adult have unmet needs for assistance",
-    " with eating, toileting, transferring, dressing, or bathing?"
-    ), 
-  dt_pt_depress = paste0(
-    "Does the patient or older adult appear depressed, anxious, or ",
-    "emotionally distressed for reasons other than their immediate medical",
-    " condition?"
-    ), 
-  dt_pt_med_hoard = paste0(
-    "Does the patient or older adult appear to be hoarding or saving old",
-    " medications?"), 
-  dt_pt_med_diff = paste0(
-    "Does the patient or older adult have difficulties taking their",
-    " prescribed medications as directed?"
-    ), 
-  dt_cg_lack = paste0(
-    "If caregiver is present, they appear to lack knowledge of the",
-    " patient or older adult’s medical needs"
-    ), 
-  dt_cg_uneng = paste0(
-    "If caregiver is present, they appear unengaged and inattentive in",
-    " caring for the patient or older adult"
-    ), 
-  dt_cg_frust = paste0(
-    "If caregiver is present, they appear frustrated, tired, angry, or ",
-    "burdened by the patient or older adult"
-    ), 
-  dt_cg_anx = paste0(
-    "If caregiver is present, they appear overly concerned ",
-    "(e.g., anxious, hovering)")
+  dt_env_odor = "Unusual odor", 
+  dt_env_hoard = "Disarray or hoarding",
+  dt_env_concern = "Health or safety concern",
+  dt_pt_isolated = "Isolated in the home", 
+  dt_pt_hygiene = "Poor personal hygiene",
+  dt_pt_clothes = "Inadequately clothed",
+  dt_pt_needs = "Unmet needs for assistance",
+  dt_pt_depress = "Emotionally distressed",
+  dt_pt_med_hoard = "Hoarding or saving old medications", 
+  dt_pt_med_diff = "Difficulties taking medications as directed",
+  dt_cg_lack = "Lacks knowledge of medical needs",
+  dt_cg_uneng = "Unengaged and inattentive",
+  dt_cg_frust = "Frustrated, tired, angry, or burdened",
+  dt_cg_anx = "Overly concerned (e.g. anxious, hovering)"
   )
 ```
 
@@ -302,7 +272,7 @@ We obtained the count and percent of our overall screening completion, as well a
 
 ```{r}
 #| label: sec4-screen-rate-month-bytype-calc
-# Plotting Screening Results
+# Extract data to plot trends in result types, per month
 ## Create dataframe with count and percents - positive, negative results
 plot_df <- month_df |> 
   dplyr::select(-total) |>
@@ -313,7 +283,7 @@ plot_df <- month_df |>
     per_positive = n_positive / n_screen,
     per_negative = n_negative / n_screen
   ) |>
-  ### Shift so that each row is MONTH - TYPE - COUNT - PERCENT 
+  ### Pivot so that each row is MONTH - TYPE - COUNT - PERCENT 
   tidyr::pivot_longer(
     cols = dplyr::all_of(
       c(dplyr::starts_with("n_"), dplyr::starts_with("per_"))
@@ -332,7 +302,7 @@ We examined our screening counts per month, by result type.
 
 ```{r}
 #| label: sec4-f2-result-month-count-plot
-# Plotting Screening Rate per Month
+# Plotting Screening Count per Month
 ## Make Plot
 plot <- ggplot2::ggplot(
   data = plot_df |>
@@ -393,6 +363,8 @@ plot <- ggplot2::ggplot(
     ), 
   ggplot2::aes(x = month, y = per, fill = group_val)
   ) + 
+  ## Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
   ### Stacked area plot
   ggplot2::geom_area(alpha = 0.8) +
   ### Labels
@@ -418,24 +390,178 @@ ggplot2::ggsave(
 plot
 ```
 
-
 ### DETECT Item Rates, by Month
 
-#### Figure 4.5: Item Completion Rates, All Screenings
+#### Item Completion Rates
+
+##### Figure 4.4: All Screenings (#sec4-f4-item-comp-all-month)
+
+We extracted the completion count and percent of each DETECT tool item, for all performed screenings each month.
+
+```{r}
+#| label: sec4-item-comp-all-month-calc
+# Extract data to plot DETECT item completion rates
+## Create dataframe with count and percents - positive, negative results
+plot_df <- binary_count_group(
+  ms_records |>
+    ### Filter to screenings only
+    dplyr::filter(dt_screened) |>
+    ### Convert DETECT Item variables to boolean/logical, indicating if they
+    ### were or were not completed
+    dplyr::mutate(dplyr::across(
+      dplyr::all_of(names(dt_item_list)), 
+      ~!is.na(.x)
+      )),
+  "month",
+  names(dt_item_list)
+  ) |>
+  ### Pivot so that each row is MONTH - TYPE - COUNT
+  tidyr::pivot_longer(
+    cols = dplyr::all_of(names(dt_item_list)),
+    names_to = 'group_val',
+    values_to = 'n'
+  ) |>
+  ### Calculate percent from the total number of records in the subset
+  dplyr::mutate(
+    per = n / num_rows
+  ) 
+
+## Pull order for our group variables
+group_var_order <- dt_item_list
+```
+
+We generated our plots. We plotted DETECT Items by broader categories (Environmental, Patient Condition, Caregiver) for visibility.
+
+```{r}
+#| label: sec4-f4-item-comp-all-month-rate-plot
+# Plot DETECT Item Completion Rate by Month
+## Plot Data
+### Plot Environmental Item Data
+env_plot <- ggplot2::ggplot(
+  data = plot_df |>
+    #### Filter to Environmental Variables
+    dplyr::filter(stringr::str_detect(group_val, 'dt_env_')) |>
+      ### Apply group variable labels/order
+    dplyr::mutate(
+      group_val = factor(
+        group_val, 
+        levels = names(group_var_order), 
+        labels = as.character(group_var_order)
+        )
+      ),
+  ggplot2::aes(x=month, y = per, color = group_val)
+  ) + 
+  ggplot2::geom_line() +
+  #### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  #### Labels
+  ggplot2::labs(
+    title="Environment Questions",
+    x= "Study Month", 
+    y = "Completion Rate (% of Screenings)",
+    col = "DETECT Item"
+    ) +
+  #### Set colors
+  ggplot2::scale_color_brewer(palette="Paired")
+
+### Plot Patient Condition Item Data
+pt_plot <- ggplot2::ggplot(
+  data = plot_df |>
+    #### Filter to Patient Condition Questions
+    dplyr::filter(stringr::str_detect(group_val, 'dt_pt_')) |>
+      ### Apply group variable labels/order
+    dplyr::mutate(
+      group_val = factor(
+        group_val, 
+        levels = names(group_var_order), 
+        labels = as.character(group_var_order)
+        )
+      ),
+  ggplot2::aes(x=month, y = per, color = group_val)
+  ) + 
+  ggplot2::geom_line() +
+  #### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  #### Labels
+  ggplot2::labs(
+    title="Patient Condition Questions",
+    x= "Study Month", 
+    y = "Completion Rate (% of Screenings)",
+    col = "DETECT Item"
+    ) +
+  #### Set colors
+  ggplot2::scale_color_brewer(palette="Accent")
+
+
+### Plot Caregiver Item Data
+cg_plot <- ggplot2::ggplot(
+  data = plot_df |>
+    #### Filter to Caregiver Questions
+    dplyr::filter(stringr::str_detect(group_val, 'dt_cg_')) |>
+      ### Apply group variable labels/order
+    dplyr::mutate(
+      group_val = factor(
+        group_val, 
+        levels = names(group_var_order), 
+        labels = as.character(group_var_order)
+        )
+      ),
+  ggplot2::aes(x=month, y = per, color = group_val)
+  ) + 
+  ggplot2::geom_line() +
+  #### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  #### Labels
+  ggplot2::labs(
+    title="Caregiver Questions",
+    x= "Study Month", 
+    y = "Completion Rate (% of Screenings)",
+    col = "DETECT Item"
+    ) +
+  #### Set colors
+  ggplot2::scale_color_brewer(palette="Spectral")
+
+### Gather Plots into a single Patchwork Plot
+plot <- patchwork::wrap_plots(
+  env_plot, pt_plot, cg_plot
+  ) + 
+  patchwork::plot_annotation(
+    title = 'DETECT Item Completion Rate, by Month'
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-4-item-comp-all-rate.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+
+##### Figure 4.5: Caregiver Items Completion by Screening Result (#sec4-f5-item-comp-cg-pos-month)
+
+We extracted the completion count and percent of the Caregiver questions in the DETECT Tool per month, by screening result type (positive or negative).
 
 #### Item Yes Rates, by Month
 
-##### Figure 4.6: All Screenings
+##### Figure 4.#: All Screenings
 
-##### Figure 4.7: Positive Screenings
+##### Figure 4.#: Positive Screenings
 
 #### Reporting Intent Rates, by Month
 
-##### Figure 4.8: All Screenings
+##### Figure 4.#: All Screenings
 
-##### Figure 4.9: Positive Screenings
+##### Figure 4.#: Positive Screenings
 
-##### Figure 4.10: Negative Screenings
+##### Figure 4.#: Negative Screenings
 
 # 🧹 Clean up
 
