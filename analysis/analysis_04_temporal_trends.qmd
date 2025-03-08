@@ -89,6 +89,10 @@ source(here::here("r", "get_dt_resp_pattern.R"))
 ## Function that performs Chi-Square and Fisher's Exact on DETECT Response
 ## Patterns, by Item
 source(here::here("r", "get_dt_rp_chi_fisher.R"))
+
+## Function that extracts a reduced tibble that gives the count of "TRUE"
+## values in binary/logical columns, by a grouping variable
+source(here::here("r", "binary_count_group.R"))
 ```
 
 # 📥 Load Data
@@ -114,26 +118,15 @@ informative_df_import(
 # [Placeholder]
 ```
 
-We loaded our MedStar subject-level data.
+# Analyses
+
+We set the path to where we wished to save our plot files.
 
 ```{r}
-#| label: load-ms-records
-# Load MedStar Subject Level Data
-## Path to data
-path <- here::here(
-    "data", "cleaned_rds_files", "analysis", 
-    "medstar_02_subj-lvl.rds"
-    )
-
-## Load
-informative_df_import(
-    "ms_subjs", path, overwrite = T
-  )
-
-# [Placeholder]
+#| label: set-plot-path
+# Set path to directory to save plot image files
+plot_path <- paste0(here::here('data', 'figs'), '/')
 ```
-
-# Analyses
 
 We set the order and labels for values in categorical variables we may use in temporal trends plots.
 
@@ -141,6 +134,13 @@ We set the order and labels for values in categorical variables we may use in te
 #| label: set-value-orders
 # Set order and labels for values in categorical variables that may be used
 # in plots
+
+## Screening result value order (Negative screens outnumber Positive)
+screen_result_order <- list(
+  screen = "Screenings Completed (Any Result)", 
+  negative = "Negative Screenings", 
+  positive = "Positive Screenings"
+  )
 
 ## Sex value order
 sex_val_list = list(
@@ -218,17 +218,224 @@ dt_item_list <- list(
 
 ## Section 4: Temporal Trends
 
-### Placeholder
-
-#### Table/Figure 1: Placeholder (#sec4-tf1-placeholder)
-
-Placeholder text
+We wished to analyse our temporal trends at the study month level.
 
 ```{r}
-#| label: sec4-tf1-placeholder-chunk
+#| label: sec4-add-month
+# Create Month-data backbone
+## Add Study Month variable to the records data.
+ms_records <- ms_records |>
+    ## Calculate study month
+    dplyr::mutate(
+      month = 1 + lubridate::interval(
+        '2019-07-01', 
+        lubridate::as_date(incident_timestamp)
+        ) %/% months(1)
+    )
 
-# Placeholder chunk to remind of labeling conventions
+## Extract table of constants: N records, N screenings, n positive screenings
+month_df <- binary_count_group(
+  ms_records, "month", c("dt_screened", "dt_positive")
+  ) |>
+  dplyr::rename_at(
+    c("dt_screened", "dt_positive", "num_rows"), 
+    ~c("n_screen", "n_positive", "total")
+    )
 ```
+
+### Screening Completion Rate, by Month 
+
+#### Figure 4.1: Screening Completion Rate, by Month (#sec4-f1-screen-rate-month)
+
+We examined our screening completion rate, by month.
+
+```{r}
+#| label: sec4-f1-screen-rate-month-plot
+# Plotting Screening Rate per Month
+## Create dataframe for the plot
+plot_df <- month_df |>
+  dplyr::mutate(
+    rate = n_screen / total,
+    min_rate = rate == min(rate)
+  )
+
+## Create plot
+plot <- ggplot2::ggplot(
+  data = plot_df, 
+  ggplot2::aes(x = month, y = rate)
+  ) + 
+  ggplot2::geom_line() +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Add a purple dot at the points with the lowest rate
+  ggplot2::geom_point(size = 1, ggplot2::aes(colour = factor(min_rate))) +
+  ggplot2::scale_color_manual(values = c('black', 'purple')) +
+  ggplot2::theme(legend.position = 'none') +
+  ### Labels
+  ggplot2::labs(
+    title="DETECT Screening Rate by Study Month",
+    x= "Study Month", 
+    y = "Screening Rate (% of Responses)",
+    #### Add the lowest rate month(s) in the caption.
+    caption = paste0(
+      "Minimum rate at month(s): ", 
+      paste(plot_df[plot_df$min_rate,]$month, collapse = ', ')
+      )
+    )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-1-screen-rate-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+### Screening Results, by Month
+
+We obtained the count and percent of our overall screening completion, as well as positive and negative results of screenings. A positive screening was defined as at least one "yes" response to a DETECT item question.
+
+```{r}
+#| label: sec4-screen-rate-month-bytype-calc
+# Plotting Screening Results
+## Create dataframe with count and percents - positive, negative results
+plot_df <- month_df |> 
+  dplyr::select(-total) |>
+  ### Calculate negative screens as total screens - positive screens
+  dplyr::mutate(
+    n_negative = n_screen - n_positive,
+    ### Use number of screens as denominator for result rates
+    per_positive = n_positive / n_screen,
+    per_negative = n_negative / n_screen
+  ) |>
+  ### Shift so that each row is MONTH - TYPE - COUNT - PERCENT 
+  tidyr::pivot_longer(
+    cols = dplyr::all_of(
+      c(dplyr::starts_with("n_"), dplyr::starts_with("per_"))
+      ),
+    names_to = c(".value", "group_val"),
+    names_pattern = "(.*)_(.*)"
+  )
+
+## Pull order for our group variables
+group_var_order <- screen_result_order
+```
+
+#### Figure 4.2: Counts (#sec4-f2-result-month-count)
+
+We examined our screening counts per month, by result type.
+
+```{r}
+#| label: sec4-f2-result-month-count-plot
+# Plotting Screening Rate per Month
+## Make Plot
+plot <- ggplot2::ggplot(
+  data = plot_df |>
+    ### Apply group variable labels/order
+  dplyr::mutate(
+    group_val = factor(
+      group_val, 
+      levels = names(group_var_order), 
+      labels = as.character(group_var_order)
+      )
+    ), 
+  ggplot2::aes(x = month, y = n, fill = group_val)
+  ) + 
+  ### Ribbon to use lines that fill the area under the line
+  ggplot2::geom_ribbon(ggplot2::aes(ymin = 0, ymax = n, fill = group_val)) +
+  ### Labels
+  ggplot2::labs(
+    title="DETECT Screening Count by Study Month",
+    x= "Study Month", 
+    y = "Screening Count",
+    fill = "Screening Result Type"
+    ) +
+  ### Color Palette
+  ggplot2::scale_fill_brewer(palette = "Paired")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-2-result-month-count.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+#### Figure 4.3: Rates (#sec4-f3-result-month-rate)
+
+We examined our screening result rates per month, by result type.
+
+```{r}
+#| label: sec4-f3-result-month-rate-plot
+# Plotting Screening Rate per Month 
+## Create plot
+plot <- ggplot2::ggplot(
+  data = plot_df |>
+    ### Omit total screenings from this plot
+  dplyr::filter(group_val != 'screen') |>
+    ### Apply group variable labels/order
+  dplyr::mutate(
+    group_val = factor(
+      group_val, 
+      levels = names(group_var_order), 
+      labels = as.character(group_var_order)
+      )
+    ), 
+  ggplot2::aes(x = month, y = per, fill = group_val)
+  ) + 
+  ### Stacked area plot
+  ggplot2::geom_area(alpha = 0.8) +
+  ### Labels
+  ggplot2::labs(
+    title="DETECT Screening Result Rates, by Month",
+    x= "Study Month", 
+    y = "Screening Rate (% of Screenings)",
+    fill = "Screening Result Type"
+    ) +
+  ### Color Palette
+  ggplot2::scale_fill_brewer(palette = "Paired")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-3-result-month-rate.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+
+### DETECT Item Rates, by Month
+
+#### Figure 4.5: Item Completion Rates, All Screenings
+
+#### Item Yes Rates, by Month
+
+##### Figure 4.6: All Screenings
+
+##### Figure 4.7: Positive Screenings
+
+#### Reporting Intent Rates, by Month
+
+##### Figure 4.8: All Screenings
+
+##### Figure 4.9: Positive Screenings
+
+##### Figure 4.10: Negative Screenings
 
 # 🧹 Clean up
 
