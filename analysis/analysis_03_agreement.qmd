@@ -21,7 +21,9 @@ These files originally contained 92,160 observations of approximately 30 demogra
 
 ## Internal Files
 
-This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ).
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [5-year data manuscript directory](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update?csf=1&web=1&e=fhfOfL).
+
+**Notes for analyses** start at the parent document["00_DETECT 5-year Analysis Notes.docx"](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update/tables/00_DETECT%205-Year%20Analysis%20Notes.docx?d=w09a61782c9ef4fe78780683996fdbd1b&csf=1&web=1&e=OWsgTv). Notes for this file are in ["section 3 - agreement tables.docx"](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update/tables/section%203%20-%20agreement%20tables.docx?d=we977750fe9144ee5bec9e25b7ab980ad&csf=1&web=1&e=tv5x5B).
 
 Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
 
@@ -37,6 +39,7 @@ Please note: as these files contain PHI and proprietary information, they are no
 suppressPackageStartupMessages({
   library(tidyverse)
   library(here)
+  library(irr)
   library(janitor, include.only = "clean_names")
 })
 ```
@@ -50,6 +53,7 @@ This file was created with:
 -   here version 1.0.1
 -   janitor version 2.2.0
 -   stats version 4.4.1
+-   irr version 0.84.1
 
 ## Functions
 
@@ -89,6 +93,14 @@ source(here::here("r", "get_dt_resp_pattern.R"))
 ## Function that performs Chi-Square and Fisher's Exact on DETECT Response
 ## Patterns, by Item
 source(here::here("r", "get_dt_rp_chi_fisher.R"))
+
+## Function that gets a formatted, human-legible 2x2 agreement summary table
+source(here::here("r", "get_twox_logical_table.R"))
+
+## Function that gets a formatted, human-legible table summarizing the results
+## of agreement statistical tests (Chi-Square, McNemar, Correlation Coefficent,
+## Kappa)
+source(here::here("r", "get_agreement_stats_table.R"))
 ```
 
 # 📥 Load Data
@@ -110,6 +122,10 @@ path <- here::here(
 informative_df_import(
     "ms_records", path, overwrite = T
   )
+
+## Drop potentially duplicated responses
+ms_records <- ms_records |>
+  dplyr::filter(!dup_drop)
 
 # [Placeholder]
 ```
@@ -135,7 +151,7 @@ informative_df_import(
 
 # Analyses
 
-We set the order and labels for values in categorical variables. PLACEHOLDER
+We set the order and labels for values in categorical variables. [PLACEHOLDER: Delete if not needed]
 
 ```{r}
 #| label: set-value-orders
@@ -218,16 +234,71 @@ dt_item_list <- list(
 
 ## Section 3: Agreement
 
-### Placeholder
+### All Screenings
 
-#### Table/Figure 1: Placeholder (#sec3-tf1-placeholder)
+#### Table 1: Agreement of Reporting Intent to DETECT Result (sec3-t1-scr-reslt-intent-all)
 
-Placeholder text
+We were interested in the agreement between the DETECT Tool's recorded intent to report to the screening result. (Did medic's typically intend to report if a screening was positive, and not if it was negative?) A positive screening was defined as at least one "yes" response, regardless of items selected. We checked this for all screenings.
+
+First, we checked to see if there were any records where one target value was present, but the other was not.
 
 ```{r}
-#| label: sec3-tf1-placeholder-chunk
+#| label: sec3-t1-scr-reslt-intent-all-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  dplyr::filter((is.na(dt_positive) != is.na(dt_aps_reported))) |>
+  nrow() == 0
+```
 
-# Placeholder chunk to remind of labeling conventions
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t1-scr-reslt-intent-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_positive"
+var_a_labs <- list(t = "Intent to Report", f = "No Intent to Report")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "dt_aps_reported"
+var_b_labs <- list(t = "Positive Screening", f = "Negative Screening")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::mutate(
+      dplyr::across(c(dt_positive, dt_aps_reported), 
+                    ~dplyr::case_when(
+                      .x ~ 't',
+                      !.x ~ 'f',
+                      is.na(.x) ~ NA
+                    ))
+      )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t1-scr-reslt-intent-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
 ```
 
 # 🧹 Clean up
