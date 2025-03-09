@@ -277,7 +277,7 @@ get_agreement_stats_table <- function(
   # -------------------------------------------------------------------------
   .valid_corrs <- c("pearson", "kendall", "spearman")
   ## If .corr_methods somehow doesn't exist, replace with default
-  if (sum(!is.na(corr_methods)) == 0){
+  if (sum(!is.na(.corr_methods)) == 0){
     .corr_methods <- .valid_corrs
   }
   ## Ensure .corr_methods is a character vector
@@ -319,7 +319,7 @@ get_agreement_stats_table <- function(
   # -------------------------------------------------------------------------
   .valid_kappas <- c("cohen", "fleiss", "light")
   ## If .kappa_methods somehow doesn't exist, replace with default
-  if (sum(!is.na(kappa_methods)) == 0){
+  if (sum(!is.na(.kappa_methods)) == 0){
     .kappa_methods <- .valid_kappas
   }
   ## Ensure .kappa_methods is a character vector
