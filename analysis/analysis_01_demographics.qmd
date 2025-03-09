@@ -21,7 +21,9 @@ These files originally contained 92,160 observations of approximately 30 demogra
 
 ## Internal Files
 
-This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ).
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [5-year data manuscript directory](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update?csf=1&web=1&e=fhfOfL).
+
+**Notes for analyses** start at the parent document["00_DETECT 5-year Analysis Notes.docx"](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update/tables/00_DETECT%205-Year%20Analysis%20Notes.docx?d=w09a61782c9ef4fe78780683996fdbd1b&csf=1&web=1&e=OWsgTv). Notes for this file are in ["section 1 - demographics tables.docx"](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update/tables/section%201%20-%20demographics%20tables.docx?d=w07f8144ba5c24ef093d232b5ed68b65b&csf=1&web=1&e=d85qHJ).
 
 Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
 
@@ -37,7 +39,6 @@ Please note: as these files contain PHI and proprietary information, they are no
 suppressPackageStartupMessages({
   library(tidyverse)
   library(here)
-  library(janitor, include.only = "clean_names")
 })
 ```
 
@@ -48,7 +49,6 @@ This file was created with:
 -   R version 4.4.1 ("Race for Your Life").
 -   tidyverse version 2.0.0, including all attached packages
 -   here version 1.0.1
--   janitor version 2.2.0
 -   stats version 4.4.1
 
 ## Functions
@@ -129,6 +129,14 @@ informative_df_import(
 ```
 
 # Analyses
+
+We set the path to where we wished to save our plot files.
+
+```{r}
+#| label: set-plot-path
+# Set path to directory to save plot image files
+plot_path <- paste0(here::here('data', 'figs'), '/')
+```
 
 We set the order we wanted to present Sex, Race, and Hispanic Ethnicity Values in our summary tables.
 
@@ -249,8 +257,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs", 
+  filename = paste0(
+    plot_path, 
     "f0-1_age-overall-resp-hist.png"
     ),
   plot = plot
@@ -539,8 +547,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs", 
+  filename = paste0(
+    plot_path, 
     "f0-2_age-overall-subj-hist.png"
     ),
   plot = plot
@@ -809,8 +817,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs",
+  filename = paste0(
+    plot_path,
     "f0-3_age-screen-resp-hist.png"
     ),
   plot = plot
@@ -1039,8 +1047,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs",
+  filename = paste0(
+    plot_path,
     "f0-4_age-screen-subj-hist.png"
     ),
   plot = plot
@@ -1274,8 +1282,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs",
+  filename = paste0(
+    plot_path,
     "f0-5_age-result-resp-hist.png"
     ),
   plot = plot
@@ -1505,8 +1513,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs",
+  filename = paste0(
+    plot_path,
     "f0-6_age-result-subj-hist.png"
     ),
   plot = plot
@@ -1741,8 +1749,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs",
+  filename = paste0(
+    plot_path,
     "f0-7_age-intent-all-resp-hist.png"
     ),
   plot = plot
@@ -1972,8 +1980,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs",
+  filename = paste0(
+    plot_path,
     "f0-8_age-intent-all-subj-hist.png"
     ),
   plot = plot
@@ -2210,8 +2218,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs",
+  filename = paste0(
+    plot_path,
     "f0-9_age-intent-pos-resp-hist.png"
     ),
   plot = plot
@@ -2448,8 +2456,8 @@ plot <- ggplot2::ggplot(
 
 ## Save plot
 ggplot2::ggsave(
-  filename = here::here(
-    "data", "figs",
+  filename = paste0(
+    plot_path,
     "f0-10_age-intent-neg-resp-hist.png"
     ),
   plot = plot
