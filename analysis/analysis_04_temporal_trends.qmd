@@ -94,9 +94,9 @@ source(here::here("r", "get_dt_resp_pattern.R"))
 ## Patterns, by Item
 source(here::here("r", "get_dt_rp_chi_fisher.R"))
 
-## Function that extracts a reduced tibble that gives the count of "TRUE"
-## values in binary/logical columns, by a grouping variable
-source(here::here("r", "binary_count_group.R"))
+## Function that extracts the count and percent of values in a set of columns
+## based on a grouping variable
+source(here::here("r", "get_freq_grouped.R"))
 ```
 
 # 📥 Load Data
@@ -139,13 +139,6 @@ We set the order and labels for values in categorical variables we may use in te
 # Set order and labels for values in categorical variables that may be used
 # in plots
 
-## Screening result value order (Negative screens outnumber Positive)
-screen_result_order <- list(
-  screen = "Screenings Completed (Any Result)", 
-  negative = "Negative Screenings", 
-  positive = "Positive Screenings"
-  )
-
 ## Sex value order
 sex_val_list = list(
     male = 'Male', female = 'Female', uta = 'Unable to Assess', 
@@ -167,6 +160,22 @@ hispanic_val_list = list(
   missing = 'Missing (NA)'
   )
 
+## Screening Result value labels ('dt_positive') 
+screen_result_list <- list(
+  completed = "Screenings Completed (Any Result)", 
+  negative = "Negative Screenings", 
+  positive = "Positive Screenings",
+  missing = "No Screening Performed"
+  )
+
+## Reporting Intent value labels ('dt_aps_reported')
+report_intent_vals <- list(
+  intent = "Intent to Report", 
+  no_intent = "No Intent to Report", 
+  missing = "Not Screened", 
+  completed = "Recorded Intent (Any Result)"
+  )
+
 ## DETECT Tool Variable Item Order
 dt_item_list <- list(
   dt_env_odor = "Unusual odor", 
@@ -183,6 +192,20 @@ dt_item_list <- list(
   dt_cg_uneng = "Unengaged and inattentive",
   dt_cg_frust = "Frustrated, tired, angry, or burdened",
   dt_cg_anx = "Overly concerned (e.g. anxious, hovering)"
+  )
+
+## DETECT Tool Response Item Order
+dt_item_vals <- list(
+    yes = "Yes", no = "No", uta = "Unable to Assess", 
+    missing = "Item Not Completed",
+    completed = "Item Completed (Any Response)"
+    )
+
+## DETECT Tool Question Categories
+dt_cat_labels <- list(
+  env = "Environmental Questions",
+  pt = "Patient Condition Questions",
+  cg = "Caregiver Questions"
   )
 ```
 
@@ -202,18 +225,36 @@ ms_records <- ms_records |>
         lubridate::as_date(incident_timestamp)
         ) %/% months(1)
     )
-
-## Extract table of constants: N records, N screenings, n positive screenings
-month_df <- binary_count_group(
-  ms_records, "month", c("dt_screened", "dt_positive")
-  ) |>
-  dplyr::rename_at(
-    c("dt_screened", "dt_positive", "num_rows"), 
-    ~c("n_screen", "n_positive", "total")
-    )
 ```
 
 ### Screening Completion Rate, by Month 
+
+We calculated our screening completion rate and results, by month.
+
+```{r}
+#| label: sec4-screen-outcomes-month-calc
+# Get Screening Completion & Result Rates, by Month
+## Calculate the screening results, which also calculates completion, for
+## each month
+screening_freqs <- get_freq_grouped(
+  .df = ms_records |>
+    ## Reduce to month and screening result columns
+    dplyr::select(month, dt_positive) |>
+    ## Convert screening result column from binary/logical to text categories
+    dplyr::mutate(
+      dt_positive = dplyr::case_when(
+        dt_positive ~ 'positive',
+        !dt_positive ~ 'negative',
+        is.na(dt_positive) ~ 'missing'
+      )
+    ),
+  .group_var = 'month',
+  .item_list = list(dt_positive = "Screening Result"),
+  .val_order = screen_result_list[names(screen_result_list) != 'completed']
+  ) |>
+  ### Convert month to a numeric, for plot
+  dplyr::mutate(month = as.numeric(month))
+```
 
 #### Figure 4.1: Screening Completion Rate, by Month (#sec4-f1-screen-rate-month)
 
@@ -222,23 +263,23 @@ We examined our screening completion rate, by month.
 ```{r}
 #| label: sec4-f1-screen-rate-month-plot
 # Plotting Screening Rate per Month
-## Create dataframe for the plot
-plot_df <- month_df |>
-  dplyr::mutate(
-    rate = n_screen / total,
-    min_rate = rate == min(rate)
-  )
+## Extract data frame for the plot
+plot_df <- screening_freqs |>
+  ### Filter to only 'completed' responses for this plot
+  dplyr::filter(response == 'completed') |>
+  ### Flag the month with the lowest completion rate
+  dplyr::mutate(min_point = per_total == min(per_total))
 
 ## Create plot
 plot <- ggplot2::ggplot(
   data = plot_df, 
-  ggplot2::aes(x = month, y = rate)
+  ggplot2::aes(x = month, y = per_total)
   ) + 
   ggplot2::geom_line() +
   ### Convert y-axis scale to a percent
   ggplot2::scale_y_continuous(labels = scales::percent) +
-  ### Add a purple dot at the points with the lowest rate
-  ggplot2::geom_point(size = 1, ggplot2::aes(colour = factor(min_rate))) +
+  ### Add a purple dot at the points with the lowest "per_total"
+  ggplot2::geom_point(size = 1, ggplot2::aes(colour = factor(min_point))) +
   ggplot2::scale_color_manual(values = c('black', 'purple')) +
   ggplot2::theme(legend.position = 'none') +
   ### Labels
@@ -249,7 +290,7 @@ plot <- ggplot2::ggplot(
     #### Add the lowest rate month(s) in the caption.
     caption = paste0(
       "Minimum rate at month(s): ", 
-      paste(plot_df[plot_df$min_rate,]$month, collapse = ', ')
+      paste(plot_df[plot_df$min_point,]$month, collapse = ', ')
       )
     )
 
@@ -268,33 +309,7 @@ plot
 
 ### Screening Results, by Month
 
-We obtained the count and percent of our overall screening completion, as well as positive and negative results of screenings. A positive screening was defined as at least one "yes" response to a DETECT item question.
-
-```{r}
-#| label: sec4-screen-rate-month-bytype-calc
-# Extract data to plot trends in result types, per month
-## Create dataframe with count and percents - positive, negative results
-plot_df <- month_df |> 
-  dplyr::select(-total) |>
-  ### Calculate negative screens as total screens - positive screens
-  dplyr::mutate(
-    n_negative = n_screen - n_positive,
-    ### Use number of screens as denominator for result rates
-    per_positive = n_positive / n_screen,
-    per_negative = n_negative / n_screen
-  ) |>
-  ### Pivot so that each row is MONTH - TYPE - COUNT - PERCENT 
-  tidyr::pivot_longer(
-    cols = dplyr::all_of(
-      c(dplyr::starts_with("n_"), dplyr::starts_with("per_"))
-      ),
-    names_to = c(".value", "group_val"),
-    names_pattern = "(.*)_(.*)"
-  )
-
-## Pull order for our group variables
-group_var_order <- screen_result_order
-```
+We examined the count and percent of our overall screening completion, as well as positive and negative results of screenings. A positive screening was defined as at least one "yes" response to a DETECT item question.
 
 #### Figure 4.2: Counts (#sec4-f2-result-month-count)
 
@@ -303,21 +318,26 @@ We examined our screening counts per month, by result type.
 ```{r}
 #| label: sec4-f2-result-month-count-plot
 # Plotting Screening Count per Month
+## Extract data frame for the plot
+plot_df <- screening_freqs |>
+  ### Filter to omit "missing" as a value for this plot
+  dplyr::filter(!response %in% c('missing')) |>
+  ### Apply group variable labels/order
+    dplyr::mutate(
+      response = factor(
+        response, 
+        levels = names(screen_result_list), 
+        labels = as.character(screen_result_list)
+        )
+      )
+
 ## Make Plot
 plot <- ggplot2::ggplot(
-  data = plot_df |>
-    ### Apply group variable labels/order
-  dplyr::mutate(
-    group_val = factor(
-      group_val, 
-      levels = names(group_var_order), 
-      labels = as.character(group_var_order)
-      )
-    ), 
-  ggplot2::aes(x = month, y = n, fill = group_val)
+  data = plot_df, 
+  ggplot2::aes(x = month, y = n, fill = response)
   ) + 
   ### Ribbon to use lines that fill the area under the line
-  ggplot2::geom_ribbon(ggplot2::aes(ymin = 0, ymax = n, fill = group_val)) +
+  ggplot2::geom_ribbon(ggplot2::aes(ymin = 0, ymax = n, fill = response)) +
   ### Labels
   ggplot2::labs(
     title="DETECT Screening Count by Study Month",
@@ -329,39 +349,42 @@ plot <- ggplot2::ggplot(
   ggplot2::scale_fill_brewer(palette = "Paired")
 
 ## Save plot
-ggplot2::ggsave(
-  filename = paste0(
-    plot_path,
-    'f4-2-result-month-count.png'
-    ),
-  plot = plot
-  )
+# ggplot2::ggsave(
+#   filename = paste0(
+#     plot_path,
+#     'f4-2-result-month-count.png'
+#     ),
+#   plot = plot
+#   )
 
 ## Display plot
 plot
 ```
 
-#### Figure 4.3: Rates (#sec4-f3-result-month-rate)
+#### Figure 4.3: Rates, Per Completed Screenings (#sec4-f3-result-month-per-comp)
 
 We examined our screening result rates per month, by result type.
 
 ```{r}
-#| label: sec4-f3-result-month-rate-plot
-# Plotting Screening Rate per Month 
+#| label: sec4-f3-result-month-per-comp-plot
+# Plotting Screening Result Frequency per Month, Completed Screenings
+## Extract data frame for the plot
+plot_df <- screening_freqs |>
+  ### Filter to omit "missing" or "total" values for this plot
+  dplyr::filter(!response %in% c('missing', 'completed')) |>
+  ### Apply group variable labels/order
+    dplyr::mutate(
+      response = factor(
+        response, 
+        levels = names(screen_result_list), 
+        labels = as.character(screen_result_list)
+        )
+      )
+
 ## Create plot
 plot <- ggplot2::ggplot(
-  data = plot_df |>
-    ### Omit total screenings from this plot
-  dplyr::filter(group_val != 'screen') |>
-    ### Apply group variable labels/order
-  dplyr::mutate(
-    group_val = factor(
-      group_val, 
-      levels = names(group_var_order), 
-      labels = as.character(group_var_order)
-      )
-    ), 
-  ggplot2::aes(x = month, y = per, fill = group_val)
+  data = plot_df, 
+  ggplot2::aes(x = month, y = per_comp, fill = response)
   ) + 
   ## Convert y-axis scale to a percent
   ggplot2::scale_y_continuous(labels = scales::percent) +
@@ -381,7 +404,7 @@ plot <- ggplot2::ggplot(
 ggplot2::ggsave(
   filename = paste0(
     plot_path,
-    'f4-3-result-month-rate.png'
+    'f4-3-result-month-per-comp.png'
     ),
   plot = plot
   )
@@ -390,143 +413,162 @@ ggplot2::ggsave(
 plot
 ```
 
-### DETECT Item Rates, by Month
+#### Figure 4.4: Rates, Per All Responses (#sec4-f4-result-month-per-total)
 
-#### Item Completion Rates
+We examined our screening result rates per month, by result type, for all responses (including no screening).
 
-##### Figure 4.4: All Screenings (#sec4-f4-item-comp-all-month)
+```{r}
+#| label: sec4-f4-result-month-per-comp-plot
+# Plotting Screening Result Frequency per Month, All Responses
+## Extract data frame for the plot
+plot_df <- screening_freqs |>
+  ### Filter to omit "total" value for this plot
+  dplyr::filter(!response %in% c('completed')) |>
+  ### Apply group variable labels/order
+    dplyr::mutate(
+      response = factor(
+        response, 
+        levels = names(screen_result_list), 
+        labels = as.character(screen_result_list)
+        )
+      )
 
-We extracted the completion count and percent of each DETECT tool item, for all performed screenings each month.
+## Create plot
+plot <- ggplot2::ggplot(
+  data = plot_df, 
+  ggplot2::aes(x = month, y = per_total, fill = response)
+  ) + 
+  ## Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Stacked area plot
+  ggplot2::geom_area(alpha = 0.8) +
+  ### Labels
+  ggplot2::labs(
+    title="DETECT Screening Result Rates, by Month",
+    subtitle = "All Responses, including missing screenings",
+    x= "Study Month", 
+    y = "Screening Rate (% of Responses)",
+    fill = "Screening Result Type"
+    ) +
+  ### Color Palette
+  ggplot2::scale_fill_brewer(palette = "Paired")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-4-result-month-per-total.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+### Initial Exploration of DETECT Item Response Patterns, by Month
+
+#### All Responses
+
+##### Figure 4.5: Item Completion Rates, All Responses (#sec4-f5-item-comp-all-month)
+
+We extracted the item completion and value patterns of each DETECT tool item, for all responses each month. This included non-screened responses.
 
 ```{r}
 #| label: sec4-item-comp-all-month-calc
-# Extract data to plot DETECT item completion rates
-## Create dataframe with count and percents - positive, negative results
-plot_df <- binary_count_group(
-  ms_records |>
-    ### Filter to screenings only
-    dplyr::filter(dt_screened) |>
-    ### Convert DETECT Item variables to boolean/logical, indicating if they
-    ### were or were not completed
-    dplyr::mutate(dplyr::across(
-      dplyr::all_of(names(dt_item_list)), 
-      ~!is.na(.x)
-      )),
-  "month",
-  names(dt_item_list)
+# Get Screening Completion & Result Rates, by Month, all responses
+## Calculate frequency of responses in all DETECT Tool Questions, per month
+## Includes completion rate calculations
+dt_freqs <- get_freq_grouped(
+  .df = ms_records |>
+    ### Reduce to month and DETECT Tool Items
+    dplyr::select(month, dplyr::all_of(names(dt_item_list))) |>
+    ### Convert missing values in DETECT Tool items to "missing"
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::all_of(names(dt_item_list)), 
+        ~ifelse(is.na(.x), 'missing', .x)
+        )
+    ),
+  .group_var = 'month',
+  .item_list = dt_item_list,
+  .val_order = dt_item_vals[names(dt_item_vals) != 'completed']
   ) |>
-  ### Pivot so that each row is MONTH - TYPE - COUNT
-  tidyr::pivot_longer(
-    cols = dplyr::all_of(names(dt_item_list)),
-    names_to = 'group_val',
-    values_to = 'n'
-  ) |>
-  ### Calculate percent from the total number of records in the subset
+  ### Convert month to a numeric, for plot
+  dplyr::mutate(month = as.numeric(month)) |>
+  ### Add Variable Label, Response Label, Subset (character), Subset Title
+  ### to facilitate loop processing in groups
   dplyr::mutate(
-    per = n / num_rows
-  ) 
-
-## Pull order for our group variables
-group_var_order <- dt_item_list
+    var_label = factor(
+      var_name,
+      levels = names(dt_item_list),
+      labels = as.character(dt_item_list)
+      ),
+    response_label = factor(
+      response,
+      levels = names(dt_item_vals),
+      labels = as.character(dt_item_vals)
+    ),
+    subset = dplyr::case_when(
+      stringr::str_detect(var_name, '_env_') ~'env',
+      stringr::str_detect(var_name, '_pt_') ~'pt',
+      stringr::str_detect(var_name, '_cg') ~'cg'
+      ),
+    subset_title = subset,
+    subset_title = factor(
+      subset_title, 
+      levels = names(dt_cat_labels), 
+      labels = as.character(dt_cat_labels)
+      )
+    )
 ```
 
 We generated our plots. We plotted DETECT Items by broader categories (Environmental, Patient Condition, Caregiver) for visibility.
 
 ```{r}
-#| label: sec4-f4-item-comp-all-month-rate-plot
-# Plot DETECT Item Completion Rate by Month
-## Plot Data
-### Plot Environmental Item Data
-env_plot <- ggplot2::ggplot(
-  data = plot_df |>
-    #### Filter to Environmental Variables
-    dplyr::filter(stringr::str_detect(group_val, 'dt_env_')) |>
-      ### Apply group variable labels/order
-    dplyr::mutate(
-      group_val = factor(
-        group_val, 
-        levels = names(group_var_order), 
-        labels = as.character(group_var_order)
-        )
-      ),
-  ggplot2::aes(x=month, y = per, color = group_val)
-  ) + 
-  ggplot2::geom_line() +
-  #### Convert y-axis scale to a percent
-  ggplot2::scale_y_continuous(labels = scales::percent) +
-  #### Labels
-  ggplot2::labs(
-    title="Environment Questions",
-    x= "Study Month", 
-    y = "Completion Rate (% of Screenings)",
-    col = "DETECT Item"
+#| label: sec4-f5-item-comp-all-month-rate-plot
+# Plot DETECT Item Completion Rate by Month, all responses
+## Extract Plot Data Frame
+plot_df <- dt_freqs |>
+  ## Reduce to completion rate values
+  dplyr::filter(response %in% c("completed"))
+
+## Create plots for the 3 groups
+### Create list to hold plots as they are generated
+plots <- list()
+groups <- names(dt_cat_labels)
+palette_order <- c("Paired", "Accent", "Spectral")
+
+### Create each plot and add to list
+for (i in seq(1, length(groups))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT Category
+      dplyr::filter(subset == groups[i]),
+    ggplot2::aes(x = month, y = per_total, color = var_label)
     ) +
-  #### Set colors
-  ggplot2::scale_color_brewer(palette="Paired")
+    ggplot2::geom_line() +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(dt_cat_labels[groups[i]]),
+      x= "Study Month", 
+      y = "Completion Rate (% of Responses)",
+      col = as.character(dt_cat_labels[groups[i]])
+      ) +
+    #### Set colors
+    ggplot2::scale_color_brewer(palette=palette_order[i])
+}
 
-### Plot Patient Condition Item Data
-pt_plot <- ggplot2::ggplot(
-  data = plot_df |>
-    #### Filter to Patient Condition Questions
-    dplyr::filter(stringr::str_detect(group_val, 'dt_pt_')) |>
-      ### Apply group variable labels/order
-    dplyr::mutate(
-      group_val = factor(
-        group_val, 
-        levels = names(group_var_order), 
-        labels = as.character(group_var_order)
-        )
-      ),
-  ggplot2::aes(x=month, y = per, color = group_val)
-  ) + 
-  ggplot2::geom_line() +
-  #### Convert y-axis scale to a percent
-  ggplot2::scale_y_continuous(labels = scales::percent) +
-  #### Labels
-  ggplot2::labs(
-    title="Patient Condition Questions",
-    x= "Study Month", 
-    y = "Completion Rate (% of Screenings)",
-    col = "DETECT Item"
-    ) +
-  #### Set colors
-  ggplot2::scale_color_brewer(palette="Accent")
-
-
-### Plot Caregiver Item Data
-cg_plot <- ggplot2::ggplot(
-  data = plot_df |>
-    #### Filter to Caregiver Questions
-    dplyr::filter(stringr::str_detect(group_val, 'dt_cg_')) |>
-      ### Apply group variable labels/order
-    dplyr::mutate(
-      group_val = factor(
-        group_val, 
-        levels = names(group_var_order), 
-        labels = as.character(group_var_order)
-        )
-      ),
-  ggplot2::aes(x=month, y = per, color = group_val)
-  ) + 
-  ggplot2::geom_line() +
-  #### Convert y-axis scale to a percent
-  ggplot2::scale_y_continuous(labels = scales::percent) +
-  #### Labels
-  ggplot2::labs(
-    title="Caregiver Questions",
-    x= "Study Month", 
-    y = "Completion Rate (% of Screenings)",
-    col = "DETECT Item"
-    ) +
-  #### Set colors
-  ggplot2::scale_color_brewer(palette="Spectral")
-
-### Gather Plots into a single Patchwork Plot
+### Use Patchwork to wrap plots into a unified graphic
 plot <- patchwork::wrap_plots(
-  env_plot, pt_plot, cg_plot
+  plots[1:length(groups)]
   ) + 
   patchwork::plot_annotation(
-    title = 'DETECT Item Completion Rate, by Month'
+    title = 'DETECT Item Completion Rate, by Month',
+    subtitle = "All responses, includes responses with no screening"
     ) + 
   patchwork::plot_layout(guides = 'collect', axes = 'collect') &
   ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
@@ -535,7 +577,7 @@ plot <- patchwork::wrap_plots(
 ggplot2::ggsave(
   filename = paste0(
     plot_path,
-    'f4-4-item-comp-all-rate.png'
+    'f4-5-item-comp-all-month-rate.png'
     ),
   plot = plot
   )
@@ -544,24 +586,1035 @@ ggplot2::ggsave(
 plot
 ```
 
+##### Figure 4.6: Environment Items Response Patterns by Month, All Responses (#sec4-f6-item-pat-all-env-month)
 
-##### Figure 4.5: Caregiver Items Completion by Screening Result (#sec4-f5-item-comp-cg-pos-month)
+We created plots exploring the response patterns for the Environment Questions across all responses, including responses without a screening.
 
-We extracted the completion count and percent of the Caregiver questions in the DETECT Tool per month, by screening result type (positive or negative).
+```{r}
+#| label: sec4-f6-item-pat-all-env-month-plot
+# Plot DETECT Item Response Patterns, Environment Questions, All Responses
+## Extract Plot Data Frame
+plot_df <- dt_freqs |>
+  ## Remove "completed" value, as individual responses will fill this
+  dplyr::filter(!response %in% c("completed"))
 
-#### Item Yes Rates, by Month
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$env)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'env')]
+palette_order <- rep("Paired", length(subset_items))
 
-##### Figure 4.#: All Screenings
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_total, fill = response_label)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = "Response Rate (% of Responses)",
+      fill = "Item Response"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
 
-##### Figure 4.#: Positive Screenings
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = "DETECT Item Response Patterns, by Month",
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
 
-#### Reporting Intent Rates, by Month
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-6-item-pat-all-env-month.png'
+    ),
+  plot = plot
+  )
 
-##### Figure 4.#: All Screenings
+## Display plot
+plot
+```
 
-##### Figure 4.#: Positive Screenings
+##### Figure 4.7: Patient Question Items Response Patterns by Month, All Responses (#sec4-f7-item-pat-all-pt-month)
 
-##### Figure 4.#: Negative Screenings
+We created plots exploring the response patterns for the Patient Questions across all responses, including responses without a screening.
+
+```{r}
+#| label: sec4-f7-item-pat-all-pt-month-plot
+# Plot DETECT Item Response Patterns, Patient Questions, All Responses
+## Extract Plot Data Frame
+plot_df <- dt_freqs |>
+  ## Remove "completed" value, as individual responses will fill this
+  dplyr::filter(!response %in% c("completed"))
+
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$pt)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'pt')]
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_total, fill = response_label)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = "Response Rate (% of Responses)",
+      fill = "Item Response"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = "DETECT Item Response Patterns, by Month",
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-7-item-pat-all-pt-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+##### Figure 4.8: Caregiver Question Items Response Patterns by Month, All Responses (#sec4-f8-item-pat-all-cg-month)
+
+We created plots exploring the response patterns for the Caregiver Questions across all responses, including responses without a screening.
+
+```{r}
+#| label: sec4-f8-item-pat-all-cg-month-plot
+# Plot DETECT Item Response Patterns, Caregiver Questions, All Responses
+## Extract Plot Data Frame
+plot_df <- dt_freqs |>
+  ## Remove "completed" value, as individual responses will fill this
+  dplyr::filter(!response %in% c("completed"))
+
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$cg)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'cg')]
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_total, fill = response_label)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = "Response Rate (% of Responses)",
+      fill = "Item Response"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = "DETECT Item Response Patterns, by Month",
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-8-item-pat-all-cg-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+#### All Screenings
+
+##### Figure 4.9: Item Completion Rates, All Screenings (#sec4f-9-item-comp-scr-month)
+
+We extracted the item completion and value patterns of each DETECT tool item, for all screenings each month. This excluded responses that did not have a screening.
+
+```{r}
+#| label: sec4-item-comp-scr-month-calc
+# Get Screening Completion & Result Rates, by Month, All Screenings
+## Calculate frequency of responses in all DETECT Tool Questions, per month
+## Includes completion rate calculations
+dt_freqs <- get_freq_grouped(
+  .df = ms_records |>
+    ### Reduce to SCREENINGS
+    dplyr::mutate(dt_screened) |>
+    ### Reduce to month and DETECT Tool Items
+    dplyr::select(month, dplyr::all_of(names(dt_item_list))) |>
+    ### Convert missing values in DETECT Tool items to "missing"
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::all_of(names(dt_item_list)), 
+        ~ifelse(is.na(.x), 'missing', .x)
+        )
+    ),
+  .group_var = 'month',
+  .item_list = dt_item_list,
+  .val_order = dt_item_vals[names(dt_item_vals) != 'completed']
+  ) |>
+  ### Convert month to a numeric, for plot
+  dplyr::mutate(month = as.numeric(month)) |>
+  ### Add Variable Label, Response Label, Subset (character), Subset Title
+  ### to facilitate loop processing in groups
+  dplyr::mutate(
+    var_label = factor(
+      var_name,
+      levels = names(dt_item_list),
+      labels = as.character(dt_item_list)
+      ),
+    response_label = factor(
+      response,
+      levels = names(dt_item_vals),
+      labels = as.character(dt_item_vals)
+    ),
+    subset = dplyr::case_when(
+      stringr::str_detect(var_name, '_env_') ~'env',
+      stringr::str_detect(var_name, '_pt_') ~'pt',
+      stringr::str_detect(var_name, '_cg') ~'cg'
+      ),
+    subset_title = subset,
+    subset_title = factor(
+      subset_title, 
+      levels = names(dt_cat_labels), 
+      labels = as.character(dt_cat_labels)
+      )
+    )
+```
+
+We generated our plots. We plotted DETECT Items by broader categories (Environmental, Patient Condition, Caregiver) for visibility.
+
+```{r}
+#| label: sec4f-9-item-comp-scr-month-rate-plot
+# Plot DETECT Item Completion Rate by Month, All Screenings
+## Extract Plot Data Frame
+plot_df <- dt_freqs |>
+  ## Reduce to completion rate values
+  dplyr::filter(response %in% c("completed"))
+
+## Create plots for the 3 groups
+### Create list to hold plots as they are generated
+plots <- list()
+groups <- names(dt_cat_labels)
+palette_order <- c("Paired", "Accent", "Spectral")
+
+### Create each plot and add to list
+for (i in seq(1, length(groups))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT Category
+      dplyr::filter(subset == groups[i]),
+    ggplot2::aes(x = month, y = per_total, color = var_label)
+    ) +
+    ggplot2::geom_line() +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(dt_cat_labels[groups[i]]),
+      x= "Study Month", 
+      y = "Completion Rate (% of Screenings)",
+      col = as.character(dt_cat_labels[groups[i]])
+      ) +
+    #### Set colors
+    ggplot2::scale_color_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(groups)]
+  ) + 
+  patchwork::plot_annotation(
+    title = 'DETECT Item Completion Rate, by Month',
+    subtitle = "All screenings"
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-9-item-comp-all-month-rate.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+##### Figure 4.10: Environment Items Response Patterns by Month, All Screenings (#sec4f-10-item-pat-scr-env-month)
+
+We created plots exploring the response patterns for the Environment Questions across all responses, including responses without a screening.
+
+```{r}
+#| label: sec4f-10-item-pat-scr-env-month-plot
+# Plot DETECT Item Response Patterns, Environment Questions, All Screenings
+## Extract Plot Data Frame
+plot_df <- dt_freqs |>
+  ## Remove "completed" value, as individual responses will fill this
+  dplyr::filter(!response %in% c("completed"))
+
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$env)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'env')]
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_total, fill = response_label)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = "Response Rate (% of Screenings)",
+      fill = "Item Response"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = "DETECT Item Response Patterns, by Month",
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-10-item-pat-scr-env-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+##### Figure 4.11: Patient Question Items Response Patterns by Month, All Screenings (#sec4f-11-item-pat-scr-pt-month)
+
+We created plots exploring the response patterns for the Patient Questions across all responses, including responses without a screening.
+
+```{r}
+#| label: sec4f-11-item-pat-scr-pt-month-plot
+# Plot DETECT Item Response Patterns, Patient Questions, All Screenings
+## Extract Plot Data Frame
+plot_df <- dt_freqs |>
+  ## Remove "completed" value, as individual responses will fill this
+  dplyr::filter(!response %in% c("completed"))
+
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$pt)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'pt')]
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_total, fill = response_label)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = "Response Rate (% of Screenings)",
+      fill = "Item Response"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = "DETECT Item Response Patterns, by Month",
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-11-item-pat-scr-pt-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+##### Figure 4.12: Caregiver Question Items Response Patterns by Month, All Screenings (#sec4f-12-item-pat-scr-cg-month)
+
+We created plots exploring the response patterns for the Caregiver Questions across all responses, including responses without a screening.
+
+```{r}
+#| label: sec4f-12-item-pat-scr-cg-month-plot
+# Plot DETECT Item Response Patterns, Caregiver Questions, All Screenings
+## Extract Plot Data Frame
+plot_df <- dt_freqs |>
+  ## Remove "completed" value, as individual responses will fill this
+  dplyr::filter(!response %in% c("completed"))
+
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$cg)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'cg')]
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_total, fill = response_label)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = "Response Rate (% of Screenings)",
+      fill = "Item Response"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = "DETECT Item Response Patterns, by Month",
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-12-item-pat-scr-cg-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+##### Figure 4.13: Item "Yes" (Only Yes) Rates, All Screenings (#sec4f-13-item-yoy-scr-all-month)
+
+We extracted the "Yes" patterns relating to each item of the DETECT tool, specifically if a "yes" response was or was not the only "yes" in a given screening, across all screenings each month.
+
+```{r}
+#| label: sec4-item-yoy-scr-all-month-calc
+# Get the "Yes, Only Yes" pattern for each Item, for each Month
+## Calculate using group response pattern functions
+onlyyes_df <- dplyr::left_join(
+  ### Get the total number of "Yes" responses for each item, by month
+  get_freq_grouped(
+    .df = ms_records |>
+      #### Reduce to SCREENINGS
+      dplyr::mutate(dt_screened) |>
+      #### Reduce to month and DETECT Tool Items
+      dplyr::select(month, dplyr::all_of(names(dt_item_list))) |>
+      #### Convert missing values in DETECT Tool items to "missing"
+      dplyr::mutate(
+        dplyr::across(
+          dplyr::all_of(names(dt_item_list)), 
+          ~ifelse(is.na(.x), 'missing', .x)
+          )
+      ),
+    .group_var = 'month',
+    .item_list = dt_item_list,
+    .val_order = dt_item_vals[names(dt_item_vals) != 'completed']
+    ) |>
+    #### Filter to "Yes" responses
+    dplyr::filter(response == 'yes') |>
+    #### Reduce to Month - VarName - Number of "Yes" Responses in Item
+    dplyr::select(month, var_name, n) |>
+    dplyr::rename_at("n", ~"total_yes"),
+  ### Get total number of "Yes, Only Yes" responses for each item, by month
+  get_freq_grouped(
+    .df = ms_records |>
+      #### Reduce to SCREENINGS
+      dplyr::mutate(dt_screened) |>
+      #### Reduce to screenings with only one "Yes" selected
+      dplyr::filter(dt_num_pos == 1) |>
+      #### Reduce to month and DETECT Tool Items
+      dplyr::select(month, dplyr::all_of(names(dt_item_list))) |>
+      #### Convert missing values in DETECT Tool items to "missing"
+      dplyr::mutate(
+        dplyr::across(
+          dplyr::all_of(names(dt_item_list)), 
+          ~ifelse(is.na(.x), 'missing', .x)
+          )
+      ),
+    .group_var = 'month',
+    .item_list = dt_item_list,
+    .val_order = dt_item_vals[names(dt_item_vals) != 'completed']
+    ) |>
+    #### Filter to "Yes" responses
+    dplyr::filter(response == 'yes') |>
+    #### Reduce to Month - VarName - Number of "Yes, Only Yes" Responses
+    dplyr::select(month, var_name, n) |>
+    dplyr::rename_at("n", ~"only_yes"),
+  by = c("month", "var_name")
+  ) |>
+  ### Calculate the number of "Yes"es that are NOT the only Yes for each Item
+  dplyr::mutate(
+    not_only_yes = total_yes - only_yes
+    ) |>
+  ### Pivot so each row is the "Num Yes (only)" or "Num Yes (Not only)"
+  tidyr::pivot_longer(
+    cols = c("only_yes", "not_only_yes"),
+    names_to = "response",
+    values_to = "n"
+  ) |>
+  ### Change labels for values of "YES (ONLY)" or "NOT YES (ONLY)" for plots
+  dplyr::mutate(
+    response = dplyr::case_when(
+      response == "only_yes" ~ "Only Yes",
+      response == "not_only_yes" ~ "Yes, but not the only Yes"
+    ),
+    ### Calculate the percentage of "Yes"es each count represents
+    per_yes = n / total_yes
+  ) |>
+  ### Convert month to a numeric, for plot
+  dplyr::mutate(month = as.numeric(month)) |>
+  ### Add Variable Label, Response Label, Subset (character), Subset Title
+  ### to facilitate loop processing in groups
+  dplyr::mutate(
+    var_label = factor(
+      var_name,
+      levels = names(dt_item_list),
+      labels = as.character(dt_item_list)
+      ),
+    response_label = factor(
+      response,
+      levels = names(dt_item_vals),
+      labels = as.character(dt_item_vals)
+    ),
+    subset = dplyr::case_when(
+      stringr::str_detect(var_name, '_env_') ~'env',
+      stringr::str_detect(var_name, '_pt_') ~'pt',
+      stringr::str_detect(var_name, '_cg') ~'cg'
+      ),
+    subset_title = subset,
+    subset_title = factor(
+      subset_title, 
+      levels = names(dt_cat_labels), 
+      labels = as.character(dt_cat_labels)
+      )
+    )
+```
+
+We generated our plots. We plotted DETECT Items by broader categories (Environmental, Patient Condition, Caregiver) for visibility.
+
+```{r}
+#| label: sec4f-13-item-yoy-scr-all-month-plot
+# Plot DETECT Item "Yes (only yes)" Rate by Month
+## Extract Plot Data Frame
+plot_df <- onlyyes_df |>
+  ### Reduce to "Only Yes" items
+  dplyr::filter(response == "Only Yes")
+
+## Create plots for the 3 groups
+### Create list to hold plots as they are generated
+plots <- list()
+groups <- names(dt_cat_labels)
+palette_order <- c("Paired", "Accent", "Spectral")
+
+### Create each plot and add to list
+for (i in seq(1, length(groups))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT Category
+      dplyr::filter(subset == groups[i]),
+    ggplot2::aes(x = month, y = per_yes, color = var_label)
+    ) +
+    ggplot2::geom_line() +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(dt_cat_labels[groups[i]]),
+      x= "Study Month", 
+      y = paste0(
+        "Frequency of Item being the only 'Yes' Response ",
+        "(% of 'Yes' Responses)"
+        ),
+      col = as.character(dt_cat_labels[groups[i]])
+      ) +
+    #### Set colors
+    ggplot2::scale_color_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(groups)]
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Yes (only yes) Frequency, by Month'
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-13-item-yoy-scr-all-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+##### Figure 4.14: Environmental Question Items "Yes" (Only Yes) Rates, All Screenings (#sec4f-14-item-yoy-scr-env-month)
+
+We created plots exploring the "Yes (Only Yes)" pattern for the Environment Questions across all responses, including responses without a screening.
+
+```{r}
+#| label: sec4f-14-item-yoy-scr-env-month-plot
+# Plot DETECT Item "Yes (Only Yes)", Environment Questions, All Screenings
+## Extract Plot Data Frame
+plot_df <- onlyyes_df
+
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$env)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'env')]
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_yes, fill = response)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = paste0(
+        "Frequency of Item being the only 'Yes' Response ",
+        "(% of 'Yes' Responses)"
+        ),
+      fill = "Yes Type"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Yes (only yes) Frequency, by Month',
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-14-item-yoy-scr-env-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+##### Figure 4.15: Patient Question Items "Yes" (Only Yes) Rates, All Screenings (#sec4f-15-item-yoy-scr-pt-month)
+
+We created plots exploring the "Yes (Only Yes)" pattern for the Patient Questions across all responses, including responses without a screening.
+
+```{r}
+#| label: sec4f-15-item-yoy-scr-pt-month-plot
+# Plot DETECT Item "Yes (Only Yes)", Patient Questions, All Screenings
+## Extract Plot Data Frame
+plot_df <- onlyyes_df
+
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$env)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'pt')]
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_yes, fill = response)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = paste0(
+        "Frequency of Item being the only 'Yes' Response ",
+        "(% of 'Yes' Responses)"
+        ),
+      fill = "Yes Type"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Yes (only yes) Frequency, by Month',
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-15-item-yoy-scr-pt-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+##### Figure 4.16: Caregiver Question Items "Yes" (Only Yes) Rates, All Screenings (#sec4f-16-item-yoy-scr-cg-month)
+
+We created plots exploring the "Yes (Only Yes)" pattern for the Caregiver Questions across all responses, including responses without a screening.
+
+```{r}
+#| label: sec4f-16-item-yoy-scr-cg-month-plot
+# Plot DETECT Item "Yes (Only Yes)", Caregiver Questions, All Screenings
+## Extract Plot Data Frame
+plot_df <- onlyyes_df
+
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+cat_label <- as.character(dt_cat_labels$env)
+subset_items <- dt_item_list[stringr::str_detect(names(dt_item_list), 'cg')]
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    data = plot_df |>
+      ## Reduce to selected DETECT item
+      dplyr::filter(var_name == names(subset_items)[i]),
+    ggplot2::aes(x = month, y = per_yes, fill = response)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = paste0(
+        "Frequency of Item being the only 'Yes' Response ",
+        "(% of 'Yes' Responses)"
+        ),
+      fill = "Yes Type"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Yes (only yes) Frequency, by Month',
+    subtitle = cat_label
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-16-item-yoy-scr-cg-month.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+### Reporting Intent Rates, by Month
+
+#### Figure 4.17: Rates, Per All Responses (#sec4-f17-report-intent-month-per-total)
+
+We examined our DETECT-recorded intent to report per month, by result type. We calculated these frequencies in aggregate (all screenings) and by result type (positive or negative).
+
+```{r}
+#| label: sec4-f17-report-intent-month-per-total-calc
+# Get Reporting Intent Rates, Overall and By Result Type, by Month
+## Extract a temporary data frame of columns for reporting intent plots
+reporting_df <- ms_records |>
+      #### Reduce to SCREENINGS
+      dplyr::mutate(dt_screened) |>
+      #### Reduce to month and DETECT Tool Items
+      dplyr::select(month, dt_positive, dt_aps_reported) |>
+      #### Convert missing values in DETECT Tool items to "missing"
+      dplyr::mutate(
+        dplyr::across(
+          dplyr::all_of('dt_aps_reported'), 
+          ~dplyr::case_when(
+            .x ~ 'intent',
+            !.x ~ 'no_intent',
+            is.na(.x) ~ 'missing'
+            )
+          )
+      )
+
+## Get results for all screenings, positive screens, and negative screens
+plot_dfs <- list(
+  ### Get count and frequency for all screenings
+  completed = get_freq_grouped(
+    .df = reporting_df,
+    .group_var = 'month',
+    .item_list = list(dt_aps_reported = "Reporting Intent"),
+    .val_order = report_intent_vals[names(report_intent_vals) != 'completed']
+    ),
+  ### Get count and frequency for positive screenings
+  positive = get_freq_grouped(
+    .df = reporting_df |>
+      #### Reduce to POSITIVE Screenings
+      dplyr::filter(dt_positive),
+    .group_var = 'month',
+    .item_list = list(dt_aps_reported = "Reporting Intent"),
+    .val_order = report_intent_vals[names(report_intent_vals) != 'completed']
+    ),
+  ### Get count and frequency for negative screenings
+  negative = get_freq_grouped(
+    .df = reporting_df |>
+      #### Reduce to NEGATIVE Screenings
+      dplyr::filter(!dt_positive),
+    .group_var = 'month',
+    .item_list = list(dt_aps_reported = "Reporting Intent"),
+    .val_order = report_intent_vals[names(report_intent_vals) != 'completed']
+    )
+  )
+
+## Small modification of data frames
+for (i in seq(1,length(plot_dfs))){
+  plot_dfs[[
+    rlang::sym(names(plot_dfs)[i])
+    ]] <- plot_dfs[[rlang::sym(names(plot_dfs)[i])]] |>
+    ### Convert month to a numeric, for plot. Label Reporting Intent Values
+    dplyr::mutate(
+      month = as.numeric(month),
+      response_label = factor(
+        response,
+        levels = names(report_intent_vals),
+        labels = as.character(report_intent_vals)
+      )
+    )
+}
+```
+
+We generated our plots.
+
+```{r}
+#| label: sec4-f17-report-intent-month-per-total-plot
+# Plot Reporting Intent Rates, Overall and By Result Type, by Month
+## Create plots for each item in the section
+### Create list to hold plots as they are generated
+plots <- list()
+subset_items <- screen_result_list[names(screen_result_list) != 'missing']
+palette_order <- rep("Paired", length(subset_items))
+
+### Create each plot and add to list
+for (i in seq(1, length(names(subset_items)))){
+  
+  plots[[i]] <- ggplot2::ggplot(
+    # Use the subset data frame
+    data = plot_dfs[[rlang::sym(names(subset_items)[i])]] |>
+      ### Remove "completed", as other values will add to this
+      dplyr::filter(response != "completed"),
+    ggplot2::aes(x = month, y = per_total, fill = response_label)
+    ) +
+    ### Stacked area plot
+    ggplot2::geom_area(alpha = 0.8) +
+    #### Convert y-axis scale to a percent
+    ggplot2::scale_y_continuous(labels = scales::percent) +
+    #### Labels
+    ggplot2::labs(
+      title = as.character(subset_items[i]),
+      x= "Study Month", 
+      y = "Frequency",
+      fill = "DETECT Recorded Reporting Intent"
+      ) +
+    #### Set colors
+    ggplot2::scale_fill_brewer(palette=palette_order[i])
+}
+
+### Use Patchwork to wrap plots into a unified graphic
+plot <- patchwork::wrap_plots(
+  plots[1:length(names(subset_items))]
+  ) + 
+  patchwork::plot_annotation(
+    title = "DETECT Item Recorded Intent to Report, by Month"
+    ) + 
+  patchwork::plot_layout(guides = 'collect', axes = 'collect') &
+  ggplot2::theme(plot.title = ggplot2::element_text(size = 10))
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f4-17-report-intent-month-per-total.png'
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
 
 # 🧹 Clean up
 
