@@ -52,6 +52,8 @@ It achieves the following:
     -   Individual question items were coded into "Ever Completed", "Ever Answered 'Yes'", "Ever Answered 'No'", "Ever Answered 'UTA'" dummy variables
 
     -   An **ever screened**, **ever screened positive**, and **ever intended to report** flag was created for each subject, consolidating all records.
+    
+We also added basic APS outcomes data, including if there was a matched APS Investigation/Intake based on our linkage maps.
 
 ## MedStar Data Background
 
@@ -79,7 +81,6 @@ Please note: as these files contain PHI and proprietary information, they are no
 suppressPackageStartupMessages({
   library(tidyverse)
   library(here)
-  library(janitor, include.only = "clean_names")
 })
 ```
 
@@ -90,7 +91,6 @@ This file was created with:
 -   R version 4.4.1 ("Race for Your Life").
 -   tidyverse version 2.0.0, including all attached packages
 -   here version 1.0.1
--   janitor version 2.2.0
 
 ## Functions
 
@@ -174,6 +174,42 @@ We cleared our MedStar within-set subject ID linkage map from memory, as it was 
 rm(ms_ids)
 ```
 
+## APS Record Linkage Data
+
+We loaded our record linkage map connecting MedStar Responses to APS Investigations.
+
+```{r}
+#| label: load-case-map
+# Load MedStar Response - APS Investigation Record Linkage Map
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "04_medstar-records_to_aps-case-invs.rds"
+    )
+
+informative_df_import(
+    "aps_inv_map", path, overwrite = T
+  )
+
+#[PLACEHOLDER]
+```
+
+We loaded our record linkage map connecting MedStar Responses to APS Intakes.
+
+```{r}
+#| label: load-intake-map
+# Load MedStar Response - APS Intake Record Linkage Map
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "05_medstar-records_to_aps-intakes.rds"
+    )
+
+informative_df_import(
+    "aps_intake_map", path, overwrite = T
+  )
+
+#[PLACEHOLDER]
+```
+
 # Data Preparation
 
 We prepared our MedStar Data for analyses.
@@ -187,10 +223,10 @@ There were several entries that remained in our data set for "Et3" testing recor
 
 # Remove test records
 ms_resps <- ms_resps |>
-  dplyr::filter(!(
-    stringr::str_detect(stringr::str_to_lower(name_full), "et3") | 
-    stringr::str_detect(stringr::str_to_lower(x_address_original), "et3")
-    ))
+  dplyr::mutate(
+    drop_flag = stringr::str_detect(stringr::str_to_lower(name_full), "et3")
+    ) |>
+  dplyr::filter(!drop_flag | is.na(drop_flag))
 ```
 
 ## Examination of Potentially Duplicated Responses
@@ -633,7 +669,7 @@ ms_subjs <- ms_subjs |>
 
 #### Sex
 
-There were 396 subjects (2,490 responses) with inconsistent values for sex between responses in the data set. "Filling" missing values with values from other observations for the same subject resolved 27 subjects (190 responses), with an additional 48 subjects (345 responses) resolved by similarly filling "unable to assess" values. The remaining 321 subjects (1,955 responses) with a mix of "male" and "female" values were resolved through manual review of trends. Of these, we reviewed all IDs with a majority between 60-75% to one sex (52 "female" majority, 40 "male" majority), with a cursory review of IDs with a greater than 75% majority (77 "female" majority, 43 "male" majority). We additionally inspected the 109 remaining IDs that did not have a majority. Judgements were based on trends, heavy associations of certain names with sex/gender (such as "Daisy" being practically considered as a female-exclusive name), and select review of public records such as obituaries.
+There were 396 subjects (2,490 responses) with inconsistent values for sex between responses in the data set. "Filling" missing values with values from other observations for the same subject resolved 27 subjects (190 responses), with an additional 48 subjects (345 responses) resolved by similarly filling "unable to assess" values. The remaining 321 subjects (1,955 responses) with a mix of "male" and "female" values were resolved through manual review of trends. Of these, we reviewed all IDs with a majority between 60-75% to one sex (52 "female" majority, 40 "male" majority), with a cursory review of IDs with a greater than 75% majority (77 "female" majority, 43 "male" majority). We additionally inspected the 109 remaining IDs that did not have a majority. Judgement were based on trends, heavy associations of certain names with sex/gender (such as "Daisy" being practically considered as a female-exclusive name), and select review of public records such as obituaries.
 
 ```{r}
 #| label: clean-demo-sex-subj
@@ -1201,6 +1237,196 @@ temp_df <- ms_resps |>
     dt_cg_lack_no = ifelse(!dt_cg_lack_no, NA, dt_cg_lack_no),
     dt_cg_lack_uta = ifelse(!dt_cg_lack_uta, NA, dt_cg_lack_uta)
   )
+
+## Add extracted data to subject-level data set
+ms_subjs <- ms_subjs |>
+  dplyr::rows_update(
+    temp_df,
+    by = 'id'
+  )
+
+## Remove temporary data frame
+rm(temp_df)
+```
+
+## APS Outcomes Data
+
+We added APS outcomes data. This included the presence of a matched APS Intake (and reporter type categorization) and presence of a matched APS Invesgitation (and its overall disposition).
+
+### Record-Level
+
+We consolidated our APS Investigation match data to the record level, and added it to our MedStar Response Level data set.
+
+```{r}
+#| label: clean-aps-resp-add-invs
+
+# Add APS Investigation Matching Data to MedStar Response Records
+## Add placeholder columns to MedStar Response data
+ms_resps <- ms_resps |>
+  dplyr::mutate(
+    aps_inv_window = F,
+    aps_inv_exact = F,
+    aps_inv_window_dispo = NA_character_,
+    aps_inv_exact_dispo = NA_character_
+  )
+
+## Obtain DF of ID - EMS_NUM - EXACT INV? & DISPO - BROAD INV? & DISPO
+best_invs <- dplyr::left_join(
+  ### Broader window-based matches (response within 30 days of APS Inv.)
+  aps_inv_map |>
+    dplyr::filter(best_window) |>
+    dplyr::select(id, ems_num, inv_dispo) |>
+    dplyr::mutate(aps_inv_window = T) |>
+    dplyr::rename_at('inv_dispo', ~'aps_inv_window_dispo'),
+  ### Narrower direct-overlap (response during open APS Inv.)
+  aps_inv_map |>
+    dplyr::filter(best_exact) |>
+    dplyr::select(id, ems_num, inv_dispo) |>
+    dplyr::mutate(aps_inv_exact = T) |>
+    dplyr::rename_at('inv_dispo', ~'aps_inv_exact_dispo'),
+  by = c('id', 'ems_num')
+  )
+
+## Update MedStar Records data
+ms_resps <- ms_resps |>
+  dplyr::rows_update(
+    best_invs,
+    by = c('id', 'ems_num')
+  )
+```
+
+We consolidated our APS Intake match data to the record level, and added it to our MedStar Response Level data set.
+
+```{r}
+#| label: clean-aps-resp-add-intakes
+
+# Add APS Intake Matching Data to MedStar Response Records
+## Add placeholder columns to MedStar Response data
+ms_resps <- ms_resps |>
+  dplyr::mutate(
+    aps_intake = F,
+    aps_intake_poss = NA,
+    aps_intake_ems = NA,
+    aps_intake_type = NA_character_
+  )
+
+## Obtain DF of 
+## ID - EMS_NUM - INTAKE? - BROADER INTAKE? - INTAKE? - EMS EXPLICIT INTAKE?
+## and a categorical interpretation of intake reporter type category spread
+intake_df <- aps_intake_map |>
+  dplyr::select(id, ems_num, reporter_possible, reporter_ems) |>
+  dplyr::mutate(
+    key = paste(id, ems_num, sep = '_'),
+    aps_intake = T
+    ) |>
+  ### Consolidate reporter type flags as an "if ever in match set"
+  dplyr::group_by(key) |>
+  dplyr::mutate(
+    aps_intake_poss =  sum(reporter_possible) > 0,
+    aps_intake_ems = sum(reporter_ems) > 0
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::select(-c(reporter_possible, reporter_ems, key)) |>
+  ### Reduce to single row
+  dplyr::distinct() |>
+  ### Interpret reporter type category from boolean/logical flag pattern
+  dplyr::mutate(
+    aps_intake_type = dplyr::case_when(
+      aps_intake_ems ~ "EMS (explicit)",
+      aps_intake_poss ~ "EMS reasonable",
+      !aps_intake_ems & !aps_intake_poss ~ "Not likely to be EMS"
+    )
+  )
+
+## Update MedStar Records data
+ms_resps <- ms_resps |>
+  dplyr::rows_update(
+    intake_df,
+    by = c('id', 'ems_num')
+  )
+```
+
+### Subject Level
+
+We performed further consolidation at the subject level, taking an "ever true" approach for most columns. If a subject ever had an APS Investigation match (exact and window levels), had a matched APS Intake, and ever had an APS Intake of a possible or explicitly EMS reporter type, those values were "TRUE". We consolidated disposition types using the APS Hierarchy, but explicitly marked records with a mix of "Valid" and "Invalid" dispositions with "Mix of Valid and Invalid Dispositions".
+
+```{r}
+#| label: clean-aps-subj
+# Pull subject-level consolidated APS Investigation & Intake Match Data
+## Add placeholders for variables to subject-level data set
+ms_subjs <- ms_subjs |>
+  dplyr::mutate(
+    aps_inv_exact = NA, aps_inv_window = F,
+    aps_inv_exact_dispo = NA_character_,
+    aps_inv_window_dispo = NA_character_,
+    aps_intake = NA, aps_intake_poss = NA, aps_intake_ems = NA,
+    aps_intake_type = NA_character_
+  )
+
+## Consolidate response level values to subject-level
+temp_df <- ms_resps |>
+  ### Select ID and APS Outcome variables of interest
+  dplyr::select(
+    id, aps_inv_exact, aps_inv_window, aps_inv_exact_dispo, 
+    aps_inv_window_dispo, aps_intake, aps_intake_poss, aps_intake_ems
+    ) |>
+  ### Reduce to unique rows
+  dplyr::distinct() |>
+  ### Fill/Consolidate in values, where NA is the source of the row 
+  ### duplication
+  dplyr::group_by(id) |>
+  tidyr::fill(aps_inv_exact_dispo, .direction = 'updown') |>
+  tidyr::fill(aps_inv_window_dispo, .direction = 'updown') |>
+  dplyr::mutate(
+    dplyr::across(
+      c(
+        aps_inv_exact, aps_inv_window, aps_intake, aps_intake_poss, 
+        aps_intake_ems
+        ),
+      ~sum(.x,na.rm = T) > 0)
+  ) |>
+  ### Where there are multiple disposition types, get a sorted list
+  dplyr::mutate(
+    window_dispos = paste(sort(unique(aps_inv_window_dispo)), collapse = ', '),
+    exact_dispos = paste(sort(unique(aps_inv_exact_dispo)), collapse = ', ')
+    ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    ### If there is no "broad match" intake, make exact match NA
+    aps_inv_exact = na_if(aps_inv_window, F),
+    ### Consolidate Dispositions based on APS Hierarchy, but mark those with
+    ### a mix of valid and invalid overall dispositions specifically.
+    ### Hierarchy: Valid/Invalid, UTA, Other
+    aps_inv_exact_dispo = dplyr::case_when(
+      stringr::str_detect(exact_dispos, 'invalid') & 
+        stringr::str_detect(exact_dispos, ', valid') ~ 
+        'Mix of Valid and Invalid',
+      stringr::str_detect(exact_dispos, 'invalid') ~ "Invalid",
+      stringr::str_detect(exact_dispos, 'valid') ~ 'Valid',
+      stringr::str_detect(exact_dispos, 'uta') ~ "Unable to Assess",
+      stringr::str_detect(exact_dispos, 'other') ~ "Other (Not Investigated)",
+      TRUE ~ NA_character_
+    ),
+    aps_inv_window_dispo = dplyr::case_when(
+      stringr::str_detect(window_dispos, 'invalid') & 
+        stringr::str_detect(window_dispos, ', valid') ~ 
+        'Mix of Valid and Invalid',
+      stringr::str_detect(window_dispos, 'invalid') ~ "Invalid",
+      stringr::str_detect(window_dispos, 'valid') ~ 'Valid',
+      stringr::str_detect(window_dispos, 'uta') ~ "Unable to Assess",
+      stringr::str_detect(window_dispos, 'other') ~ "Other (Not Investigated)",
+      TRUE ~ NA_character_
+    ),
+    ### Interpret reporter type category from boolean/logical flag pattern
+    aps_intake_type = dplyr::case_when(
+      aps_intake_ems ~ "EMS (explicit)",
+      aps_intake_poss ~ "EMS reasonable",
+      !aps_intake_ems & !aps_intake_poss ~ "Not likely to be EMS"
+    )
+  ) |>
+  dplyr::select(-c(window_dispos, exact_dispos)) |>
+  ### Reduce to unique rows
+  dplyr::distinct()
 
 ## Add extracted data to subject-level data set
 ms_subjs <- ms_subjs |>
