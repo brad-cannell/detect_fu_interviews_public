@@ -1251,7 +1251,7 @@ rm(temp_df)
 
 ## APS Outcomes Data
 
-We added APS outcomes data. This included the presence of a matched APS Intake (and reporter type categorization) and presence of a matched APS Invesgitation (and its overall disposition).
+We added APS outcomes data. This included the presence of a matched APS Intake (and reporter type categorization) and presence of a matched APS Investigation (and its overall disposition).
 
 ### Record-Level
 
@@ -1259,38 +1259,109 @@ We consolidated our APS Investigation match data to the record level, and added 
 
 ```{r}
 #| label: clean-aps-resp-add-invs
-
-# Add APS Investigation Matching Data to MedStar Response Records
+# Add APS Intake Matching Data to MedStar Response Records
 ## Add placeholder columns to MedStar Response data
 ms_resps <- ms_resps |>
   dplyr::mutate(
     aps_inv_window = F,
-    aps_inv_exact = F,
+    aps_inv_window_num = NA_integer_,
     aps_inv_window_dispo = NA_character_,
-    aps_inv_exact_dispo = NA_character_
+    aps_inv_window_dispo_best = NA_character_,
+    aps_inv_exact = F,
+    aps_inv_exact_num = NA_integer_,
+    aps_inv_exact_dispo = NA_character_,
+    aps_inv_exact_dispo_best = NA_character_
   )
 
-## Obtain DF of ID - EMS_NUM - EXACT INV? & DISPO - BROAD INV? & DISPO
-best_invs <- dplyr::left_join(
-  ### Broader window-based matches (response within 30 days of APS Inv.)
-  aps_inv_map |>
-    dplyr::filter(best_window) |>
-    dplyr::select(id, ems_num, inv_dispo) |>
-    dplyr::mutate(aps_inv_window = T) |>
-    dplyr::rename_at('inv_dispo', ~'aps_inv_window_dispo'),
-  ### Narrower direct-overlap (response during open APS Inv.)
-  aps_inv_map |>
-    dplyr::filter(best_exact) |>
-    dplyr::select(id, ems_num, inv_dispo) |>
-    dplyr::mutate(aps_inv_exact = T) |>
-    dplyr::rename_at('inv_dispo', ~'aps_inv_exact_dispo'),
+## Get DF of ID - EMS_NUM - MATCH? - DISPO
+### MATCH? - DISPO for both Exact and Broad Matching in aggregate across all
+### matches of that type. Also have a DISPO_BEST that has the disposition 
+### of the "best" match at the stated level.
+
+inv_df <- dplyr::left_join(
+  ### AGGREGATE (ALL MATCHES) FLAGS & CONSOLIDATED DISPOSITIONS
+  dplyr::rows_update(
+    #### Broader window-based matches (response within 30 days of APS Inv.)
+    aps_inv_map |>
+      dplyr::select(id, ems_num, inv_dispo) |>
+      dplyr::group_by(id, ems_num) |>
+      dplyr::mutate(
+        aps_inv_window_num = max(dplyr::row_number()),
+        aps_inv_exact_num = NA_integer_,
+        aps_inv_exact = F,
+        aps_inv_exact_dispo = NA_character_,
+        aps_inv_window = T,
+        aps_inv_window_dispo = paste(sort(unique(inv_dispo)), collapse = ', ')
+      ) |>
+      dplyr::ungroup() |>
+      ##### Consolidate Dispositions based on APS Hierarchy, but mark those 
+      ##### with a mix of valid and invalid overall dispositions specifically.
+      ##### Hierarchy: Valid/Invalid, UTA, Other
+      dplyr::mutate(
+        aps_inv_window_dispo = dplyr::case_when(
+          stringr::str_detect(aps_inv_window_dispo, 'invalid') & 
+            stringr::str_detect(aps_inv_window_dispo, ', valid') ~ 
+            'mixed_validity',
+          stringr::str_detect(aps_inv_window_dispo, 'invalid') ~ "invalid",
+          stringr::str_detect(aps_inv_window_dispo, 'valid') ~ 'valid',
+          stringr::str_detect(aps_inv_window_dispo, 'utd') ~ "utd",
+          stringr::str_detect(aps_inv_window_dispo, 'other') ~ "other",
+          TRUE ~ NA_character_
+        )
+      ) |>
+      dplyr::select(-inv_dispo) |>
+      dplyr::distinct(),
+    #### Narrower direct-overlap (response during open APS Inv.)
+    aps_inv_map |>
+      dplyr::filter(exact) |>
+      dplyr::select(id, ems_num, inv_dispo) |>
+      dplyr::group_by(id, ems_num) |>
+      dplyr::mutate(
+        aps_inv_exact_num = max(dplyr::row_number()),
+        aps_inv_exact = T,
+        aps_inv_exact_dispo = paste(sort(unique(inv_dispo)), collapse = ', ')
+      ) |>
+      dplyr::ungroup() |>
+      ##### Consolidate Dispositions based on APS Hierarchy, but mark those 
+      ##### with a mix of valid and invalid overall dispositions specifically.
+      ##### Hierarchy: Valid/Invalid, UTD, Other
+      dplyr::mutate(
+        aps_inv_exact_dispo = dplyr::case_when(
+          stringr::str_detect(aps_inv_exact_dispo, 'invalid') & 
+            stringr::str_detect(aps_inv_exact_dispo, ', valid') ~ 
+            'mixed_validity',
+          stringr::str_detect(aps_inv_exact_dispo, 'invalid') ~ "invalid",
+          stringr::str_detect(aps_inv_exact_dispo, 'valid') ~ 'valid',
+          stringr::str_detect(aps_inv_exact_dispo, 'utd') ~ "utd",
+          stringr::str_detect(aps_inv_exact_dispo, 'other') ~ "other",
+          TRUE ~ NA_character_
+        )
+      ) |>
+      dplyr::select(-inv_dispo) |>
+      dplyr::distinct() ,
+    by = c('id', 'ems_num')
+    ),
+  ### "BEST" Dispositions only
+  dplyr::left_join(
+    #### Broader window-based matches (response within 30 days of APS Inv.)
+    aps_inv_map |>
+      dplyr::filter(best_window) |>
+      dplyr::select(id, ems_num, inv_dispo) |>
+      dplyr::rename_at('inv_dispo', ~'aps_inv_window_dispo_best'),
+    #### Narrower direct-overlap (response during open APS Inv.)
+    aps_inv_map |>
+      dplyr::filter(best_exact) |>
+      dplyr::select(id, ems_num, inv_dispo) |>
+      dplyr::rename_at('inv_dispo', ~'aps_inv_exact_dispo_best'),
+    by = c('id', 'ems_num')
+    ),
   by = c('id', 'ems_num')
   )
 
 ## Update MedStar Records data
 ms_resps <- ms_resps |>
   dplyr::rows_update(
-    best_invs,
+    inv_df,
     by = c('id', 'ems_num')
   )
 ```
@@ -1305,8 +1376,11 @@ We consolidated our APS Intake match data to the record level, and added it to o
 ms_resps <- ms_resps |>
   dplyr::mutate(
     aps_intake = F,
+    aps_intake_num = NA_integer_,
     aps_intake_poss = NA,
+    aps_intake_poss_num = NA_integer_,
     aps_intake_ems = NA,
+    aps_intake_ems_num = NA_integer_,
     aps_intake_type = NA_character_
   )
 
@@ -1319,11 +1393,15 @@ intake_df <- aps_intake_map |>
     key = paste(id, ems_num, sep = '_'),
     aps_intake = T
     ) |>
-  ### Consolidate reporter type flags as an "if ever in match set"
   dplyr::group_by(key) |>
   dplyr::mutate(
-    aps_intake_poss =  sum(reporter_possible) > 0,
-    aps_intake_ems = sum(reporter_ems) > 0
+  ### Get count of intakes of each reporter type flag
+    aps_intake_num = max(dplyr::row_number()),
+    aps_intake_poss_num = sum(reporter_possible, na.rm = T),
+    aps_intake_ems_num = sum(reporter_ems, na.rm = T),
+  ### Consolidate reporter type flags as an "if ever in match set"
+    aps_intake_poss =  sum(reporter_possible, na.rm = T) > 0,
+    aps_intake_ems = sum(reporter_ems, na.rm = T) > 0
   ) |>
   dplyr::ungroup() |>
   dplyr::select(-c(reporter_possible, reporter_ems, key)) |>
@@ -1356,10 +1434,15 @@ We performed further consolidation at the subject level, taking an "ever true" a
 ## Add placeholders for variables to subject-level data set
 ms_subjs <- ms_subjs |>
   dplyr::mutate(
-    aps_inv_exact = NA, aps_inv_window = F,
-    aps_inv_exact_dispo = NA_character_,
+    aps_inv_exact = NA, aps_inv_exact_num = NA_integer_, 
+    aps_inv_window = F, aps_inv_window_num = NA_integer_,
+    aps_inv_exact_dispo = NA_character_, 
+    aps_inv_exact_dispo_best = NA_character_,
     aps_inv_window_dispo = NA_character_,
-    aps_intake = NA, aps_intake_poss = NA, aps_intake_ems = NA,
+    aps_inv_window_dispo_best = NA_character_,
+    aps_intake = NA, aps_intake_num = NA_integer_,
+    aps_intake_poss = NA, aps_intake_poss_num = NA_integer_, 
+    aps_intake_ems = NA, aps_intake_ems_num = NA_integer_,
     aps_intake_type = NA_character_
   )
 
@@ -1367,16 +1450,22 @@ ms_subjs <- ms_subjs |>
 temp_df <- ms_resps |>
   ### Select ID and APS Outcome variables of interest
   dplyr::select(
-    id, aps_inv_exact, aps_inv_window, aps_inv_exact_dispo, 
-    aps_inv_window_dispo, aps_intake, aps_intake_poss, aps_intake_ems
+    id, aps_inv_exact, aps_inv_exact_num, aps_inv_exact_dispo, 
+    aps_inv_exact_dispo_best, 
+    aps_inv_window, aps_inv_window_num, aps_inv_window_dispo, 
+    aps_inv_window_dispo_best,
+    aps_intake, aps_intake_num, aps_intake_poss, aps_intake_poss_num,
+    aps_intake_ems, aps_intake_ems_num
     ) |>
   ### Reduce to unique rows
   dplyr::distinct() |>
   ### Fill/Consolidate in values, where NA is the source of the row 
-  ### duplication
+  ### duplication.
   dplyr::group_by(id) |>
   tidyr::fill(aps_inv_exact_dispo, .direction = 'updown') |>
+  tidyr::fill(aps_inv_exact_dispo_best, .direction = 'updown') |>
   tidyr::fill(aps_inv_window_dispo, .direction = 'updown') |>
+  tidyr::fill(aps_inv_window_dispo_best, .direction = 'updown') |>
   dplyr::mutate(
     dplyr::across(
       c(
@@ -1385,46 +1474,55 @@ temp_df <- ms_resps |>
         ),
       ~sum(.x,na.rm = T) > 0)
   ) |>
+  ### Sum numerical count columns
+    dplyr::mutate(
+    dplyr::across(
+      c(
+        aps_inv_exact_num, aps_inv_window_num, aps_intake_num, 
+        aps_intake_poss_num, aps_intake_ems_num
+      ),
+      ~sum(.x, na.rm = T)
+      )
+  ) |>
   ### Where there are multiple disposition types, get a sorted list
   dplyr::mutate(
-    window_dispos = paste(sort(unique(aps_inv_window_dispo)), collapse = ', '),
-    exact_dispos = paste(sort(unique(aps_inv_exact_dispo)), collapse = ', ')
-    ) |>
+    dplyr::across(
+      c(
+        aps_inv_window_dispo, aps_inv_window_dispo_best, 
+        aps_inv_exact_dispo, aps_inv_exact_dispo_best
+      ),
+    ~paste(sort(unique(.x)), collapse = ', ')
+    )
+  ) |>
   dplyr::ungroup() |>
   dplyr::mutate(
-    ### If there is no "broad match" intake, make exact match NA
-    aps_inv_exact = na_if(aps_inv_window, F),
     ### Consolidate Dispositions based on APS Hierarchy, but mark those with
     ### a mix of valid and invalid overall dispositions specifically.
     ### Hierarchy: Valid/Invalid, UTA, Other
-    aps_inv_exact_dispo = dplyr::case_when(
-      stringr::str_detect(exact_dispos, 'invalid') & 
-        stringr::str_detect(exact_dispos, ', valid') ~ 
-        'Mix of Valid and Invalid',
-      stringr::str_detect(exact_dispos, 'invalid') ~ "Invalid",
-      stringr::str_detect(exact_dispos, 'valid') ~ 'Valid',
-      stringr::str_detect(exact_dispos, 'uta') ~ "Unable to Assess",
-      stringr::str_detect(exact_dispos, 'other') ~ "Other (Not Investigated)",
-      TRUE ~ NA_character_
-    ),
-    aps_inv_window_dispo = dplyr::case_when(
-      stringr::str_detect(window_dispos, 'invalid') & 
-        stringr::str_detect(window_dispos, ', valid') ~ 
-        'Mix of Valid and Invalid',
-      stringr::str_detect(window_dispos, 'invalid') ~ "Invalid",
-      stringr::str_detect(window_dispos, 'valid') ~ 'Valid',
-      stringr::str_detect(window_dispos, 'uta') ~ "Unable to Assess",
-      stringr::str_detect(window_dispos, 'other') ~ "Other (Not Investigated)",
-      TRUE ~ NA_character_
-    ),
-    ### Interpret reporter type category from boolean/logical flag pattern
+    dplyr::across(
+      c(
+        aps_inv_window_dispo, aps_inv_window_dispo_best, 
+        aps_inv_exact_dispo, aps_inv_exact_dispo_best
+      ),
+    ~dplyr::case_when(
+          stringr::str_detect(.x, 'invalid') & 
+            stringr::str_detect(.x, ', valid') ~ 'mixed_validity',
+          stringr::str_detect(.x, 'invalid') ~ "invalid",
+          stringr::str_detect(.x, 'valid') ~ 'valid',
+          stringr::str_detect(.x, 'utd') ~ "utd",
+          stringr::str_detect(.x, 'other') ~ "other",
+          TRUE ~ NA_character_
+        )
+    )
+  ) |>
+  dplyr::mutate(
+  ### Interpret reporter type category from boolean/logical flag pattern
     aps_intake_type = dplyr::case_when(
       aps_intake_ems ~ "EMS (explicit)",
       aps_intake_poss ~ "EMS reasonable",
       !aps_intake_ems & !aps_intake_poss ~ "Not likely to be EMS"
     )
   ) |>
-  dplyr::select(-c(window_dispos, exact_dispos)) |>
   ### Reduce to unique rows
   dplyr::distinct()
 
