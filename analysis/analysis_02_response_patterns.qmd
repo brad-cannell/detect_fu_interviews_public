@@ -125,7 +125,7 @@ We loaded the DETECT Tool response patterns from the Pilot study.
 # Load Pilot study response pattern data
 ## Path to data
 path <- here::here(
-    "data", "prev_dt_resp_pattern_pilot.csv"
+    "data", "prev_data", "prev_dt_resp_pattern_pilot.csv"
     )
 
 ## Load
@@ -179,7 +179,7 @@ We loaded the DETECT Tool response patterns from the 1 Year Study interval.
 # Load 1-Year study response pattern data
 ## Path to data
 path <- here::here(
-    "data", "prev_dt_resp_pattern_1year.csv"
+    "data", "prev_data", "prev_dt_resp_pattern_1year.csv"
     )
 
 ## Load
@@ -387,7 +387,7 @@ dplyr::left_join(
   by = 'var_val'
   ) |>
   dplyr::select(-var_val) |>
-  dplyr::relocate(text_var_val)
+  dplyr::relocate(text_var_val) 
 ```
 
 We calculated Chi-square and Fisher exact tests for the response patterns of each item.
@@ -468,7 +468,7 @@ stats <- get_dt_rp_chi_fisher(
   .target_vals = c("only_yes", "not_only_yes")
 )
 
-stats
+stats 
 ```
 
 #### Comparison to 1-Year Study
@@ -817,7 +817,7 @@ stats <- get_dt_rp_chi_fisher(
   .target_vals = c("complete", "not_complete")
 )
 
-stats
+stats 
 ```
 
 ##### Table 2.10: Item Response Patterns (#sec2-t10-rp-all-intent-resp-pats)
@@ -1080,7 +1080,7 @@ stats <- get_dt_rp_chi_fisher(
   .omit_vals = c("uta")
 )
 
-stats
+stats 
 ```
 
 ##### Table 2.14: "Only Yes" (#sec2-t14-rp-posscr-intent-resp-onlyyes)
