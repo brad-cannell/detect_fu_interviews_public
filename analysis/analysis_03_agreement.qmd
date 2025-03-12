@@ -40,7 +40,6 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(here)
   library(irr)
-  library(janitor, include.only = "clean_names")
 })
 ```
 
@@ -51,7 +50,6 @@ This file was created with:
 -   R version 4.4.1 ("Race for Your Life").
 -   tidyverse version 2.0.0, including all attached packages
 -   here version 1.0.1
--   janitor version 2.2.0
 -   stats version 4.4.1
 -   irr version 0.84.1
 
@@ -151,94 +149,15 @@ informative_df_import(
 
 # Analyses
 
-We set the order and labels for values in categorical variables. [PLACEHOLDER: Delete if not needed]
-
-```{r}
-#| label: set-value-orders
-# Set order and labels for values in categorical variables that may be used
-# in plots
-
-## Sex value order
-sex_val_list = list(
-    male = 'Male', female = 'Female', uta = 'Unable to Assess', 
-    missing = 'Missing (NA)'
-    )
-
-## Race value order
-race_val_list = list(
-  white = "White", black = "Black or African American", asian = "Asian", 
-  nhpi = "Native Hawaiian or Other Pacific Islander", 
-  aian = "American Indian or Alaska Native", 
-  mena = "Middle Eastern or North African", 
-  other = "Other Race", multiracial = "Multiracial", missing = "Missing (NA)"
-  )
-
-## Hispanic Ethnicity value order
-hispanic_val_list = list(
-  hispanic = 'Hispanic or Latino', nonhispanic = 'Not Hispanic or Latino', 
-  missing = 'Missing (NA)'
-  )
-
-## DETECT Tool Variable Item Order
-dt_item_list <- list(
-  dt_env_odor = "Unusual odor (e.g., urine, feces)", 
-  dt_env_hoard = paste0(
-    "Inside of the home is in extreme disarray or there is hoarding"
-    ), 
-  dt_env_concern = paste0(
-    "Living environment poses a health or safety concern (e.g., fire hazard,",
-    " insect or rodent infestation, or urine or feces present)"
-    ), 
-  dt_pt_isolated = "Is the patient or older adult isolated in the home?", 
-  dt_pt_hygiene = paste0(
-    "Does the patient or older adult have poor personal hygiene",
-    " (including soiled in urine or feces)?"
-    ), 
-  dt_pt_clothes = paste0(
-    "Is the patient or older adult inadequately clothed or wearing",
-    " dirty, torn, or soiled clothing?"
-    ), 
-  dt_pt_needs = paste0(
-    "Does the patient or older adult have unmet needs for assistance",
-    " with eating, toileting, transferring, dressing, or bathing?"
-    ), 
-  dt_pt_depress = paste0(
-    "Does the patient or older adult appear depressed, anxious, or ",
-    "emotionally distressed for reasons other than their immediate medical",
-    " condition?"
-    ), 
-  dt_pt_med_hoard = paste0(
-    "Does the patient or older adult appear to be hoarding or saving old",
-    " medications?"), 
-  dt_pt_med_diff = paste0(
-    "Does the patient or older adult have difficulties taking their",
-    " prescribed medications as directed?"
-    ), 
-  dt_cg_lack = paste0(
-    "If caregiver is present, they appear to lack knowledge of the",
-    " patient or older adult’s medical needs"
-    ), 
-  dt_cg_uneng = paste0(
-    "If caregiver is present, they appear unengaged and inattentive in",
-    " caring for the patient or older adult"
-    ), 
-  dt_cg_frust = paste0(
-    "If caregiver is present, they appear frustrated, tired, angry, or ",
-    "burdened by the patient or older adult"
-    ), 
-  dt_cg_anx = paste0(
-    "If caregiver is present, they appear overly concerned ",
-    "(e.g., anxious, hovering)")
-  )
-```
-
 ## Section 3: Agreement
 
 ### All Screenings
 
-#### Table 1: Agreement of Reporting Intent to DETECT Result (sec3-t1-scr-reslt-intent-all)
+#### DETECT Screening Result 
 
-We were interested in the agreement between the DETECT Tool's recorded intent to report to the screening result. (Did medic's typically intend to report if a screening was positive, and not if it was negative?) A positive screening was defined as at least one "yes" response, regardless of items selected. We checked this for all screenings.
+##### Table 3.1: Agreement of DETECT Result to Reporting Intent (sec3-t1-scr-reslt-intent-all)
+
+We were interested in the agreement between the DETECT Tool's recorded intent to report to the screening result. (Did medics typically intend to report if a screening was positive, and not if it was negative?) A positive screening was defined as at least one "yes" response, regardless of items selected. We checked this for all screenings.
 
 First, we checked to see if there were any records where one target value was present, but the other was not.
 
@@ -249,6 +168,8 @@ First, we checked to see if there were any records where one target value was pr
 ms_records |>
   dplyr::filter((is.na(dt_positive) != is.na(dt_aps_reported))) |>
   nrow() == 0
+
+# [1] TRUE
 ```
 
 We then defined our target variables, and created our summary of counts in the agreement table.
@@ -259,19 +180,21 @@ We then defined our target variables, and created our summary of counts in the a
 ## Define Variables
 ### "First Column" or "Top-Down" Value
 var_a <- "dt_positive"
-var_a_labs <- list(t = "Intent to Report", f = "No Intent to Report")
+var_a_labs <- list(t = "Positive Screening", f = "Negative Screening")
 ### "Column-wise", "Across", or "Left-Right" Value
 var_b <- "dt_aps_reported"
-var_b_labs <- list(t = "Positive Screening", f = "Negative Screening")
+var_b_labs <- list(t = "Intent to Report", f = "No Intent to Report")
 ### Reduce to desired columns, and modify values to match desired labels
 set_df <- ms_records |>
     dplyr::mutate(
-      dplyr::across(c(dt_positive, dt_aps_reported), 
-                    ~dplyr::case_when(
-                      .x ~ 't',
-                      !.x ~ 'f',
-                      is.na(.x) ~ NA
-                    ))
+      dplyr::across(
+        c(dt_positive, dt_aps_reported), 
+        ~dplyr::case_when(
+          .x ~ 't',
+          !.x ~ 'f',
+          is.na(.x) ~ NA
+          )
+        )
       )
 
 ## Get & display summary count table
@@ -288,6 +211,1057 @@ We then calculated our agreement statistics.
 
 ```{r}
 #| label: sec3-t1-scr-reslt-intent-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.2: Agreement DETECT Result to APS Determination, Broad Matching (sec3-t2-scr-reslt-inv-broad)
+
+We were interested in the agreement between the DETECT Tool's result (positive/negative) in relation to APS determinations at the APS Investigation level.
+
+A positive screening was defined as at least one "yes" response, regardless of items selected. APS Investigations were selected from the aggregate disposition of all matched investigations within a 30 day temporal window (broad matching), with an "Ever Valid" approach. Only subjects with an APS determination were used.
+
+First, we checked to see if there were any records with an APS disposition, but no screening.
+
+```{r}
+#| label: sec3-t2-scr-reslt-inv-broad-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with an APS record
+  dplyr::filter(!is.na(aps_inv_window_dispo)) |>
+  dplyr::filter((is.na(dt_positive) != is.na(aps_inv_window_dispo))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t2-scr-reslt-inv-broad-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_positive"
+var_a_labs <- list(t = "Positive Screening", f = "Negative Screening")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_inv_window_dispo"
+var_b_labs <- list(t = "Ever Valid", f = "No Valid")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(!is.na(aps_inv_window_dispo)) |>
+    dplyr::mutate(
+      dt_positive = dplyr::case_when(
+        dt_positive ~ 't',
+        !dt_positive ~ 'f',
+        is.na(dt_positive) ~ NA
+      ),
+      aps_inv_window_dispo = ifelse(
+        aps_inv_window_dispo %in% c('valid', 'mixed_validity'),
+        't', 
+        'f'
+        )
+    )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t2-scr-reslt-inv-broad-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.3: Agreement DETECT Result to APS Determination, Broad Matching, "Best" Disposition (sec3-t3-scr-reslt-inv-broad-best)
+
+We were interested in the agreement between the DETECT Tool's result (positive/negative) in relation to APS determinations at the APS Investigation level.
+
+A positive screening was defined as at least one "yes" response, regardless of items selected. APS Investigation disposition was selected from single "best" matched APS Investigation within a 30 day temporal window (broad matching), Only subjects with an APS determination were used.
+
+First, we checked to see if there were any records with an APS disposition, but no screening.
+
+```{r}
+#| label: sec3-t3-scr-reslt-inv-broad-best-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with an APS record
+  dplyr::filter(!is.na(aps_inv_window_dispo_best)) |>
+  dplyr::filter((is.na(dt_positive) != is.na(aps_inv_window_dispo_best))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t3-scr-reslt-inv-broad-best-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_positive"
+var_a_labs <- list(t = "Positive Screening", f = "Negative Screening")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_inv_window_dispo_best"
+var_b_labs <- list(t = "Valid", f = "Not Valid")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(!is.na(aps_inv_window_dispo)) |>
+    dplyr::mutate(
+      dt_positive = dplyr::case_when(
+        dt_positive ~ 't',
+        !dt_positive ~ 'f',
+        is.na(dt_positive) ~ NA
+      ),
+      aps_inv_window_dispo_best = ifelse(
+        aps_inv_window_dispo_best %in% c('valid', 'mixed_validity'),
+        't', 
+        'f'
+        )
+    )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t3-scr-reslt-inv-broad-best-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.4: Agreement DETECT Result to APS Determination, Exact Matching (sec3-t4-scr-reslt-inv-exact)
+
+We were interested in the agreement between the DETECT Tool's result (positive/negative) in relation to APS determinations at the APS Investigation level.
+
+A positive screening was defined as at least one "yes" response, regardless of items selected. APS Investigations were selected from the aggregate disposition of all APS Investigations open at the time of MedStar response, with an "Ever Valid" approach. Only subjects with an APS determination were used.
+
+First, we checked to see if there were any records with an APS disposition, but no screening.
+
+```{r}
+#| label: sec3-t4-scr-reslt-inv-exact-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with an APS record
+  dplyr::filter(!is.na(aps_inv_exact_dispo)) |>
+  dplyr::filter((is.na(dt_positive) != is.na(aps_inv_exact_dispo))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t4-scr-reslt-inv-exact-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_positive"
+var_a_labs <- list(t = "Positive Screening", f = "Negative Screening")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_inv_exact_dispo"
+var_b_labs <- list(t = "Ever Valid", f = "No Valid")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(!is.na(aps_inv_exact_dispo)) |>
+    dplyr::mutate(
+      dt_positive = dplyr::case_when(
+        dt_positive ~ 't',
+        !dt_positive ~ 'f',
+        is.na(dt_positive) ~ NA
+      ),
+      aps_inv_exact_dispo = ifelse(
+        aps_inv_exact_dispo %in% c('valid', 'mixed_validity'),
+        't', 
+        'f'
+        )
+    )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t4-scr-reslt-inv-exact-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.5: Agreement DETECT Result to APS Determination, Exact Matching, "Best" Disposition (sec3-t5-scr-reslt-inv-exact-best)
+
+We were interested in the agreement between the DETECT Tool's result (positive/negative) in relation to APS determinations at the APS Investigation level.
+
+A positive screening was defined as at least one "yes" response, regardless of items selected. APS Investigation disposition was selected from single "best" matched APS Investigation open at the time of MedStar response. Only subjects with an APS determination were used.
+
+First, we checked to see if there were any records with an APS disposition, but no screening.
+
+```{r}
+#| label: sec3-t5-scr-reslt-inv-exact-best-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with an APS record
+  dplyr::filter(!is.na(aps_inv_exact_dispo_best)) |>
+  dplyr::filter((is.na(dt_positive) != is.na(aps_inv_exact_dispo_best))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t5-scr-reslt-inv-exact-best-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_positive"
+var_a_labs <- list(t = "Positive Screening", f = "Negative Screening")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_inv_exact_dispo_best"
+var_b_labs <- list(t = "Valid", f = "Not Valid")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(!is.na(aps_inv_exact_dispo)) |>
+    dplyr::mutate(
+      dt_positive = dplyr::case_when(
+        dt_positive ~ 't',
+        !dt_positive ~ 'f',
+        is.na(dt_positive) ~ NA
+      ),
+      aps_inv_exact_dispo_best = ifelse(
+        aps_inv_exact_dispo_best %in% c('valid', 'mixed_validity'),
+        't', 
+        'f'
+        )
+    )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t5-scr-reslt-inv-exact-best-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.6: Agreement DETECT Result to APS Intake, Any Reporter (sec3-t6-scr-reslt-intake-any)
+
+We were interested in the agreement between the DETECT Tool's result (positive/negative) and the presence of an APS Intake within 72 hours of the MedStar response. Any reporter type was accepted. 
+
+A positive screening was defined as at least one "yes" response, regardless of items selected. All screenings were used.
+
+First, we checked to see if there were any records with screening, but no APS Intake value.
+
+```{r}
+#| label: sec3-t6-scr-reslt-intake-any-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with a screening
+  dplyr::filter(dt_screened) |>
+  dplyr::filter((is.na(dt_positive) != is.na(aps_intake))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t6-scr-reslt-intake-any-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_positive"
+var_a_labs <- list(t = "Positive Screening", f = "Negative Screening")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_intake"
+var_b_labs <- list(t = "Intake Present", f = "No Intake")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(dt_screened) |>
+    dplyr::mutate(
+      dplyr::across(
+        c(dt_positive, aps_intake), 
+        ~dplyr::case_when(
+          .x ~ 't',
+          !.x ~ 'f',
+          is.na(.x) ~ NA
+          )
+        )
+      )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t6-scr-reslt-intake-any-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.7: Agreement DETECT Result to APS Intake, EMS Possible Reporter Type (sec3-t7-scr-reslt-intake-poss)
+
+We were interested in the agreement between the DETECT Tool's result (positive/negative) and the presence of an APS Intake within 72 hours of the MedStar response. Reporter types that were reasonably possible to represent an EMS reporter were accepted (“Health Care Providers/Staff -- EMS/EMT”, "Health Care Providers/Staff", "Other Providers", "Community Agencies/Organizations", "Others", "Anonymous", and "Unknown").
+
+A positive screening was defined as at least one "yes" response, regardless of items selected. All screenings were used.
+
+First, we checked to see if there were poss records with screening, but no APS Intake value.
+
+```{r}
+#| label: sec3-t7-scr-reslt-intake-poss-na-check
+# Check if there are poss rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with a screening
+  dplyr::filter(dt_screened) |>
+  dplyr::filter((is.na(dt_positive) != is.na(aps_intake_poss))) |>
+  nrow() == 0
+
+# [1] FALSE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t7-scr-reslt-intake-poss-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_positive"
+var_a_labs <- list(t = "Positive Screening", f = "Negative Screening")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_intake_poss"
+var_b_labs <- list(t = "Intake Present", f = "No Intake")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(dt_screened) |>
+    dplyr::mutate(
+      aps_intake_poss = ifelse(is.na(aps_intake_poss), F, aps_intake_poss)
+    ) |>
+    dplyr::mutate(
+      dplyr::across(
+        c(dt_positive, aps_intake_poss), 
+        ~dplyr::case_when(
+          .x ~ 't',
+          !.x ~ 'f',
+          is.na(.x) ~ NA
+          )
+        )
+      )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t7-scr-reslt-intake-poss-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.8: Agreement DETECT Result to APS Intake, EMS Explicit (sec3-t8-scr-reslt-intake-ems)
+
+We were interested in the agreement between the DETECT Tool's result (positive/negative) and the presence of an APS Intake within 72 hours of the MedStar response. Only the explicit  “Health Care Providers/Staff -- EMS/EMT” reporter type was accepted.
+
+A positive screening was defined as at least one "yes" response, regardless of items selected. All screenings were used.
+
+First, we checked to see if there were ems records with screening, but no APS Intake value.
+
+```{r}
+#| label: sec3-t8-scr-reslt-intake-ems-na-check
+# Check if there are ems rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with a screening
+  dplyr::filter(dt_screened) |>
+  dplyr::filter((is.na(dt_positive) != is.na(aps_intake_ems))) |>
+  nrow() == 0
+
+# [1] FALSE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t8-scr-reslt-intake-ems-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_positive"
+var_a_labs <- list(t = "Positive Screening", f = "Negative Screening")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_intake_ems"
+var_b_labs <- list(t = "Intake Present", f = "No Intake")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(dt_screened) |>
+    dplyr::mutate(
+      aps_intake_ems = ifelse(is.na(aps_intake_ems), F, aps_intake_ems)
+    ) |>
+    dplyr::mutate(
+      dplyr::across(
+        c(dt_positive, aps_intake_ems), 
+        ~dplyr::case_when(
+          .x ~ 't',
+          !.x ~ 'f',
+          is.na(.x) ~ NA
+          )
+        )
+      )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t8-scr-reslt-intake-ems-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+#### Reporting Intent
+
+##### Table 3.9: Agreement of Reporting Intent to APS Intake, Any Reporter Type (sec3-t9-scr-intent-intake-any)
+
+We were interested in the agreement between the DETECT Tool's recorded intent to report to the presence of an APS Intake within 72 hours of the MedStar response. (If a medic intended to report, was there generally an APS Intake?). We checked this for all screenings. Any reporter type was accepted.
+
+First, we checked to see if there were any records where one target value was present, but the other was not.
+
+```{r}
+#| label: sec3-t9-scr-intent-intake-any-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  dplyr::filter(dt_screened) |>
+  dplyr::filter((is.na(dt_aps_reported) != is.na(aps_intake))) |>
+  nrow() == 0
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t9-scr-intent-intake-any-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_aps_reported"
+var_a_labs <- list(t = "Intent to Report", f = "No Intent to Report")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_intake"
+var_b_labs <- list(t = "Intake Present", f = "No Intake")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(dt_screened) |>
+    dplyr::mutate(
+      dplyr::across(
+        c(dt_aps_reported, aps_intake), 
+        ~dplyr::case_when(
+          .x ~ 't',
+          !.x ~ 'f',
+          is.na(.x) ~ NA
+          )
+        )
+      )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t9-scr-intent-intake-any-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.10: Agreement of Reporting Intent to APS Intake, Any Reporter Type (sec3-t10-scr-intent-intake-poss)
+
+We were interested in the agreement between the DETECT Tool's recorded intent to report to the presence of an APS Intake within 72 hours of the MedStar response. (If a medic intended to report, was there generally an APS Intake?). We checked this for all screenings. Reporter types that were reasonably possible to represent an EMS reporter were accepted (“Health Care Providers/Staff -- EMS/EMT”, "Health Care Providers/Staff", "Other Providers", "Community Agencies/Organizations", "Others", "Anonymous", and "Unknown").
+
+First, we checked to see if there were any records where one target value was present, but the other was not.
+
+```{r}
+#| label: sec3-t10-scr-intent-intake-poss-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  dplyr::filter(dt_screened) |>
+  dplyr::filter((is.na(dt_aps_reported) != is.na(aps_intake_poss))) |>
+  nrow() == 0
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t10-scr-intent-intake-poss-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_aps_reported"
+var_a_labs <- list(t = "Intent to Report", f = "No Intent to Report")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_intake_poss"
+var_b_labs <- list(t = "Intake Present", f = "No Intake")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(dt_screened) |>
+    dplyr::mutate(
+      aps_intake_poss = ifelse(is.na(aps_intake_poss), F, aps_intake_poss)
+    ) |>
+    dplyr::mutate(
+      dplyr::across(
+        c(dt_aps_reported, aps_intake_poss), 
+        ~dplyr::case_when(
+          .x ~ 't',
+          !.x ~ 'f',
+          is.na(.x) ~ NA
+          )
+        )
+      )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t10-scr-intent-intake-poss-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.11: Agreement of Reporting Intent to APS Intake, Any Reporter Type (sec3-t11-scr-intent-intake-ems)
+
+We were interested in the agreement between the DETECT Tool's recorded intent to report to the presence of an APS Intake within 72 hours of the MedStar response. (If a medic intended to report, was there generally an APS Intake?). We checked this for all screenings. Only the EMS-explcitit “Health Care Providers/Staff -- EMS/EMT” reporter type was accepted.
+
+First, we checked to see if there were any records where one target value was present, but the other was not.
+
+```{r}
+#| label: sec3-t11-scr-intent-intake-ems-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  dplyr::filter(dt_screened) |>
+  dplyr::filter((is.na(dt_aps_reported) != is.na(aps_intake_ems))) |>
+  nrow() == 0
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t11-scr-intent-intake-ems-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_aps_reported"
+var_a_labs <- list(t = "Intent to Report", f = "No Intent to Report")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_intake_ems"
+var_b_labs <- list(t = "Intake Present", f = "No Intake")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(dt_screened) |>
+    dplyr::mutate(
+      aps_intake_ems = ifelse(is.na(aps_intake_ems), F, aps_intake_ems)
+    ) |>
+    dplyr::mutate(
+      dplyr::across(
+        c(dt_aps_reported, aps_intake_ems), 
+        ~dplyr::case_when(
+          .x ~ 't',
+          !.x ~ 'f',
+          is.na(.x) ~ NA
+          )
+        )
+      )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t11-scr-intent-intake-ems-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.12: Agreement of Reporting Intent to APS Intake to APS Determination, Broad Matching (sec3-t12-scr-intent-inv-broad)
+
+We were interested in DETECT tool recorded intent to report in relation to APS determinations at the APS Investigation level.
+
+APS Investigations were selected from the aggregate disposition of all matched investigations within a 30 day temporal window (broad matching), with an "Ever Valid" approach. Only subjects with an APS determination were used.
+
+First, we checked to see if there were any records with an APS disposition, but no screening.
+
+```{r}
+#| label: sec3-t12-scr-intent-inv-broad-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with an APS record
+  dplyr::filter(!is.na(aps_inv_window_dispo)) |>
+  dplyr::filter((is.na(dt_aps_reported) != is.na(aps_inv_window_dispo))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t12-scr-intent-inv-broad-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_aps_reported"
+var_a_labs <- list(t = "Intent to Report", f = "No Intent")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_inv_window_dispo"
+var_b_labs <- list(t = "Ever Valid", f = "No Valid")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(!is.na(aps_inv_window_dispo)) |>
+    dplyr::mutate(
+      dt_aps_reported = dplyr::case_when(
+        dt_aps_reported ~ 't',
+        !dt_aps_reported ~ 'f',
+        is.na(dt_aps_reported) ~ NA
+      ),
+      aps_inv_window_dispo = ifelse(
+        aps_inv_window_dispo %in% c('valid', 'mixed_validity'),
+        't', 
+        'f'
+        )
+    )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t12-scr-intent-inv-broad-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.13: Agreement of Reporting Intent to APS Intake to APS Determination, Broad Matching, "Best" Disposition (sec3-t13-scr-intent-inv-broad-best)
+
+We were interested in DETECT tool recorded intent to report in relation to APS determinations at the APS Investigation level.
+
+APS Investigation disposition was selected from single "best" matched APS Investigation within a 30 day temporal window (broad matching), Only subjects with an APS determination were used.
+
+First, we checked to see if there were any records with an APS disposition, but no screening.
+
+```{r}
+#| label: sec3-t13-scr-intent-inv-broad-best-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with an APS record
+  dplyr::filter(!is.na(aps_inv_window_dispo_best)) |>
+  dplyr::filter((is.na(dt_aps_reported) != is.na(aps_inv_window_dispo_best))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t13-scr-intent-inv-broad-best-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_aps_reported"
+var_a_labs <- list(t = "Intent to Report", f = "No Intent")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_inv_window_dispo_best"
+var_b_labs <- list(t = "Valid", f = "Not Valid")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(!is.na(aps_inv_window_dispo)) |>
+    dplyr::mutate(
+      dt_aps_reported = dplyr::case_when(
+        dt_aps_reported ~ 't',
+        !dt_aps_reported ~ 'f',
+        is.na(dt_aps_reported) ~ NA
+      ),
+      aps_inv_window_dispo_best = ifelse(
+        aps_inv_window_dispo_best %in% c('valid', 'mixed_validity'),
+        't', 
+        'f'
+        )
+    )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t13-scr-intent-inv-broad-best-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.14: Agreement of Reporting Intent to APS Intake to APS Determination, Exact Matching (sec3-t14-scr-intent-inv-exact)
+
+We were interested in DETECT tool recorded intent to report in relation to APS determinations at the APS Investigation level.
+
+APS Investigations were selected from the aggregate disposition of all APS Investigations open at the time of MedStar response, with an "Ever Valid" approach. Only subjects with an APS determination were used.
+
+First, we checked to see if there were any records with an APS disposition, but no screening.
+
+```{r}
+#| label: sec3-t14-scr-intent-inv-exact-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with an APS record
+  dplyr::filter(!is.na(aps_inv_exact_dispo)) |>
+  dplyr::filter((is.na(dt_aps_reported) != is.na(aps_inv_exact_dispo))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t14-scr-intent-inv-exact-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_aps_reported"
+var_a_labs <- list(t = "Intent to Report", f = "No Intent")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_inv_exact_dispo"
+var_b_labs <- list(t = "Ever Valid", f = "No Valid")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(!is.na(aps_inv_exact_dispo)) |>
+    dplyr::mutate(
+      dt_aps_reported = dplyr::case_when(
+        dt_aps_reported ~ 't',
+        !dt_aps_reported ~ 'f',
+        is.na(dt_aps_reported) ~ NA
+      ),
+      aps_inv_exact_dispo = ifelse(
+        aps_inv_exact_dispo %in% c('valid', 'mixed_validity'),
+        't', 
+        'f'
+        )
+    )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t14-scr-intent-inv-exact-stats
+# Statistics Table
+get_agreement_stats_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df,
+  .corr_methods = c("pearson", "kendall", "spearman"), 
+  .kappa_methods = c("cohen", "fleiss", "light"), 
+  .n_decimal = 4
+  )
+```
+
+##### Table 3.15: Agreement of Reporting Intent to APS Intake to APS Determination, Exact Matching, "Best" Disposition (sec3-t15-scr-intent-inv-exact-best)
+
+We were interested in DETECT tool recorded intent to report in relation to APS determinations at the APS Investigation level.
+
+APS Investigation disposition was selected from single "best" matched APS Investigation open at the time of MedStar response. Only subjects with an APS determination were used.
+
+First, we checked to see if there were any records with an APS disposition, but no screening.
+
+```{r}
+#| label: sec3-t15-scr-intent-inv-exact-best-na-check
+# Check if there are any rows where there is a value for one of the 
+# variables of interest, but not the other
+ms_records |>
+  ## Select only records with an APS record
+  dplyr::filter(!is.na(aps_inv_exact_dispo_best)) |>
+  dplyr::filter((is.na(dt_aps_reported) != is.na(aps_inv_exact_dispo_best))) |>
+  nrow() == 0
+
+# [1] TRUE
+```
+
+We then defined our target variables, and created our summary of counts in the agreement table.
+
+```{r}
+#| label: sec3-t15-scr-intent-inv-exact-best-summ
+# Agreement Table
+## Define Variables
+### "First Column" or "Top-Down" Value
+var_a <- "dt_aps_reported"
+var_a_labs <- list(t = "Intent to Report", f = "No Intent")
+### "Column-wise", "Across", or "Left-Right" Value
+var_b <- "aps_inv_exact_dispo_best"
+var_b_labs <- list(t = "Valid", f = "Not Valid")
+### Reduce to desired columns, and modify values to match desired labels
+set_df <- ms_records |>
+    dplyr::filter(!is.na(aps_inv_exact_dispo)) |>
+    dplyr::mutate(
+      dt_aps_reported = dplyr::case_when(
+        dt_aps_reported ~ 't',
+        !dt_aps_reported ~ 'f',
+        is.na(dt_aps_reported) ~ NA
+      ),
+      aps_inv_exact_dispo_best = ifelse(
+        aps_inv_exact_dispo_best %in% c('valid', 'mixed_validity'),
+        't', 
+        'f'
+        )
+    )
+
+## Get & display summary count table
+get_twox_logical_table(
+  .var_a = var_a,
+  .var_b = var_b,
+  .var_a_labs = var_a_labs,
+  .var_b_labs = var_b_labs,
+  .df = set_df
+  )
+```
+
+We then calculated our agreement statistics.
+
+```{r}
+#| label: sec3-t15-scr-intent-inv-exact-best-stats
 # Statistics Table
 get_agreement_stats_table(
   .var_a = var_a,
