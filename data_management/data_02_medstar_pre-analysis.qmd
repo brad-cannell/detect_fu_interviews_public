@@ -216,7 +216,7 @@ We prepared our MedStar Data for analyses.
 
 ## Removal of "Test" Entries
 
-There were several entries that remained in our data set for "Et3" testing records. We removed these from our data set prior to analysis.
+There were several entries that remained in our data set for "Et3" testing records or blank records. We removed these from our data set prior to analysis.
 
 ```{r}
 #| label: clean-remove-tests
@@ -224,9 +224,13 @@ There were several entries that remained in our data set for "Et3" testing recor
 # Remove test records
 ms_resps <- ms_resps |>
   dplyr::mutate(
-    drop_flag = stringr::str_detect(stringr::str_to_lower(name_full), "et3")
+    drop_flag = (
+      stringr::str_detect(stringr::str_to_lower(name_full), "et3") |
+        is.na(incident_timestamp)
+      )
     ) |>
-  dplyr::filter(!drop_flag | is.na(drop_flag))
+  dplyr::filter(!drop_flag | is.na(drop_flag)) |>
+  dplyr::select(-drop_flag)
 ```
 
 ## Examination of Potentially Duplicated Responses
