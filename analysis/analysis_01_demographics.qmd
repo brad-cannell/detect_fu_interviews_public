@@ -104,8 +104,7 @@ informative_df_import(
     "ms_records", path, overwrite = T
   )
 
- # 2025-03-05: MS RECORDS data imported with 91,700 rows and 126 columns.
- # Data last modified on OneDrive: 2025-03-05 12:27:24 
+ # [PLACEHOLDER]
 ```
 
 We loaded our MedStar subject-level data.
@@ -124,8 +123,7 @@ informative_df_import(
     "ms_subjs", path, overwrite = T
   )
 
- # 2025-03-05: MS SUBJS data imported with 41,612 rows and 75 columns.
- # Data last modified on OneDrive: 2025-03-05 12:27:24 
+ # [PLACEHOLDER]
 ```
 
 # Analyses
@@ -228,7 +226,7 @@ We calculated summary statistics for calculated age.
 ```{r}
 #| label: sec1-t1-demo-all-resp-age-summ
 # Get Summary Statistics for Age, Response-Level
-get_cont_summary(t_df$age_calc) |>
+get_cont_summary(as.vector(na.omit(t_df$age_calc))) |>
   dplyr::rename_at('summary_text', ~'Overall (All Responses)')
 ```
 
@@ -2139,7 +2137,7 @@ get_chi_fisher(
   )
 ```
 
-#### Table 1.9: Positive Screenings, Response-Level (#sec1-t9-demo-intent-pos-resp)
+##### Table 1.9: Positive Screenings, Response-Level (#sec1-t9-demo-intent-pos-resp)
 
 We wished to examine demographic differences between responses with positive DETECT screenings that did and not have a DETECT Tool recorded intent to report. We stored this internally as Table 1.9.
 
@@ -2165,7 +2163,7 @@ t_df <- ms_records |>
 t_group_order = list(t = 'Intent to Report', f = 'No Intent')
 ```
 
-##### Age
+###### Age
 
 We calculated summary statistics for calculated age.
 
@@ -2247,7 +2245,7 @@ get_twos_num_stats(
 )
 ```
 
-##### Sex
+###### Sex
 
 We calculated summary statistics for sex.
 
@@ -2289,7 +2287,7 @@ get_chi_fisher(
   )
 ```
 
-##### Race
+###### Race
 
 We calculated summary statistics for race.
 
@@ -2331,7 +2329,7 @@ get_chi_fisher(
   )
 ```
 
-##### Ethnicity
+###### Ethnicity
 
 We calculated summary statistics for ethnicity.
 
@@ -2377,7 +2375,7 @@ get_chi_fisher(
   )
 ```
 
-#### Table 1.10: Positive Screenings, Response-Level (#sec1-t10-demo-intent-neg-resp)
+##### Table 1.10: Positive Screenings, Response-Level (#sec1-t10-demo-intent-neg-resp)
 
 We wished to examine demographic differences between responses with negative DETECT screenings that did and not have a DETECT Tool recorded intent to report. We stored this internally as Table 1.10.
 
@@ -2403,7 +2401,7 @@ t_df <- ms_records |>
 t_group_order = list(t = 'Intent to Report', f = 'No Intent')
 ```
 
-##### Age
+###### Age
 
 We calculated summary statistics for calculated age.
 
@@ -2485,7 +2483,7 @@ get_twos_num_stats(
 )
 ```
 
-##### Sex
+###### Sex
 
 We calculated summary statistics for sex.
 
@@ -2527,7 +2525,7 @@ get_chi_fisher(
   )
 ```
 
-##### Race
+###### Race
 
 We calculated summary statistics for race.
 
@@ -2569,7 +2567,7 @@ get_chi_fisher(
   )
 ```
 
-##### Ethnicity
+###### Ethnicity
 
 We calculated summary statistics for ethnicity.
 
@@ -2613,6 +2611,5184 @@ get_chi_fisher(
   .value_var = 'value_name',
   .omit_vals = c('Missing (NA)')
   )
+```
+
+
+### By Matched APS Intake
+
+#### Response-Level
+
+##### Table 1.11: Any Reporter Type (#sec1-t11-demo-intake-any-resp)
+
+We wished to examine demographic differences between responses that did and did not have a matched APS Intake, with any reporter type. We stored this internally as Table 1.11.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_intake = dplyr::case_when(
+      aps_intake ~ 't',
+      !aps_intake ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Matched APS Intake', f = 'No Matched Intake')
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-age-summ
+# Get Summary Statistics for Age by Intake Match (Any), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_intake",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-age-hist-f0-11
+# Figure 0.11: Distribution of Age by Intake Match (Any), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_intake = factor(
+        aps_intake, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_intake, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Intake Match (Any), Response-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Matched APS Intake (Any)"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-11-age-intake-any-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intake Match (Any)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_intake = dplyr::case_when(
+        aps_intake == 't' ~ T,
+        aps_intake == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_intake"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_intake",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_intake",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_intake",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t11-demo-intake-any-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Table 1.12: EMS Possible Reporter Type (#sec1-t12-demo-intake-poss-resp)
+
+We wished to examine demographic differences between responses that did and did not have a matched APS Intake, with reporter types that might indicate an EMS reporter accepted (“Health Care Providers/Staff -- EMS/EMT”, "Health Care Providers/Staff", "Other Providers", "Community Agencies/Organizations", "Others", "Anonymous", and "Unknown"). We stored this internally as Table 1.12.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_intake_poss = dplyr::case_when(
+      aps_intake_poss ~ 't',
+      !aps_intake_poss | is.na(aps_intake_poss) ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Matched APS Intake', f = 'No Matched Intake')
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-age-summ
+# Get Summary Statistics for Age by Intake Match (Possible), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_intake_poss",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-age-hist-f0-12
+# Figure 0.12: Distribution of Age by Intake Match (Possible), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_intake_poss = factor(
+        aps_intake_poss, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_intake_poss, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Intake Match (Possible), Response-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Matched APS Intake (Possible)"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-12-age-intake-poss-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intake Match (Possible)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_intake_poss = dplyr::case_when(
+        aps_intake_poss == 't' ~ T,
+        aps_intake_poss == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_intake_poss"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_intake_poss",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_intake_poss",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_intake_poss",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t12-demo-intake-poss-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Table 1.13: EMS Explicit Reporter Type (#sec1-t13-demo-intake-ems-resp)
+
+We wished to examine demographic differences between responses that did and did not have a matched APS Intake, with only an explicit declaration of an EMS reporter accepted (“Health Care Providers/Staff -- EMS/EMT”). We stored this internally as Table 1.13.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_intake_ems = dplyr::case_when(
+      aps_intake_ems ~ 't',
+      !aps_intake_ems | is.na(aps_intake_ems) ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Matched APS Intake', f = 'No Matched Intake')
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-age-summ
+# Get Summary Statistics for Age by Intake Match (EMS), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_intake_ems",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-age-hist-f0-13
+# Figure 0.13: Distribution of Age by Intake Match (EMS), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_intake_ems = factor(
+        aps_intake_ems, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_intake_ems, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Intake Match (EMS), Response-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Matched APS Intake (EMS)"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-13-age-intake-ems-resp-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intake Match (EMS)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_intake_ems = dplyr::case_when(
+        aps_intake_ems == 't' ~ T,
+        aps_intake_ems == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_intake_ems"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_intake_ems",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_intake_ems",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_intake_ems",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t13-demo-intake-ems-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+#### Subject-Level
+
+##### Table 1.14: Any Reporter Type (#sec1-t14-demo-intake-any-subj)
+
+We wished to examine demographic differences between subjects that did and did not have a matched APS Intake, with any reporter type. We stored this internally as Table 1.14.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-subset
+# Take response-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_intake = dplyr::case_when(
+      aps_intake ~ 't',
+      !aps_intake ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Matched APS Intake', f = 'No Matched Intake')
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-age-summ
+# Get Summary Statistics for Age by Intake Match (Any), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_intake",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-age-hist-f0-14
+# Figure 0.14: Distribution of Age by Intake Match (Any), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_intake = factor(
+        aps_intake, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_intake, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Intake Match (Any), Subject-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Matched APS Intake (Any)"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-14-age-intake-any-subj-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intake Match (Any)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_intake = dplyr::case_when(
+        aps_intake == 't' ~ T,
+        aps_intake == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_intake"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_intake",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_intake",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_intake",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t14-demo-intake-any-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Table 1.15: EMS Possible Reporter Type (#sec1-t15-demo-intake-poss-subj)
+
+We wished to examine demographic differences between subjects that did and did not have a matched APS Intake, with reporter types that might indicate an EMS reporter accepted (“Health Care Providers/Staff -- EMS/EMT”, "Health Care Providers/Staff", "Other Providers", "Community Agencies/Organizations", "Others", "Anonymous", and "Unknown"). We stored this internally as Table 1.15.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-subset
+# Take response-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_intake_poss = dplyr::case_when(
+      aps_intake_poss ~ 't',
+      !aps_intake_poss | is.na(aps_intake_poss) ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Matched APS Intake', f = 'No Matched Intake')
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-age-summ
+# Get Summary Statistics for Age by Intake Match (Possible), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_intake_poss",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-age-hist-f0-15
+# Figure 0.15: Distribution of Age by Intake Match (Possible), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_intake_poss = factor(
+        aps_intake_poss, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_intake_poss, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Intake Match (Possible), Subject-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Matched APS Intake (Possible)"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-15-age-intake-poss-subj-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intake Match (Possible)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_intake_poss = dplyr::case_when(
+        aps_intake_poss == 't' ~ T,
+        aps_intake_poss == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_intake_poss"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_intake_poss",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_intake_poss",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_intake_poss",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t15-demo-intake-poss-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+##### Table 1.16: EMS Explicit Reporter Type (#sec1-t16-demo-intake-ems-subj)
+
+We wished to examine demographic differences between subjects that did and did not have a matched APS Intake, with only an explicit declaration of an EMS reporter accepted (“Health Care Providers/Staff -- EMS/EMT”). We stored this internally as Table 1.16.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-subset
+# Take response-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_intake_ems = dplyr::case_when(
+      aps_intake_ems ~ 't',
+      !aps_intake_ems | is.na(aps_intake_ems) ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(t = 'Matched APS Intake', f = 'No Matched Intake')
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-age-summ
+# Get Summary Statistics for Age by Intake Match (EMS), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_intake_ems",
+  .group_order = t_group_order
+  ) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-age-hist-f0-16
+# Figure 0.16: Distribution of Age by Intake Match (EMS), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_intake_ems = factor(
+        aps_intake_ems, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+        )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_intake_ems, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Intake Match (EMS), Subject-Level",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "Matched APS Intake (EMS)"
+    ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-16-age-intake-ems-subj-hist.png"
+    ),
+  plot = plot
+  )
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Intake Match (EMS)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_intake_ems = dplyr::case_when(
+        aps_intake_ems == 't' ~ T,
+        aps_intake_ems == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_intake_ems"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_intake_ems",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+  )
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_intake_ems",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_intake_ems",
+  .group_order = t_group_order
+  )
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+    )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t16-demo-intake-ems-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+  dplyr::select(value_name, t_n, f_n) |>
+  dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+  )
+```
+
+
+### By Matched APS Investigation
+
+#### Response-Level
+
+##### Table 1.17: Broad Match, Aggregate, All Screenings (#sec1-t17-demo-inv-broad-all-scrs-resp)
+
+We wished to examine demographic differences between responses that did and did not have at least one valid allegation of EM in a matched APS Investigation, across all screenings (those without a paired investigation deemed "no valid allegations"). We used broad temporal matching (30 day window), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.17.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Broad, Agg.), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-age-hist-f0-17
+# Figure 0.17: Distribution of Age by Valid APS Inv (Broad, Agg.), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Broad, Agg.), Response-Level",
+    subtitle = "Includes no matched investigations with 'no valid allegations'",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-17-age-inv-broad-all-scrs-resp-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Broad, Agg.)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t17-demo-inv-broad-all-scrs-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.18: Broad Match, Aggregate, All Screenings (#sec1-t18-demo-inv-broad-all-matches-resp)
+
+We wished to examine demographic differences between responses that did and did not have at least one valid allegation of EM in a matched APS Investigation, across records with a matched APS Investigation. We used broad temporal matching (30 day window), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.18.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only records with a paired APS Investigation
+  dplyr::filter(aps_inv_window) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Broad, Agg.), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-age-hist-f0-18
+# Figure 0.18: Distribution of Age by Valid APS Inv (Broad, Agg.), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Broad, Agg.), Response-Level",
+    subtitle = "Only records with a matched APS Investigation",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-18-age-inv-broad-all-matches-resp-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Broad, Agg.)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t18-demo-inv-broad-all-matches-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.19: Broad Match, "Best", All Screenings (#sec1-t19-demo-inv-broad-best-scrs-resp)
+
+We wished to examine demographic differences between responses that did and did not have at least one valid allegation of EM in a matched APS Investigation, across all screenings (those without a paired investigation deemed "no valid allegations"). We used broad temporal matching (30 day window), and used dispositions of the single "best" paired investigation. We stored this internally as Table 1.19.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo_best %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Broad, 'Best'), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-age-hist-f0-19
+# Figure 0.19: Distribution of Age by Valid APS Inv (Broad, 'Best'), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Broad, 'Best'), Response-Level",
+    subtitle = "Includes no matched investigations with 'no valid allegations'",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-19-age-inv-broad-best-scrs-resp-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Broad, 'Best')
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t19-demo-inv-broad-best-scrs-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.20: Broad Match, "Best", All Screenings (#sec1-t20-demo-inv-broad-best-matches-resp)
+
+We wished to examine demographic differences between responses that did and did not have at least one valid allegation of EM in a matched APS Investigation, across records with a matched APS Investigation. We used broad temporal matching (30 day window), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.20.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only records with a paired APS Investigation
+  dplyr::filter(aps_inv_window) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo_best %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Broad, 'Best'), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-age-hist-f0-20
+# Figure 0.20: Distribution of Age by Valid APS Inv (Broad, 'Best'), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Broad, 'Best'), Response-Level",
+    subtitle = "Only records with a matched APS Investigation",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-20-age-inv-broad-best-matches-resp-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Broad, 'Best')
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t20-demo-inv-broad-best-matches-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+
+##### Table 1.21: Exact Match, Aggregate, All Screenings (#sec1-t21-demo-inv-exact-all-scrs-resp)
+
+We wished to examine demographic differences between responses that did and did not have at least one valid allegation of EM in a matched APS Investigation, across all screenings (those without a paired investigation deemed "no valid allegations"). We used exact matching (case open at the time of the response), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.21.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Exact, Agg.), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-age-hist-f0-21
+# Figure 0.21: Distribution of Age by Valid APS Inv (Exact, Agg.), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Exact, Agg.), Response-Level",
+    subtitle = "Includes no matched investigations with 'no valid allegations'",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-21-age-inv-exact-all-scrs-resp-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Exact, Agg.)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t21-demo-inv-exact-all-scrs-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.22: Exact Match, Aggregate, All Screenings (#sec1-t22-demo-inv-exact-all-matches-resp)
+
+We wished to examine demographic differences between responses that did and did not have at least one valid allegation of EM in a matched APS Investigation, across records with a matched APS Investigation. We used exact matching (case open at the time of the response), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.22.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only records with a paired APS Investigation
+  dplyr::filter(aps_inv_window) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Exact, Agg.), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-age-hist-f0-22
+# Figure 0.22: Distribution of Age by Valid APS Inv (Exact, Agg.), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Exact, Agg.), Response-Level",
+    subtitle = "Only records with a matched APS Investigation",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-22-age-inv-exact-all-matches-resp-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Exact, Agg.)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t22-demo-inv-exact-all-matches-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.23: Exact Match, "Best", All Screenings (#sec1-t23-demo-inv-exact-best-scrs-resp)
+
+We wished to examine demographic differences between responses that did and did not have at least one valid allegation of EM in a matched APS Investigation, across all screenings (those without a paired investigation deemed "no valid allegations"). We used exact matching (case open at the time of the response), and used dispositions of the single "best" paired investigation. We stored this internally as Table 1.23.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo_best %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Exact, 'Best'), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-age-hist-f0-23
+# Figure 0.23: Distribution of Age by Valid APS Inv (Exact, 'Best'), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Exact, 'Best'), Response-Level",
+    subtitle = "Includes no matched investigations with 'no valid allegations'",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-23-age-inv-exact-best-scrs-resp-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Exact, 'Best')
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t23-demo-inv-exact-best-scrs-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.24: Exact Match, "Best", All Screenings (#sec1-t24-demo-inv-exact-best-matches-resp)
+
+We wished to examine demographic differences between responses that did and did not have at least one valid allegation of EM in a matched APS Investigation, across records with a matched APS Investigation. We used exact matching (case open at the time of the response), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.24.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only records with a paired APS Investigation
+  dplyr::filter(aps_inv_window) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo_best %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Exact, 'Best'), Response-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_calc",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-age-hist-f0-24
+# Figure 0.24: Distribution of Age by Valid APS Inv (Exact, 'Best'), Response-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_calc, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Exact, 'Best'), Response-Level",
+    subtitle = "Only records with a matched APS Investigation",
+    x= "Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-24-age-inv-exact-best-matches-resp-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Exact, 'Best')
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_calc",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-sex-summ
+# Get Summary Statistics for Sex, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-race-summ
+# Get Summary Statistics for Race, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-ethn-summ
+# Get Summary Statistics for Ethnicity, Response-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t24-demo-inv-exact-best-matches-resp-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+#### Subject-Level
+
+##### Table 1.25: Broad Match, Aggregate, All Screenings (#sec1-t25-demo-inv-broad-all-scrs-subj)
+
+We wished to examine demographic differences between subjects that did and did not have at least one valid allegation of EM in a matched APS Investigation, across all screenings (those without a paired investigation deemed "no valid allegations"). We used broad temporal matching (30 day window), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.25.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-subset
+# Take subject-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Broad, Agg.), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-age-hist-f0-25
+# Figure 0.25: Distribution of Age by Valid APS Inv (Broad, Agg.), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Broad, Agg.), Subject-Level",
+    subtitle = "Includes no matched investigations with 'no valid allegations'",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-25-age-inv-broad-all-scrs-subj-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Broad, Agg.)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t25-demo-inv-broad-all-scrs-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.26: Broad Match, Aggregate, All Screenings (#sec1-t26-demo-inv-broad-all-matches-subj)
+
+We wished to examine demographic differences between subjects that did and did not have at least one valid allegation of EM in a matched APS Investigation, across records with a matched APS Investigation. We used broad temporal matching (30 day window), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.26.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-subset
+# Take subject-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only records with a paired APS Investigation
+  dplyr::filter(aps_inv_window) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Broad, Agg.), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-age-hist-f0-26
+# Figure 0.26: Distribution of Age by Valid APS Inv (Broad, Agg.), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Broad, Agg.), Subject-Level",
+    subtitle = "Only records with a matched APS Investigation",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-26-age-inv-broad-all-matches-subj-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Broad, Agg.)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t26-demo-inv-broad-all-matches-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.27: Broad Match, "Best", All Screenings (#sec1-t27-demo-inv-broad-best-scrs-subj)
+
+We wished to examine demographic differences between subjects that did and did not have at least one valid allegation of EM in a matched APS Investigation, across all screenings (those without a paired investigation deemed "no valid allegations"). We used broad temporal matching (30 day window), and used dispositions of the single "best" paired investigation. We stored this internally as Table 1.27.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-subset
+# Take subject-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo_best %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Broad, 'Best'), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-age-hist-f0-27
+# Figure 0.27: Distribution of Age by Valid APS Inv (Broad, 'Best'), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Broad, 'Best'), Subject-Level",
+    subtitle = "Includes no matched investigations with 'no valid allegations'",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-27-age-inv-broad-best-scrs-subj-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Broad, 'Best')
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t27-demo-inv-broad-best-scrs-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.28: Broad Match, "Best", All Screenings (#sec1-t28-demo-inv-broad-best-matches-subj)
+
+We wished to examine demographic differences between subjects that did and did not have at least one valid allegation of EM in a matched APS Investigation, across records with a matched APS Investigation. We used broad temporal matching (30 day window), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.28.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-subset
+# Take subject-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only records with a paired APS Investigation
+  dplyr::filter(aps_inv_window) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo_best %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Broad, 'Best'), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-age-hist-f0-28
+# Figure 0.28: Distribution of Age by Valid APS Inv (Broad, 'Best'), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Broad, 'Best'), Subject-Level",
+    subtitle = "Only records with a matched APS Investigation",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-28-age-inv-broad-best-matches-subj-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Broad, 'Best')
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t28-demo-inv-broad-best-matches-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+
+##### Table 1.29: Exact Match, Aggregate, All Screenings (#sec1-t29-demo-inv-exact-all-scrs-subj)
+
+We wished to examine demographic differences between subjects that did and did not have at least one valid allegation of EM in a matched APS Investigation, across all screenings (those without a paired investigation deemed "no valid allegations"). We used exact matching (case open at the time of the subject), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.29.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-subset
+# Take subject-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Exact, Agg.), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-age-hist-f0-29
+# Figure 0.29: Distribution of Age by Valid APS Inv (Exact, Agg.), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Exact, Agg.), Subject-Level",
+    subtitle = "Includes no matched investigations with 'no valid allegations'",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-29-age-inv-exact-all-scrs-subj-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Exact, Agg.)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t29-demo-inv-exact-all-scrs-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.30: Exact Match, Aggregate, All Screenings (#sec1-t30-demo-inv-exact-all-matches-subj)
+
+We wished to examine demographic differences between subjects that did and did not have at least one valid allegation of EM in a matched APS Investigation, across records with a matched APS Investigation. We used exact matching (case open at the time of the subject), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.30.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-subset
+# Take subject-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only records with a paired APS Investigation
+  dplyr::filter(aps_inv_window) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Exact, Agg.), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-age-hist-f0-30
+# Figure 0.30: Distribution of Age by Valid APS Inv (Exact, Agg.), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Exact, Agg.), Subject-Level",
+    subtitle = "Only records with a matched APS Investigation",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-30-age-inv-exact-all-matches-subj-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Exact, Agg.)
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t30-demo-inv-exact-all-matches-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.31: Exact Match, "Best", All Screenings (#sec1-t31-demo-inv-exact-best-scrs-subj)
+
+We wished to examine demographic differences between subjects that did and did not have at least one valid allegation of EM in a matched APS Investigation, across all screenings (those without a paired investigation deemed "no valid allegations"). We used exact matching (case open at the time of the subject), and used dispositions of the single "best" paired investigation. We stored this internally as Table 1.31.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-subset
+# Take subject-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo_best %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Exact, 'Best'), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-age-hist-f0-31
+# Figure 0.31: Distribution of Age by Valid APS Inv (Exact, 'Best'), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Exact, 'Best'), Subject-Level",
+    subtitle = "Includes no matched investigations with 'no valid allegations'",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-31-age-inv-exact-best-scrs-subj-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Exact, 'Best')
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t31-demo-inv-exact-best-scrs-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+##### Table 1.32: Exact Match, "Best", All Screenings (#sec1-t32-demo-inv-exact-best-matches-subj)
+
+We wished to examine demographic differences between subjects that did and did not have at least one valid allegation of EM in a matched APS Investigation, across records with a matched APS Investigation. We used exact matching (case open at the time of the subject), and aggregated the dispositions of all matched investigations. We stored this internally as Table 1.32.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-subset
+# Take subject-level subset for the following analyses
+t_df <- ms_subjs |>
+  ## Select only records with a DETECT screening
+  dplyr::filter(dt_screened) |>
+  ## Select only records with a paired APS Investigation
+  dplyr::filter(aps_inv_window) |>
+  ## Convert grouping variable to text for table functions
+  dplyr::mutate(
+    aps_dispo = dplyr::case_when(
+      aps_inv_window_dispo_best %in% c('valid', 'mixed_validity') ~ 't',
+      TRUE ~ 'f'
+    )
+  )
+
+## Subset-specific group order for tables
+t_group_order = list(
+  t = '1+ Valid EM Allegation', 
+  f = 'No Valid Allegations'
+)
+```
+
+###### Age
+
+We calculated summary statistics for calculated age.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-age-summ
+# Get Summary Statistics for Age by Valid APS Inv (Exact, 'Best'), Subject-Level
+get_group_cont_summary(
+  .df = t_df,
+  .var_name = "age_avg",
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+) 
+```
+
+We used a histogram to broadly examine the distribution of values for age. Values demonstrated a significant left skew, and were not approximately normally distributed
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-age-hist-f0-32
+# Figure 0.32: Distribution of Age by Valid APS Inv (Exact, 'Best'), Subject-Level
+## Create Histogram
+plot <- ggplot2::ggplot(
+  t_df |>
+    dplyr::mutate(
+      aps_dispo = factor(
+        aps_dispo, levels = names(t_group_order),
+        labels = as.character(t_group_order), ordered = T
+      )
+    ), 
+  ggplot2::aes(
+    x = age_avg, fill = aps_dispo, y = ggplot2::after_stat(density),
+    alpha = 0.5
+  )) +
+  ggplot2::scale_alpha(guide = "none") +
+  ggplot2::geom_histogram(binwidth = 1, position = 'identity') +
+  ### Convert y-axis scale to a percent
+  ggplot2::scale_y_continuous(labels = scales::percent) +
+  ### Labels
+  ggplot2::labs(
+    title="Distribution of Age by Valid APS Inv. (Exact, 'Best'), Subject-Level",
+    subtitle = "Only records with a matched APS Investigation",
+    x= "Average Calculated Age at Encounter (Years)", 
+    y = "Frequency (%)",
+    fill = "APS Determinations"
+  ) +
+  ### Colors
+  ggplot2::scale_fill_brewer(palette="Spectral")
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    "f0-32-age-inv-exact-best-matches-subj-hist.png"
+  ),
+  plot = plot
+)
+
+## Display plot
+plot
+```
+
+We performed Student T-Test and Wilcox Rank-Sum testing to assess for a statistical association.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-age-stats
+# T-Test and Wilcox Rank-Sum for Age, by Valid APS Inv (Exact, 'Best')
+get_twos_num_stats(
+  .df = t_df |>
+    dplyr::mutate(
+      aps_dispo = dplyr::case_when(
+        aps_dispo == 't' ~ T,
+        aps_dispo == 'f' ~ F
+      )
+    ),
+  .var_name = "age_avg",
+  .binary_var = "aps_dispo"
+)
+```
+
+###### Sex
+
+We calculated summary statistics for sex.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-sex-summ
+# Get Summary Statistics for Sex, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      sex_cat = ifelse(is.na(sex_cat), 'missing', sex_cat)
+    ),
+  "sex_cat",
+  .val_order = sex_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-sex-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Unable to Assess', 'Missing (NA)')
+)
+```
+
+###### Race
+
+We calculated summary statistics for race.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-race-summ
+# Get Summary Statistics for Race, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      race_cat = ifelse(is.na(race_cat), 'missing', race_cat)
+    ),
+  "race_cat",
+  .val_order = race_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-race-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
+```
+
+###### Ethnicity
+
+We calculated summary statistics for ethnicity.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-ethn-summ
+# Get Summary Statistics for Ethnicity, Subject-Level
+## Calculate summary statistics
+obs <- get_group_cat_summary(
+  .df = t_df |>
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        is.na(hispanic) ~ 'missing',
+        hispanic ~ 'hispanic',
+        !hispanic ~ 'nonhispanic'
+      )
+    ),
+  "hispanic",
+  .val_order = hispanic_val_list,
+  .group_var = "aps_dispo",
+  .group_order = t_group_order
+)
+
+## Display Table - Text columns only
+obs |>
+  dplyr::select(
+    !dplyr::all_of(c(dplyr::ends_with("_n"), dplyr::ends_with("_perc")))
+  )
+```
+
+We performed Chi-Square and Fisher's Exact test to assess for an association.
+
+```{r}
+#| label: sec1-t32-demo-inv-exact-best-matches-subj-ethn-stats
+# Chi-Square and Fisher's Exact test
+get_chi_fisher(
+  .df = obs |> 
+    dplyr::select(value_name, t_n, f_n) |>
+    dplyr::filter(value_name != "TOTAL"),
+  .counts_a_var = 't_n',
+  .counts_b_var = 'f_n',
+  .value_var = 'value_name',
+  .omit_vals = c('Missing (NA)')
+)
 ```
 
 # 🧹 Clean up
