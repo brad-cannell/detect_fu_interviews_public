@@ -214,7 +214,11 @@ informative_df_import(
 
 We prepared our MedStar Data for analyses.
 
-## Removal of "Test" Entries
+## MedStar Data
+
+We prepared our MedStar Data for analyses.
+
+### Removal of "Test" Entries
 
 There were several entries that remained in our data set for "Et3" testing records or blank records. We removed these from our data set prior to analysis.
 
@@ -233,7 +237,7 @@ ms_resps <- ms_resps |>
   dplyr::select(-drop_flag)
 ```
 
-## Examination of Potentially Duplicated Responses
+### Examination of Potentially Duplicated Responses
 
 Our data was expected to have a unique combination of subject ID and EMS Response number for each row. However, we found that we had 24 rows, representing 12 unique keys, which appeared to be duplicates. These were not resolvable by broad deduplication, indicating that at least one value differed between records. Resolution of these differences thus required additional examination.
 
@@ -336,15 +340,15 @@ ms_resps <- ms_resps |>
 rm(dup_resps)
 ```
 
-## Patient Demographics
+### Patient Demographics
 
 We processed our demographic variables of age, date of birth, sex, race, and ethnicity.
 
-### Response-Level
+#### Response-Level
 
 We first prepared our data at the response level.
 
-#### Age and DOB
+##### Age and DOB
 
 There were several questionable age values within our data set, in which a calculated age was different from the age calculated from the incident date and date of birth. The vast majority of these entries differed only in a single year or reflected a likely typo, such as the substitution of a digit that would be adjacent on a number pad. There were also entries which reflected a DOB entry that was the date of the response. Assuming that no subject in the data set was a neonate born on the date of the response, we considered those DOB values invalid.
 
@@ -477,7 +481,7 @@ ms_resps <- ms_resps |>
   )
 ```
 
-#### Sex
+##### Sex
 
 Biological sex appeared to be input by MedStar medics as a "select one" option. Values for sex were stored in our data as numerical values, representing one of three categorical values: "Male", "Female", or "Unknown (Unable To Determine)". We converted these values into text-based categories for processing in R.
 
@@ -496,7 +500,7 @@ ms_resps <- ms_resps |>
   )
 ```
 
-#### Race and Ethnicity
+##### Race and Ethnicity
 
 We processed our values for race and ethnicity. As the MedStar ePCR platform appeared to allow for selection of race and ethnicity from a "select all that apply" list, any combination of these values was present within a single response. These values appeared to largely follow US Census options. Potential values were noted to be: "White", "Black or African American", "Asian", "American Indian or Alaska Native", "Native Hawaiian or Other Pacific Islander", "Middle Eastern or North African", "Hispanic or Latino", "Other Race", "Not Applicable", and "Not Recorded".
 
@@ -583,7 +587,7 @@ dplyr::mutate(
   )
 ```
 
-### Subject-Level
+#### Subject-Level
 
 To perform subject-level analyses, we consolidated all observations for a single subject to determine the single "consensus" value for demographic variables. First, we initiated a frame to store subject-level data.
 
@@ -615,7 +619,7 @@ ms_subjs <- ms_resps |>
   )
 ```
 
-#### Age
+##### Age
 
 There were 897 subjects (4,921 responses) with inconsistent DOB values, reduced to 881 subjects (4,803 responses) if omitting missing values, even after the minor resolutions created in the response-level processing. We consolidated these values by taking the single most common non-missing date of birth value for each subject. We expected subjects to have differing ages due to the multi-year and multi-encounter nature of our data set: 11,153 subjects (52,066 responses) had inconsistent calculated age values, reduced to 11,152 subjects (52,064 responses) after omitting missing age values. We resolved age at the subject level by taking the average value of the ages calculated from the subject-level common date of birth values.
 
@@ -671,7 +675,7 @@ ms_subjs <- ms_subjs |>
     )
 ```
 
-#### Sex
+##### Sex
 
 There were 396 subjects (2,490 responses) with inconsistent values for sex between responses in the data set. "Filling" missing values with values from other observations for the same subject resolved 27 subjects (190 responses), with an additional 48 subjects (345 responses) resolved by similarly filling "unable to assess" values. The remaining 321 subjects (1,955 responses) with a mix of "male" and "female" values were resolved through manual review of trends. Of these, we reviewed all IDs with a majority between 60-75% to one sex (52 "female" majority, 40 "male" majority), with a cursory review of IDs with a greater than 75% majority (77 "female" majority, 43 "male" majority). We additionally inspected the 109 remaining IDs that did not have a majority. Judgement were based on trends, heavy associations of certain names with sex/gender (such as "Daisy" being practically considered as a female-exclusive name), and select review of public records such as obituaries.
 
@@ -752,7 +756,7 @@ ms_subjs <- ms_subjs |>
   )
 ```
 
-#### Race and Ethnicity
+##### Race and Ethnicity
 
 There were a total of 766 subjects (across 4,382 responses) with inconsistencies in values for race and ethnicity: 292 subjects (1,782 responses) were inconsistent only in race values, 42 subjects (212 responses) were inconsistent only in ethnicity values, and 432 subjects (2,388 responses) had inconsistencies in both.
 
@@ -958,11 +962,11 @@ ms_subjs <- ms_subjs |>
 
 ```
 
-## DETECT Tool Variables
+### DETECT Tool Variables
 
 We additionally processed our DETECT Tool variables.
 
-### Response-Level
+#### Response-Level
 
 We first counted the number of missing (`NA`) values in DETECT screening items, and the number of items with a positive ("yes", 1) response. We used these counts to flag responses if they contained a DETECT screening (at least one item completed), and determine the screening result (positive for even one "yes" response, otherwise negative if screening was performed).
 
@@ -1036,7 +1040,325 @@ ms_resps <- ms_resps |>
   ))
 ```
 
-### Subject Level
+##### Comment-Box Patterns
+
+We additionally flagged values for "APS Report Number" that indicated patterns in how Medics utilized the field as a comment box.
+
+```{r}
+#| label: clean-dt-comment-box
+# Flag patterns of use of the "APS Report Number" field as a comment box"
+## Add flags using regular expressions
+ms_resps <- ms_resps |>
+    dplyr::mutate(
+      ### Flag if there is a likely Report Number
+      dt_comment_report_num = ifelse(
+        stringr::str_detect(dt_aps_report_num,'([0-9]{5,})') |
+          stringr::str_detect(
+            stringr::str_to_lower(dt_aps_report_num),
+            paste0(
+              '^([0-9]{3}[ -][0-9]{3}[ -][0-9]{2}|',
+               '[0-9]{3}[ -][0-9]{2}[ -][0-9]{2}|',
+              '[0-9]{2}[ -][0-9]{2}[ -][0-9]{2}[ -][0-9]{2})'
+              )
+            ) |
+          (
+            stringr::str_detect(
+              stringr::str_to_lower(dt_aps_report_num),
+              paste0(
+                '(confirmation num|report num|[0-9]+ online report|',
+                'report confirmation|e report|[0-9]+[a-z]+ \\(care)'
+                )
+              ) &
+              !stringr::str_detect(
+                stringr::str_to_lower(dt_aps_report_num),
+                paste0(
+                  '(unable to provide report num|report number already filed',
+                  'fwpd made)'
+                  )
+                )
+            ) |
+          (
+            stringr::str_detect(
+              stringr::str_remove_all(
+                stringr::str_to_lower(dt_aps_report_num),
+                '[`\\.]'
+                ),
+              '^[0-9a-z]+$'
+              ) &
+              !stringr::str_detect(
+                stringr::str_to_lower(dt_aps_report_num),
+                paste0(
+                  '^(deceased|dos|homeless|l|none|na|pending|tbd|',
+                  'transport|vicky)$'
+                  )
+                )
+            ) |
+          stringr::str_detect(
+            stringr::str_to_lower(dt_aps_report_num),
+            '(- caseworker ap)'
+          ),
+        T, 
+        F
+      ),
+      ### Flag if there's an APS staff member name or ID
+      dt_comment_aps_staffer = ifelse(
+        stringr::str_detect(dt_aps_report_num, '[0-9]+') &
+          (
+            stringr::str_detect(
+              stringr::str_remove_all(
+                stringr::str_to_lower(dt_aps_report_num), 
+                '([`# ,\\.-])'
+                ),
+              '(^[0-9a-z]+[^0-9a-z]+)'
+              ) &
+            !stringr::str_detect(
+              stringr::str_to_lower(dt_aps_report_num),
+              paste0(
+                '(e-report confirmation number|care giver was contacted|',
+                'on scene for prev|opened by daughter|ily members called 911|',
+                'fort worth pd|forth worth pd|vitas on scene|2:27:1|',
+                'lack of attention to his medical needs|friend relayed)'
+                )
+              ) &
+            !stringr::str_detect(
+              stringr::str_trim(
+                stringr::str_to_lower(dt_aps_report_num), 
+                side = 'both'
+                ),
+              "^(aps report number: [0-9]+)$"
+            )
+          ) | stringr::str_detect(
+            stringr::str_to_lower(dt_aps_report_num), 
+            '(call taker)'
+            ),
+        T,
+        F
+      ),
+      ### Flag if there's a mention that APS was on scene
+      dt_comment_aps_onscene = ifelse(
+        stringr::str_detect(dt_aps_report_num, '[^0-9#]') &
+          (
+            stringr::str_detect(
+              stringr::str_to_lower(dt_aps_report_num), 
+              '(on scene|on-scene| os|was there)'
+              ) & !stringr::str_detect(
+                stringr::str_to_lower(dt_aps_report_num),
+                '(np on scene states|pd on scene and|vitas on scene)'
+                )
+            ),
+        T,
+        F
+        ),
+      ### Flag if there's a mention that APS called EMS
+      dt_comment_aps_called_ems = ifelse(
+        stringr::str_detect(stringr::str_to_lower(dt_aps_report_num), 'aps') &
+          (
+            stringr::str_detect(
+              stringr::str_to_lower(dt_aps_report_num), 
+              paste0(
+                '(directed|called|contacted 911|contacted ems|',
+                'summoned ems|pt transport)'
+                )
+              ) & !(stringr::str_detect(
+                stringr::str_to_lower(dt_aps_report_num), 
+                paste0(
+                  '(family members called 911|made and called in talked to',
+                  '|was called and)'
+                  )
+                )
+                )
+            ),
+        T,
+        F
+      ),
+      ### Flag if there's a mention of someone else making a report
+      dt_comment_aps_other_reporter = ifelse(
+        !(
+          dt_comment_report_num|dt_comment_aps_staffer|dt_comment_aps_onscene|
+            dt_comment_aps_called_ems
+          ) &
+          stringr::str_detect(
+            stringr::str_to_lower(dt_aps_report_num),
+            paste0(
+              '(np on scene|fd reported to aps|fd to file|fwfd follow up|',
+              'haltom city fire and jps contacting|fwpd made report|',
+              'np on scene states|case opened by dau|rn at facility states|',
+              'processed per ccp|pd on scene and report|',
+              'stated she is currently working with aps|',
+              'to rn who will investigate|reported to mih|river oaks reported|',
+              'rn at baylor advises|hospital staff also states they will|',
+              'states that will be photographing the scene|',
+              'already placed by home health)'
+              )
+            ),
+        T,
+        F
+      ),
+      ### Flag if mention of previous report filed by MedStar
+      dt_comment_aps_prev_ems_report = ifelse(
+        !(
+          dt_comment_report_num|dt_comment_aps_staffer|dt_comment_aps_onscene|
+          dt_comment_aps_called_ems
+          ) &
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          paste0(
+            '(medstar has written|was reported|aps has been notified tw|',
+            'reported to aps earlier|made by another crew)'
+            )
+        ),
+        T,
+        F
+      ),
+      ### Flag if there's a mention of an already open APS case
+      dt_comment_aps_aware = ifelse(
+        (!(
+          dt_comment_report_num|dt_comment_aps_staffer|dt_comment_aps_onscene|
+            dt_comment_aps_called_ems|dt_comment_aps_prev_ems_report
+          ) & (
+            stringr::str_detect(
+              stringr::str_to_lower(dt_aps_report_num), 
+              paste0(
+                '(case in progress|case opened by dau|case worker spoken to|',
+                'aps home in first|aps is on the ca|filled and being process|',
+                'aps was called|open aps case|involved with aps representative',
+                "|there's an open case|multiple aps reports pending|",
+                'reported that aps had been out|active aps open|active case|',
+                'aps case already|already has a active|aps home in the fi|',
+                'aps is already taking ca|aps is already work|',
+                'aps already has a ca|reports already made and case|',
+                'case is in progress|active aps case|pt already has open case',
+                '|already on aps rad|already an aps case open|',
+                'open report already exist|previously opened case|',
+                '[0-9]+ on file)'
+                )
+              ) & !stringr::str_detect(
+                stringr::str_to_lower(dt_aps_report_num),
+                paste0(
+                  '(plan has been formulated|ly is in the active process of',
+                  '|actively seeking|actively working with home)'
+                  )
+                )
+            )
+        ) |
+        (
+          dt_comment_aps_onscene|dt_comment_aps_called_ems|
+            dt_comment_aps_other_reporter|dt_comment_aps_prev_ems_report
+          ),
+        T,
+        F
+      ),
+      ### Flag if mention that patient was deceased
+      dt_comment_pt_deceased = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num), 
+          '(dos|doa|deceased|obvious death|pt passed away)'
+          ),
+        T,
+        F
+      ),
+      ### Flag if medic indicated unsure if reporting
+      dt_comment_undecided = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          "^(tbd|to be determined|pending)$"
+        ),
+        T,
+        F
+      ),
+      ### Flag if medic indicated they were unable to report
+      dt_comment_aps_unable = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          paste0(
+            "(attempted multiple|answer|disconnected|wouldn't let me|blocked|",
+            'office was closed)'
+            )
+        ),
+        T,
+        F
+      ),
+      ### Flag if medic indicated comments in narrative
+      dt_comment_narrative = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          '(narrative|narative)'
+        ),
+        T,
+        F
+      ),
+      ### Flag if medic commented that they were not allowed in the patient
+      ### home, or gave exigent circumstances for lack of assessment
+      dt_comment_did_not_enter = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          paste0(
+            '(evicted|on fire|pt would not let ems or fwfd in the house|',
+            'homeless|in assisted living|did not view inside|',
+            "not the pt's home|not the pt apart|visiting her neighbor)"
+            )
+        ),
+        T,
+        F
+      ),
+      ### Flag if DETECT tool was limited or not done due to patient
+      ### condition (or being canceled by PD)
+      dt_comment_uta = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          paste0(
+            '(no known demographics|pt unresponsive|limited by critical pt|',
+            'canceled by fw)'
+            )
+        ),
+        T,
+        F
+      ),
+      ### Flag if medic stated responses were due to the current medical 
+      ### condition
+      dt_comment_condition = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          '(current medical|current compl|part of medstar program)'
+          ),
+          T,
+          F
+      ),
+      ### Flag if medic referenced a non-APS referral or outside assistance
+      ### they believed was handling the situation
+      dt_comment_other_ref = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          paste0(
+          '(refer to mih|actively working with home health|',
+          'existing caseworker|ongoing investigation by fw|',
+          'direction of social worker)'
+          )
+        ),
+        T,
+        F
+      ),
+      ### Flag if medic referenced they believed the situation was being
+      ### handled by family or other resources already in place
+      dt_comment_resolving = ifelse(
+        stringr::str_detect(
+          stringr::str_to_lower(dt_aps_report_num),
+          paste0(
+            '(medical needs|ongoing issues with delusional|',
+            'seems to understand what is going on|appointment with medi|',
+            'family has already secured|process of establishing a solution|',
+            'family members called|patient actively seeking|',
+            'known to ems hord|depressed|esolution in process|',
+            'vitas on scene)'
+          )
+        ),
+        T,
+        F
+      )
+    )
+```
+
+#### Subject Level
 
 We performed further consolidation at the subject level, taking an "ever true" approach. We calculated if a subject was ever screened, if screening was ever positive, and if there was ever any recorded reporting intent. We also calculated if each item was ever completed (and ever received a "yes", "no", or "uta" response) for each subject.
 
@@ -1257,6 +1579,89 @@ rm(temp_df)
 
 We added APS outcomes data. This included the presence of a matched APS Intake (and reporter type categorization) and presence of a matched APS Investigation (and its overall disposition).
 
+### 2025-03-25 Updates to Reporter Type Definitions
+
+We revised the reporter type classifications in our APS Intake Map data, based on PI feedback (2025-03-25 meeting).
+
+```{r}
+#| label: revise-aps-intake-map-reporter-type-classif
+# Revise APS Intake Map Classifications
+aps_intake_map <- aps_intake_map |>
+  ## Revise Definition of "Possible/Reasonable EMS Reporter Types"
+  dplyr::mutate(
+    reporter_possible = ifelse(
+      reporter_type %in% c(
+        "Health Care Providers/Staff", "Other Providers"
+        ),
+      T, 
+      F
+    )
+  ) |>
+  ## Create overall classification column
+  dplyr::mutate(
+    reporter_classif = "any",
+    reporter_classif = dplyr::case_when(
+      reporter_possible ~ "possible",
+      reporter_ems ~ "ems",
+      TRUE ~ reporter_classif
+    )
+  )
+
+# Save revised map file
+## Path
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "06_medstar-records_to_aps-intakes_revised.rds"
+    )
+## Save file
+saveRDS(aps_intake_map, path)
+```
+
+We also conveyed the reporter type classification updates from our APS Intake Map data to our APS Investigation Map data, based on PI feedback (2025-03-25 meeting).
+
+```{r}
+#| label: revise-aps-inv-map-reporter-type-classif
+# Convey Intake Updates to APS Investigation Map
+## Update Intake Classifications in Investigation Map
+aps_inv_map <- dplyr::rows_update(
+  aps_inv_map |>
+    ### Convert TRUE/FALSE flags for matched intakes to counts (0 as default)
+    dplyr::mutate(
+      intake_paired = 0,
+      intake_ems_poss = 0,
+      intake_ems_expl = 0
+    ),
+  aps_intake_map |>
+    ### Reduce to matching key columns and reporter type flag columns
+    dplyr::select(id, ems_num, case_id, reporter_possible, reporter_ems) |>
+    ### Rename variables to match with the APS Investigation Map
+    dplyr::rename_at(
+      c("reporter_possible", "reporter_ems"), 
+      ~c("intake_ems_poss", "intake_ems_expl")
+      ) |>
+    ### For each matched APS Case...
+    dplyr::group_by(id, ems_num, case_id) |>
+    #### Obtain count of paired Intakes, and count with each"reporter class"
+    dplyr::mutate(
+      intake_paired = max(dplyr::row_number()),
+      intake_ems_poss = sum(intake_ems_poss),
+      intake_ems_expl = sum(intake_ems_expl)
+      ) |>
+    ### Reduce to distinct rows
+    dplyr::distinct(),
+  by = c('id', 'ems_num', 'case_id')
+  )
+
+# Save revised map file
+## Path
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "07_medstar-records_to_aps-case-invs_revised.rds"
+    )
+## Save file
+saveRDS(aps_inv_map, path)
+```
+
 ### Record-Level
 
 We consolidated our APS Investigation match data to the record level, and added it to our MedStar Response Level data set.
@@ -1411,12 +1816,13 @@ intake_df <- aps_intake_map |>
   dplyr::select(-c(reporter_possible, reporter_ems, key)) |>
   ### Reduce to single row
   dplyr::distinct() |>
-  ### Interpret reporter type category from boolean/logical flag pattern
+  ### Interpret reporter type category from reporter type flag pattern
   dplyr::mutate(
     aps_intake_type = dplyr::case_when(
-      aps_intake_ems ~ "EMS (explicit)",
-      aps_intake_poss ~ "EMS reasonable",
-      !aps_intake_ems & !aps_intake_poss ~ "Not likely to be EMS"
+      aps_intake_ems > 0 ~ "ems",
+      aps_intake_poss > 0 ~ "possible",
+      aps_intake & aps_intake_ems == 0 & aps_intake_poss == 0 ~ "any",
+      TRUE ~ NA_character_
     )
   )
 
@@ -1522,9 +1928,10 @@ temp_df <- ms_resps |>
   dplyr::mutate(
   ### Interpret reporter type category from boolean/logical flag pattern
     aps_intake_type = dplyr::case_when(
-      aps_intake_ems ~ "EMS (explicit)",
-      aps_intake_poss ~ "EMS reasonable",
-      !aps_intake_ems & !aps_intake_poss ~ "Not likely to be EMS"
+      aps_intake_ems ~ "ems",
+      aps_intake_poss ~ "possible",
+      aps_intake & !aps_intake_ems & !aps_intake_poss ~ "any",
+      TRUE ~ NA_character_
     )
   ) |>
   ### Reduce to unique rows
