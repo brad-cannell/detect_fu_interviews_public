@@ -5,7 +5,7 @@ ls_lack_companionship_3cat_f,UCLA LS lack companionship
 ls_feel_left_out_3cat_f,UCLA LS feel left out 
 ls_feel_isolated_3cat_f,UCLA LS feel isolated
 ls_total,UCLA LS total score
-ls_total_7cat_f,UCLA LS total score (categorical)
+ls_total_9cat_f,UCLA LS total score (categorical)
 loneliness_det_2cat_f,UCLA LS determination
 peg_pain_11cat,PEG pain
 peg_enjoyment_11cat,PEG enjoyment
@@ -28,7 +28,7 @@ depres_worthless_2cat,GDS worthless
 depres_energy_2cat,GDS energy
 gds_total,GDS total score
 depres_det_2cat_f,GDS determination
-outcomes_month_social_7cat_f,MOS limited social 
+outcomes_month_social_5cat_f,MOS limited social 
 outcomes_month_nervous_5cat_f,MOS nervous
 outcomes_month_calm_5cat_f,MOS calm
 outcomes_month_blue_5cat_f,MOS blue
@@ -105,12 +105,13 @@ sode_race_eth_4cat_f,Race/ ethnicity
 hispanic,Hispanic
 black,Black
 white,White
-other_race,Other
+other_race,Other race
 sogi_orientation_4cat_f,Sexual orientation
 straight,Straight
 gay_man,Gay man
 lesbian,Lesbian
 bisexual,Bisexual
+other_or,Other sexual orientation
 sode_marital_6cat_f,Marital Status (categorical)
 married,Married
 common_law,Living as an unmarried or common law couple
@@ -137,7 +138,7 @@ retired,Retired
 student,A student
 homemaker,A homemaker
 disabled,Disabled or unable to work
-other,Something else
+other_emp,Something else (employment)
 sode_income_7cat_f,Household income
 inc_10,"$10,000 or less"
 inc_20,"Between $10,001 and $20,000"
@@ -154,3 +155,4 @@ age_65_74,Age 65 to 74
 age_75_84,Age 75 to 84
 age_85_94,Age 85 to 94
 age_95,Age 95 and older
+total_py_visits,Number of Past Year MedStar visits

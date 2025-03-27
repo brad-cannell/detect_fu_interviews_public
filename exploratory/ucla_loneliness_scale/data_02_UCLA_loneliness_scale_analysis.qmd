@@ -1,4 +1,7 @@
+
+
 # Load packages
+
 ```{r, warning=FALSE, echo=FALSE, output = FALSE}
 library(flextable)
 library(table1)
@@ -13,6 +16,7 @@ library(mice)
 library(expss, include.only = "apply_labels")
 library(ggplot2)
 ```
+
 
 # Load cleaned data and custom functions
 
@@ -48,6 +52,7 @@ Pooling p-values
 Pooled chi-square
 <https://nerler.github.io/EP16_Multiple_Imputation/slide/08_analysis_and_pooling.pdf>
 
+## Extract mice out put dataframe in long format
 
 ```{r}
 mice_out_df <- complete(mice_out,"long", include=TRUE) %>% 
@@ -55,6 +60,7 @@ mice_out_df <- complete(mice_out,"long", include=TRUE) %>%
     impute = ".imp",
     org_row_id = ".id"
   )
+names(mice_out_df)
 ```
 
 
@@ -64,7 +70,7 @@ mice_out_df <- complete(mice_out,"long", include=TRUE) %>%
 mice_out_df_dum <- mice_out_df %>%
   mutate(
     # 7 category loneliness variable
-    ls_total_7cat_f = factor(ls_total),
+    ls_total_9cat_f = factor(ls_total),
     # Binary loneliness variable
     loneliness_det_2cat_f = case_when(
       ls_total <= 5 ~ 0,
@@ -122,10 +128,10 @@ mice_out_df_dum <- mice_out_df %>%
     gay_man = ifelse(sogi_orientation_4cat_f == "Gay man", 1,0),
     lesbian = ifelse(sogi_orientation_4cat_f == "Lesbian/gay woman", 1,0),
     bisexual = ifelse(sogi_orientation_4cat_f == "Bisexual", 1,0),
-    other = ifelse(sogi_orientation_4cat_f == "Queer" | 
+    other_or = ifelse(sogi_orientation_4cat_f == "Queer" | 
                      sogi_orientation_4cat_f == "Other", 1,0),
     across(
-      .cols = c(straight, gay_man, lesbian, bisexual, other),
+      .cols = c(straight, gay_man, lesbian, bisexual, other_or),
       .fns = ~factor(.x,
         levels = c(0,1),
         labels = c("No", "Yes")
@@ -219,10 +225,10 @@ mice_out_df_dum <- mice_out_df %>%
    student = ifelse(sode_employed_9cat_f == "A student", 1,0),
    homemaker = ifelse(sode_employed_9cat_f == "A homemaker", 1,0),
    disabled = ifelse(sode_employed_9cat_f == "Disabled or unable to work", 1,0),
-   other = ifelse(sode_employed_9cat_f == "Something else", 1,0),
+   other_emp = ifelse(sode_employed_9cat_f == "Something else", 1,0),
    across(
       .cols = c(full_time, part_time, in_military, unemployed, retired, student,
-                homemaker, disabled, other),
+                homemaker, disabled, other_emp),
       .fns = ~factor(.x,
         levels = c(0,1),
         labels = c("No", "Yes")
@@ -252,7 +258,7 @@ mice_out_df_dum <- mice_out_df %>%
    ),
    sode_military_2cat_f = factor(
      sode_military_2cat,
-     levels = c(1,2),
+     levels = c(1,0),
      labels = c("Yes", "No")
    ),
    female = ifelse(sex_2cat_f == "Female", 1,0), 
@@ -289,23 +295,8 @@ mice_out_df_dum <- mice_out_df %>%
         levels = c(0,1),
         labels = c("No", "Yes")
    )
-  ) %>% select(-c(starts_with("outcomes_") & ends_with("cat"),
+  ) %>% select(-c(starts_with("outcomes_") & ends_with("cat")
                   ))
- 
-```
-
-
-# Add variable labels
-
-```{r}
-add_labs <- function(label_df, df){
-  labels_named_vec <- setNames(label_df[["label"]], label_df[["var"]]) %>% as.list() 
-  result <- apply_labels(df, labels_named_vec)
-}
-```
-
-```{r, warning=FALSE}
-mice_out_df_dum <- add_labs(all_labels, mice_out_df_dum)
 ```
 
 
@@ -315,7 +306,7 @@ mice_out_df_dum <- add_labs(all_labels, mice_out_df_dum)
 # Loneliness scale variables
 ls_vars <- c(# "ls_lack_companionship_3cat_f", "ls_feel_left_out_3cat_f", 
              # "ls_feel_isolated_3cat_f", 
-             "ls_total", "ls_total_7cat_f", "loneliness_det_2cat_f")
+             "ls_total", "ls_total_9cat_f", "loneliness_det_2cat_f")
 
 # 3 Item Pain Assessment Scale
 peg_vars <- c("peg_total")
@@ -332,11 +323,11 @@ mos_vars <- c("outcomes_month_social_5cat_f", "outcomes_month_nervous_5cat_f",
 
 ## Race/ Ethnicity
 race_vars <- c(# "sode_race_eth_6cat", "sode_race_eth_4cat_f", 
-  "hispanic", "black", "white", "other")
+  "hispanic", "black", "white", "other_race")
 
 ## Sexual orientation
 so_vars <- c(# "sogi_orientation_8cat", "sogi_orientation_4cat_f", 
-  "straight", "gay_man", "lesbian", "bisexual", "other")
+  "straight", "gay_man", "lesbian", "bisexual", "other_or")
 
 ## Marital status
 mar_vars <- c(# "sode_marital_8cat", "sode_marital_6cat_f", 
@@ -354,7 +345,7 @@ edu_vars <- c(# "sode_school_9cat", "sode_school_7cat_f",
 ## Employment status
 job_vars <- c(# "sode_employed_11cat", "sode_employed_9cat_f", 
   "full_time", "part_time", "in_military", "unemployed", "retired", "student", 
-  "homemaker", "disabled")
+  "homemaker", "disabled", "other_emp")
 
 ## Income
 income_vars <- c(# "sode_income_9cat", "sode_income_7cat_f", 
@@ -387,7 +378,15 @@ all_pred_vars <- c(soc_vars, sr_vars, peg_vars, gds_vars, mos_vars)
 ```
 
 
-# Descriptive Statistics Tables
+# Original data
+
+```{r}
+original <- mice_out_df_dum %>% filter(impute == 0)
+```
+
+## Functions
+
+### P-value
 
 ```{r}
 pvalue <- function(x, ...) {
@@ -423,6 +422,9 @@ pvalue <- function(x, ...) {
 }
 ```
 
+
+### Statistical test
+
 ```{r}
 test <- function(x, ...) {
     # Construct vectors of data y, and groups (strata) g
@@ -454,9 +456,16 @@ test <- function(x, ...) {
 }
 ```
 
+### Add variable labels
 
-Error due to variables with no values (0) <https://github.com/parklab/ShatterSeek/issues/9>
-Try to create output instead of error message <https://stackoverflow.com/questions/12193779/how-to-use-the-trycatch-function>
+```{r}
+add_labs <- function(label_df, df){
+  labels_named_vec <- setNames(label_df[["label"]], label_df[["var"]]) %>% as.list() 
+  result <- apply_labels(df, labels_named_vec)
+}
+```
+
+### Create a formula
 
 ```{r}
 create_formula <- function(predictors, target){
@@ -475,24 +484,7 @@ create_formula <- function(predictors, target){
 }
 ```
 
-## Imputed sets
-
-```{r}
-original <- mice_out_df_dum %>% filter(impute == 0)
-impute_1 <- mice_out_df_dum %>% filter(impute == 1)
-impute_2 <- mice_out_df_dum %>% filter(impute == 2)
-impute_3 <- mice_out_df_dum %>% filter(impute == 3)
-impute_4 <- mice_out_df_dum %>% filter(impute == 4)
-impute_5 <- mice_out_df_dum %>% filter(impute == 5)
-```
-
-```{r}
-imp_list <- mice_out_df_dum %>% filter(impute != 0) %>%
- group_split(impute, .keep = FALSE)
-```
-
-
-# Flextable formula
+### Create and format flextable
 
 ```{r}
 desc_flex <- function(df){
@@ -508,10 +500,14 @@ desc_flex <- function(df){
 }
 ```
 
-## Loneliness Data
+```{r}
+original <- add_labs(all_labels, original)
+```
+
+## Loneliness Data (target)
 
 ```{r}
-ls_tab <- table1(~ls_total + ls_total_7cat_f,
+ls_tab <- table1(~ls_total + ls_total_9cat_f,
        data = original
     ) %>% 
   t1flex(tablefn = c("qflextable", "flextable", "regulartable")) %>% 
@@ -520,6 +516,16 @@ ls_tab <- table1(~ls_total + ls_total_7cat_f,
   width(j = 1, width = 2) %>%
   fontsize(size = 9, part = "footer") %>%
   italic(part = "footer")
+
+ls_tab
+```
+
+## Predictors
+
+```{r}
+original_tab <- desc_flex(original)
+
+original_tab
 ```
 
 ```{r}
@@ -536,41 +542,417 @@ ls_plot <- ggplot(original, aes(ls_total)) +
 ls_plot
 ```
 
-## Original data
+# Imputed data
+
+## List of imputed datasets
 
 ```{r}
-original_tab <- desc_flex(original)
+imp_list <- mice_out_df_dum %>% filter(impute != 0) %>%
+ group_split(impute, .keep = FALSE)
 ```
 
-## Imputation 1
+## Functions
 
 ```{r}
-imp1_tab <- desc_flex(impute_1)
-imp1_tab
+df_test <- imp_list[[1]]
 ```
 
-## Imputation 2
+### Pooling resultd for categorical variables
+Chisquare and Fisher's test
+<https://stefvanbuuren.name/fimd/sec-multiparameter.html#sec:chi> Citation for converting p-values to z-scores and then back
 
 ```{r}
-imp2_tab <- desc_flex(impute_2)
+pooled_imp_desc_table_cat <- function(imp_list, x, group_var){
+  lonely_perc <- NULL
+  not_lonely_perc <- NULL
+  
+  # Fishers test only
+  fish_z_scores <- NULL
+  
+  # Chi-square test only
+  chi_sqs <- NULL
+  d_frs <- NULL
+  
+  for(imp in imp_list){
+    stat_test <- tryCatch(
+        {
+          chisq.test(table(imp[[x]], imp[[group_var]]), correct = FALSE)
+        },
+        error=function(e) {
+          message('An Error Occurred')
+          print(e)
+          return(NA)
+          },
+        # If warning is produced with Chi-squared test, use fisher's test
+        warning=function(w) {
+          if(w$message == "Chi-squared approximation may be incorrect"){
+            fisher.test(table(imp[[x]], imp[[group_var]]))
+          }
+          }
+        )
+    
+    if(grepl("Fisher", stat_test$method) == TRUE){
+      test_name <- "Fisher's test"
+      z_pval <- round(stat_test$p.value, 10)
+      # For cases where p = 1, adjust to number slightly less than 1 
+      # to avoid -Inf in z-scores
+      if(z_pval == 1){
+        fish_z_score <- qnorm(1 - (z_pval - 1e-16))
+      } else if(z_pval != 1){
+        fish_z_score <- qnorm(1 - z_pval)
+      }    
+      fish_z_scores <- cbind(fish_z_scores, fish_z_score)
+      
+    }else if(grepl("Pearson's Chi-squared", stat_test$method) == TRUE){ 
+      test_name <- "Chi-square test"
+      chi_sq <- as.numeric(stat_test$statistic)
+      chi_sqs <- cbind(chi_sqs, chi_sq)
+      # Get degrees of freedom to calculate variance for chi-square test
+      tbl <- table(imp[[x]], imp[[group_var]])
+      d_fr <- (nrow(tbl) - 1) * (ncol(tbl) - 1)
+      d_frs <- cbind(d_frs, d_fr)
+    }
+  }
+  # Calculate the pooled p-values
+  
+  if(test_name == "Fisher's test"){
+    # Calculate pooled p-value from the z-scores using Rubin's rules
+    m <- length(fish_z_scores)
+    mean_z <- mean(fish_z_scores)
+    between_var <- apply(fish_z_scores, 1, var)
+    within_var <- 1  # Variance of Z under null hypothesis
+    total_var <- within_var + between_var + (between_var/m)
+    if(between_var == 0){
+      p_value <- stat_test$p.value
+      }
+    else{
+      # Combine Z-scores
+      z_combined <- mean_z / sqrt(total_var)
+      # Calculate combined p-value
+      p_value <- 2 * (1 - pnorm(abs(z_combined)))
+      }
+    } 
+  else if(test_name == "Chi-square test"){
+    # Calculate pooled p-value from the chi_square output using Rubin's rules
+    m <- length(imp_list) # Number of imputations
+    mean_chi_sq <- mean(chi_sqs)
+    between_var <- apply(chi_sqs, 1, var)
+    within_var <- mean(chi_sqs / d_frs)
+    total_var <- within_var + between_var + (between_var/m)
+    
+    lambda <- (between_var + (between_var/m))/total_var
+    n <- max(sapply(imp_list, nrow))  # Sample size of imputed set
+    k <- 1 # number of parameters
+    df_old <- (m - 1)/ (lambda)^2
+    
+    df_observed <- (((n - k) + 1)/ ((n - k) + 3)) * (n - k)*(1 - lambda)
+    df_adjusted <- (df_old * df_observed)/ (df_old + df_observed)
+    
+    if(between_var == 0){
+      p_value <- 1 - pchisq(mean_chi_sq, mean(d_frs))
+    } 
+    else{
+      # Calculate p-value from the pooled chi-square statistic
+      p_value <- 1 - pchisq(mean_chi_sq, df_adjusted)          
+    }
+  }
+  
+  # Create summary data frame
+  sum_df <- imp_list[[1]] %>%
+    reframe(
+      var = x,
+      .data[[x]],
+      est_name = "proportion",
+      stat_name = test_name,
+      pvalue = p_value
+    ) %>% distinct() %>%
+    rename(group = x)
+    
+    for(imp in imp_list){
+      # Get data summary
+      est_perc <- imp %>%
+        reframe(
+          var = x,
+          est_name = "proportion",
+          est = n(), .by = c(group_var, x),
+        ) %>% distinct() %>%
+        rename(group = x) %>% tidyr::pivot_wider(names_from = group_var,
+                                                          values_from =  est, 
+                                                 values_fill = 0
+                                                 ) %>%
+        rename_with(
+          .cols = !(c(group, est_name, var)),
+          .fn = ~ gsub(" ", "_", tolower(.x))
+        ) %>%
+        mutate(
+          across(
+            .cols = !(c(group, est_name, var)),
+            .fns = ~ (.x/sum(.x))*100,
+            .names = "est_{col}"
+          )
+        )
+      
+      lonely_perc <- cbind(lonely_perc, est_perc[["est_lonely"]])
+      not_lonely_perc <- cbind(not_lonely_perc, est_perc[["est_not_lonely"]])
+    }
+  
+  # Pooled proportions and standard errors
+  # Pooled estimates
+  lonely_perc_pool <- apply(lonely_perc, 1, mean)
+  not_lonely_perc_pool <- apply(not_lonely_perc, 1, mean)
+  
+  n <- max(sapply(imp_list, nrow)) # sample size
+  
+  # Add pooled proportions and standard errors to dataframe
+  sum_df <- cbind(sum_df, lonely_perc_pool, not_lonely_perc_pool, between_var) %>% 
+    as.data.frame() %>% 
+    # Order by category level
+    arrange(group)
+
+  sum_df
+}
 ```
 
-## Imputation 3
-
-```{r, warning=FALSE}
-imp3_tab <- desc_flex(impute_3)
-```
-
-## Imputation 4
+### Pooling t-test results for numeric variables
 
 ```{r}
-imp4_tab <- desc_flex(impute_4)
+pooled_imp_desc_table_num <- function(imp_list, x, group_var){
+  s_errors <- NULL
+  sd_lonely <- NULL
+  sd_not_lonely <- NULL
+  est_lonely <- NULL
+  est_not_lonely <- NULL
+  est <- NULL
+  min_lonely <- NULL
+  min_not_lonely <- NULL
+  max_lonely <- NULL
+  max_not_lonely <- NULL
+  
+  for(imp in imp_list){
+    stat_test <- t.test(eval(parse(text = x)) ~ 
+                          eval(parse(text = group_var)), data = imp)
+    # Extract standard errors
+    se <- stat_test$stderr 
+    s_errors <- cbind(s_errors, se)
+    
+    # Extract mean differences
+    mean_diff <- abs(diff(as.numeric(stat_test$estimate)))
+    est <- cbind(est, mean_diff)
+    
+    # Compute the means, min, max and medians
+    sum_df <- imp %>%
+      reframe(
+        var = x,
+        est_name = "mean",
+        stat_name = "T-test",
+        max = max(.data[[x]]),
+        min = min(.data[[x]]),
+        sdev = sd(.data[[x]]),
+        est = mean(.data[[x]]), .by = group_var
+      ) %>% tidyr::pivot_wider(
+        names_from = group_var, values_from = c(min, max, sdev, est), 
+        values_fill = 0) %>%
+      rename_with(
+        .cols = !(c(est_name)),
+        .fn = ~ gsub(" ", "_", tolower(.x))
+      )
+    est_lonely <- cbind(est_lonely, sum_df[["est_lonely"]])
+    est_not_lonely <- cbind(est_not_lonely, sum_df[["est_not_lonely"]])
+    sd_lonely <- cbind(sd_lonely, sum_df[["sdev_lonely"]])
+    sd_not_lonely <- cbind(sd_not_lonely, sum_df[["sdev_not_lonely"]])
+    min_lonely <- cbind(min_lonely, sum_df[["min_lonely"]])
+    min_not_lonely <- cbind(min_not_lonely, sum_df[["min_not_lonely"]])
+    max_lonely <- cbind(max_lonely, sum_df[["max_lonely"]])
+    max_not_lonely <- cbind(max_not_lonely, sum_df[["max_not_lonely"]])
+    
+    sum_df <- sum_df %>% select(-c(est_lonely, est_not_lonely, sdev_lonely,
+                                   sdev_not_lonely, min_lonely, min_not_lonely,
+                                   max_lonely, max_not_lonely))
+  }
+    
+  # Pooled estimates (means, max, min, medians and standard deviations)
+  max_max_lonely <- apply(max_lonely, 1, max)
+  max_max_not_lonely <- apply(max_not_lonely, 1, max)
+  min_min_lonely <- apply(min_lonely, 1, min)
+  min_min_not_lonely <- apply(min_not_lonely, 1, min)
+  est_lonely_pool <- apply(est_lonely, 1, mean)
+  est_not_lonely_pool <- apply(est_not_lonely, 1, mean)
+  sd_lonely_pool <- apply(sd_lonely, 1, mean)
+  sd_not_lonely_pool <- apply(sd_not_lonely, 1, mean)
+  est_pool <- apply(est, 1, mean)
+
+  # Pooled SE
+  m <- length(imp_list) # number of imputations
+  between_var <- apply(est, 1, var)
+  within_var <- mean(s_errors^2) #apply(s_errors^2, 1, mean)
+  var_total_pool <- within_var + between_var + (between_var/m)
+  se_pool <- sqrt(var_total_pool)
+  # pooled t_values
+  t_pool <- est_pool/se_pool
+  n <- max(sapply(imp_list, nrow)) # sample size
+
+  # Pooled p-values
+  if(between_var == 0){
+    pvalue <- 2 * pt(-abs(t_pool), df = n - 2)  # Standard t-test degrees of freedom 
+  }
+  else{
+    # Lambda is equal to the fraction of missing information
+    lambda <- (between_var + (between_var/m))/var_total_pool
+    k <- 1 # number of parameters
+    df_old <- (m - 1)/ (lambda)^2
+  
+    df_observed <- (((n - k) + 1)/ ((n - k) + 3)) * (n - k)*
+      (1 - lambda)
+    df_adjusted <- (df_old * df_observed)/
+      (df_old + df_observed)
+    
+    pvalue <- 2 * pt(-abs(t_pool), df_adjusted) 
+  }
+
+  sum_df <- cbind(sum_df, min_min_lonely, min_min_not_lonely, max_max_lonely, 
+                  max_max_not_lonely, est_lonely_pool, est_not_lonely_pool, 
+                  sd_lonely_pool, sd_not_lonely_pool, between_var, pvalue) %>% 
+    as.data.frame()
+
+  sum_df
+  
+}
 ```
 
-## Imputation 5
+## Combining all pooled results into single table
 
 ```{r}
-imp5_tab <- desc_flex(impute_5)
+all_vars <- list()
+for(p in all_pred_vars){
+  if(is.numeric(imp_list[[1]][[p]]) == TRUE){
+    p_sum <- pooled_imp_desc_table_num(imp_list, p, "loneliness_det_2cat_f") %>%
+      mutate(
+        ct_lonely = paste0(format(round(est_lonely_pool, 1), nsmall = 1),
+                        " (", format(round(sd_lonely_pool, 1), nsmall = 1), ")"),
+        ct_notlonely = paste0(format(round(est_not_lonely_pool, 1), nsmall = 1),
+                        " (", format(round(sd_not_lonely_pool, 1), nsmall = 1), ")"),
+        range_lonely = paste0("[", min_min_lonely, ", ", max_max_lonely, "]"),
+        range_notlonely = paste0("[", min_min_not_lonely, ", ", 
+                                    max_max_not_lonely, "]")
+      ) %>%
+      pivot_longer(c(ct_lonely, range_lonely, ct_notlonely, range_notlonely), 
+                   names_to = c("group_sum_stat",
+                   ".value"), names_sep="_") %>% 
+      mutate(
+        group_sum_stat = case_when(
+          group_sum_stat == "ct" ~ "Mean (SD)",
+          group_sum_stat == "range" ~ "[Min, Max]"
+        )
+      ) %>%
+      rename(not_lonely = notlonely) %>%
+      select(var, est_name, group_sum_stat, not_lonely, lonely, stat_name, pvalue, 
+             between_var)
+  }
+  else if(is.factor(imp_list[[1]][[p]]) == TRUE){
+    p_sum <- pooled_imp_desc_table_cat(imp_list, p, "loneliness_det_2cat_f") %>%
+      mutate(
+        lonely = paste0(format(round(lonely_perc_pool, 1), nsmall = 1), "%"),
+        not_lonely = paste0(format(round(not_lonely_perc_pool, 1), nsmall = 1), 
+                            "%")) %>% rename(
+        group_sum_stat = group
+        ) %>%
+      select(var, est_name, group_sum_stat, not_lonely, lonely, stat_name, pvalue, 
+             between_var)   
+  }
+  all_vars <- append(all_vars, list(p_sum))
+}
+
+all_vars <- dplyr::bind_rows(all_vars)
+```
+
+## Format columns to prepare for flextable
+
+```{r}
+sum_table <- all_vars %>%
+  mutate(
+    pvalue = case_when(
+      pvalue > 0.2 ~ format(round(pvalue, 2), nsmall = 2),
+      pvalue <= 0.2 & pvalue > 0.05 ~ format(round(pvalue, 3), nsmall = 3),
+      (pvalue <= 0.05 & pvalue > 0.01) ~
+        paste(format(round(pvalue, 3), nsmall = 3), "*"),
+      (pvalue <= 0.01 & pvalue > 0.001) ~
+        paste(format(round(pvalue, 3), nsmall = 3), "**"),
+      pvalue <= 0.001 ~ paste("< 0.01 ***"),
+      (pvalue <= 0.05 & pvalue > 0.01) ~
+        paste(format(round(pvalue, 3), nsmall = 3)),
+      (pvalue <= 0.01 & pvalue > 0.001) ~
+        paste(format(round(pvalue, 3), nsmall = 3)),
+      pvalue <= 0.001 ~ paste("< 0.01")
+      ),
+    between_var = case_when(
+      between_var == 0 ~ "Little to no variation",
+      between_var < 0.01 & between_var != 0 ~ "< 0.01",
+      TRUE ~ format(round(between_var, 2), nsmall = 2)
+    )
+  ) %>% left_join(all_labels, by = "var") %>% relocate(label) %>% 
+  select(-c(var, est_name)) %>% 
+  # Group by label to keep each label on a separate line in flextable
+  group_by(label) %>%
+  mutate(
+    label = str_wrap(label, width = 20),
+    label_no = cur_group_id()
+  ) %>% 
+  as_grouped_data(groups = "label")
+
+prep_table <- bind_cols(sum_table, row_no = c(1:nrow(sum_table)))
+```
+
+## Creating flextable
+
+```{r}
+# Create a list of row numbers to guide merging
+
+label_row_df <- prep_table %>% select(row_no, label_no)
+
+groups <- label_row_df %>% select(label_no) %>% filter(!is.na(label_no)) %>% 
+  distinct() %>% unlist %>% as.numeric()
+
+start_stop <- list()
+
+for(g in groups){
+  start <- min(label_row_df$row_no[label_row_df$label_no == g], na.rm = TRUE) 
+  stop <- max(label_row_df$row_no[label_row_df$label_no == g], na.rm = TRUE)
+  ss <- list(start, stop)
+  start_stop <- append(start_stop, list(ss))
+}
+
+```
+
+```{r}
+ft <- prep_table %>% 
+  as_flextable() %>%
+  flextable::compose(
+    i = ~ !is.na(label), # when var_group not NA
+    j = "group_sum_stat", # on column "var"
+    # create a paragraph containing a chunk containing value of `label`
+    value = as_paragraph(as_chunk(label))
+    ) %>% 
+  width(width = 1) %>%
+  set_header_labels(group_sum_stat = "",
+                    lonely = "Lonely\n (pooled estimates)",
+                    not_lonely = "Not lonely \n(pooled estimates)",
+                    stat_name = "Test",
+                    pvalue = "P-value\n (pooled estimate)",
+                    between_var = "Variance between \ntest estimates") %>%
+  bold(i = ~ !is.na(label)) %>%
+  align(i = ~ !is.na(label), align = "left") %>%
+  font(fontname = "Arial", part = "all") %>%
+  fontsize(size = 10, part = "all") %>%
+  width(j = 1, width = 2) %>%
+  delete_columns(j = 7)
+
+for(j in 4:6){
+  for(s in start_stop){
+    ft <-  merge_at(ft, i = s[[1]]:s[[2]], j = j)
+  }  
+}
+
+ft
 ```
 
 
@@ -586,7 +968,7 @@ ucla_desc_tables_doc <- ucla_desc_tables_doc %>%
   body_add_par(value = "") %>%
   body_add_gg(ls_plot, height = 3.41, width = 4.09) %>%
   body_add_par(value = "") %>%
-  body_add_par("Individuals with loneliness scale total scores of 5 or less were categorized as not lonely while those with scores of 6 or greater were categorized as lonely. Five versions of the data were produced using the R MICE package with different imputed values.", 
+  body_add_par("Individuals with loneliness scale total scores of 5 or less were categorized as not lonely while those with scores of 6 or greater were categorized as lonely. Five imputations of the data were produced using the R MICE package with different imputed values. These values were pooled using Rubin's rules.", 
                style = "Normal") %>%
   
   # Original data
@@ -594,30 +976,11 @@ ucla_desc_tables_doc <- ucla_desc_tables_doc %>%
   body_add_flextable(original_tab, align = "left") %>%
   body_add_par(value = "") %>%
   
-  # Imputation 1
-  body_add_par("Imputation 1 Data", style = "heading 1") %>%
-  body_add_flextable(imp1_tab, align = "left") %>%
-  body_add_par(value = "") %>%  
+  # Imputated data
+  body_add_par("Imputed Data", style = "heading 1") %>%
+  body_add_flextable(ft, align = "left") %>%
+  body_add_par(value = "") 
 
-  # Imputation 2
-  body_add_par("Imputation 2 Data", style = "heading 1") %>%
-  body_add_flextable(imp2_tab, align = "left") %>%
-  body_add_par(value = "") %>%  
-  
-  # Imputation 3
-  body_add_par("Imputation 3 Data", style = "heading 1") %>%
-  body_add_flextable(imp3_tab, align = "left") %>%
-  body_add_par(value = "") %>%  
-  
-  # Imputation 4
-  body_add_par("Imputation 4 Data", style = "heading 1") %>%
-  body_add_flextable(imp4_tab, align = "left") %>%
-  body_add_par(value = "") %>%  
-
-  # Imputation 5
-  body_add_par("Imputation 5 Data", style = "heading 1") %>%
-  body_add_flextable(imp5_tab, align = "left") %>%
-  body_add_par(value = "")
 
 # print the word document
 print(ucla_desc_tables_doc, 
