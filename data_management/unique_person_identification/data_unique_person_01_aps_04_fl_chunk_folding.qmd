@@ -1,0 +1,3916 @@
+---
+title: "Within-Set APS Chunk Cleaning"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## APS Data Background
+
+The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`. 
+
+This APS data file was cleaned/prepped for processing prior to fuzzy-matching in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_within_set_aps.qmd). Due to the significantly large size of the data (568,616 rows and 23 columns) the data had to be divided into 7 chunks for within-set fuzzy matching secondary to hardware limitations. This was performed in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_02_fl_chunk_generation.qmd). Initial within-set matching was performed in [a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_unique_person_01_aps_03_fl_chunk_cleaning.qmd). 
+
+## This File
+
+This file performs fastLink pairing and "folding" of individual chunks prepped and cleaned in the previous file, returning the chunks into a single cohesive within-set matched whole.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ). 
+
+It is recommended that anyone orienting to the task start at the primary task notes document, which provides a high-level overview of the task data, parameters, and process: [notes_01_task_01_00_merging aps and medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_01_task_01_00_merging aps and medstar task.docx?d=w542529e69bd2411da7a2d7efe56269a5&csf=1&web=1&e=8ZF6Rg).
+
+Notes for the APS data are located in the [notes_00_data_aps.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_00_data_aps.docx?d=w854dec51d8b049bdab8b0018f3d4bfff&csf=1&web=1&e=DKCWsI) file. Notes relating to this specific step of processing are in the [notes_01_task_01_02_aps fuzzy matching task notes.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_01_task_01_02_aps fuzzy matching task notes.docx?d=w81b2211a8d204ae5bc0021ac95c11c4e&csf=1&web=1&e=hgbwPk) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# Summary
+
+-   Reduced 378,418 `client_id` values to  370,958 `aps_id` values, a 1.971% reduction
+
+-   Output file of `client_id` to `aps_id` value translations saved as "00_map-aps_id-to-client_id.rds"
+
+
+## Assumptions and Considerations
+
+-   Typographical errors may occur in any field, but are less likely to occur consistently
+
+-   Common First and Last Names are more likely to result in accidental mismatches
+
+    -   Hispanic naming conventions, which may include multiple family names and many relatively common names, may increase the probability these names are either mismatched or fail to match
+
+-   Names
+
+    -   First names may include nicknames or a middle name that the subject "goes by" in some observations, but their legal first name in others
+
+        -   As twins are unlikely, individuals that identical other than First Name are likely to refer to the same person
+
+    -   Individuals with hyphenated Last Names may go by either or both names
+
+        -   More likely in Female patients, due to name change conventions around marriage in the U.S.A.
+
+            -   The ability to keep a maiden name, hyphenate, or take a new last name [was not codified in the U.S.A until the 1980s](https://scholarship.law.wm.edu/wmjowl/vol17/iss1/6/), and as such is comparatively more common in younger women
+
+            -   [Informal polls have found that today, approximately 10% of women chose to hyphenate and 20% keep their maiden name in full.](https://time.com/3939688/maiden-names-married-women-report/) These rates are likely lower in older populations.
+
+        -   Men are both less likely to change their name at all based on name change conventions in the U.S.A, but also [face greater legal barriers in some states to obtaining name change on marriage](https://heinonline.org/HOL/LandingPage?handle=hein.journals/tclj24&div=10&id=&page=)
+
+    -   Two individuals with the First and Last Name at the same Address, but with birth dates greater than 12 years apart may potentially be parent and child using a Junior/Senior naming conventionpe
+
+        -   More likely in Male patients, due to naming conventions in the US
+
+        -   Birth Date considerations relating to the possibility of JR/SR relationships or other familial pairing apply
+
+-   Birth Dates
+
+    -   Slight differences in any one Birth Date value is likely to be a data entry error if all other fields are either identical or significantly similar
+
+    -   Month and Date values are most likely to be transposed in data entry errors
+
+-   Address
+
+    -   Address values may have been entered as a temporary location or the location where the reporter encountered the subject, rather than the subject's residential or mailing address
+
+    -   There are multiple multi-residence facilities, such as apartment complexes and healthcare facilities represented in the data - these addresses should be weighed less heavily as identifiers for differentiation
+
+    -   Individuals may move or be at a temporary location in an encounter
+
+        -   Healthcare facilities, homeless shelters, and businesses should be considered indicators that the patient's address should be weighed less heavily as an identifier
+
+        -   Multiple observations that appear to "alternate" between addresses are less likely to refer to the same individual
+
+        -   Reported addresses may not be accurate, if the reporter was either misinformed, misremembered, or guessed at the subject's residential location - if addresses are within 0.5 miles of each other, or otherwise appear sufficiently close on a map that a GPS error may have occurred, consideration should be given that it was an error rather than a truly different value
+
+-   Judgement should err on the side of separating observations if doubt exists that they refer to the same person
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r, warning = FALSE}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(fastLink)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   fastLink version 0.6.1
+-   janitor version 2.2.0
+
+## Functions
+
+```{r}
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+# Function that creates a modified version of table output, allowing
+# simplified manual review of unique values in a given column or set of
+# columns
+source(here::here("r", "get_unique_value_summary.R"))
+
+# Function that facilitates using fastlink to match a single data set
+# without limiting the returned data
+source(here::here("r", "single_df_fastlink.R"))
+       
+# Function that generates stacked pairs of the original data based on
+# fastLink's probabilistic matching
+source(here::here("r", "get_pair_data.R"))
+
+# Function that adds a potential Unique Subject ID to pairs
+source(here::here("r", "stack_ids.R"))
+```
+
+# 📥 Load Data
+
+## APS Identifier Data for Chunking
+
+APS client data was originally in XLSX format. It had been cleaned and exported to an RDS file with 568,616 rows and 23 columns. The data was further modified by reducing to 378,604 unique combinations and the addition of flags in the fastLink process.
+
+```{r}
+aps_path <- here::here(
+  "data","cleaned_rds_files", "record_linkage", "aps", 
+  "aps_01_prepped_for_fl.rds"
+  )
+
+informative_df_import(
+    "aps", aps_path, overwrite = T
+  )
+
+ # 2025-01-13: APS data imported with 378,604 rows and 26 columns.
+ # Data last modified on OneDrive: 2024-11-13 11:46:12 
+```
+
+## APS Chunk fastLink Outputs
+
+Due to the size of the APS data, fastLink within-set fuzzy matching required "chunking" the data into 7 subsets. Chunks 1 and 2 contained rows with data in all identifiers, which were randomly assigned to one of the two chunks. Chunk 3 contained rows missing values in name fields, Chunk 4 contained rows missing values in address fields, Chunk 5 contained rows missing values in date of birth fields, Chunk 6 contained rows missing data in more than one field type, and Chunk 7 contained observations without any identifier data. Within within-subset cleaning and matching performed in the prior Quarto file. The result of this within-set matching was loaded for processing.
+
+```{r, warning = F}
+purrr::walk(
+  .x = c(1:6),
+  .f = function(x) {
+    informative_df_import(
+      paste0("aps_chunk_", x), 
+      paste0(
+        here::here("data","cleaned_rds_files", "record_linkage", "aps"), 
+        "/aps_02_ids_chunk_",
+        x, 
+        ".rds"
+        ), overwrite = T
+      ) 
+  }
+)
+
+aps_chunk_7 <- aps |>
+  dplyr::filter(chunks == 7)
+
+ # 2025-01-13: APS CHUNK 1 data imported with 167,916 rows and 27 columns.
+ # Data last modified on OneDrive: 2024-12-31 15:54:11 
+ # 
+ # 2025-01-13: APS CHUNK 2 data imported with 167,827 rows and 27 columns.
+ # Data last modified on OneDrive: 2025-01-08 13:58:26 
+ # 
+ # 2025-01-13: APS CHUNK 3 data imported with 1,377 rows and 28 columns.
+ # Data last modified on OneDrive: 2025-01-08 13:58:28 
+ # 
+ # 2025-01-13: APS CHUNK 4 data imported with 12,359 rows and 28 columns.
+ # Data last modified on OneDrive: 2025-01-08 13:58:32 
+ # 
+ # 2025-01-13: APS CHUNK 5 data imported with 28 rows and 28 columns.
+ # Data last modified on OneDrive: 2025-01-08 13:58:33 
+ # 
+ # 2025-01-13: APS CHUNK 6 data imported with 549 rows and 28 columns.
+ # Data last modified on OneDrive: 2025-01-08 13:58:34 
+```
+
+# Constants
+
+We named our constants: our random seed value for fastLink fuzzy-matching and the manual verification posterior probability range (0.20 - 0.70).
+
+```{r}
+## Random Seed
+doc_seed <- 42
+
+## Manual review posterior probability range
+posteriors = c(0.20, 0.70)
+```
+
+# Chunk Recombination
+
+## Chunk = Chunk 1 + Chunk 2
+
+We performed between-set fastLink matching of Chunk 1 to Chunk 2. As these two chunks contained all identifiers, we set the variables utilized for fuzzy matching, the names of all gamma columns, and which variables we wished to include in our side-by-side pair data sets to include all identifiers.
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+## Fuzzy-Matching Variables
+str_vars <- c(
+  "client_first_name", "client_last_name", "client_street_address"
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Variables for fastLink output function (basic output)
+fl_ids <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+## Gamma column names
+gamma_cols <- paste(match_vars, "gamma", sep = "_")
+
+## Variables for ID stacking and Generation (all variables)
+pack_id_vars <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+pack_id_vars <- c(pack_id_vars, setdiff(pack_id_vars, colnames(aps)))
+
+## Packing Subset for Chunk A (1)
+subset_a_pack <- list()
+subset_a_pack$df <- aps_chunk_1
+subset_a_pack$suffix <- '1'
+subset_a_pack$ids <- fl_ids
+
+## Packing Subset for Chunk B (2)
+subset_b_pack <- list()
+subset_b_pack$df <- aps_chunk_2
+subset_b_pack$suffix <- '2'
+subset_b_pack$ids <- fl_ids
+
+#fastLink
+fl_out <- fastLink::fastLink(
+  # Chunk A
+      dfA = subset_a_pack$df,
+  # Chunk B
+      dfB = subset_b_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+      partial.match = str_vars,
+  # Do not deduplicate, lower posterior threshold
+      dedupe.matches = FALSE,
+      threshold.match = min(posteriors)
+    )
+```
+
+We obtained our preliminary pair and ID data from this output.
+
+```{r}
+# Obtain pair data
+chunk_temp_pairs <- get_pair_data(
+  subset_a_pack, subset_b_pack, match_vars, fl_out
+  )
+
+# Add ID values to pairs
+chunk_temp_pairs <- dplyr::left_join(
+  # Add in Chunk A IDs
+    dplyr::left_join(
+      chunk_temp_pairs,
+      subset_a_pack$df |>
+        dplyr::select(id, aps_row) |> 
+        dplyr::distinct() |> 
+        dplyr::rename_at(c('id', 'aps_row'), ~c('id_1', 'aps_row_1')),
+      by = 'aps_row_1'
+      ),
+  # Add in Chunk 2 IDS
+  subset_b_pack$df |>
+    dplyr::select(id, aps_row) |> 
+    dplyr::distinct() |> 
+    dplyr::rename_at(c('id', 'aps_row'), ~c('id_2', 'aps_row_2')),
+    by = 'aps_row_2'
+  ) |> 
+  dplyr::relocate(pair, posterior_probability, id_1, id_2)
+
+# Obtain initial IDs
+chunk_temp_ids <- stack_ids(subset_a_pack, subset_b_pack, chunk_temp_pairs)
+```
+
+### Review of Initial Pairs
+
+Our initial pair data was formed from 335,743 observations (167,916 from Chunk 1, 167,827 from Chunk 2). This resulted in 41,375 pairs, of which 41,359 were unique pairs based on ID combinations. Posterior probabilities ranged from 0.20653 to 1.0000. No pairs were missing a value for row or ID. There were 134,317 rows from Chunk 1 and 134,362 rows from Chunk 2 omitted from the pair data, likely due to failure to obtain a match with a posterior above the lower threshold. Similarly, there were 130,844 IDs from Chunk 1 and 131,180 IDs from Chunk 2 missing, likely for the same reason.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the subsets used to generate this chunk?
+format(nrow(subset_a_pack$df)+nrow(subset_b_pack$df), big.mark = ',')
+
+# How many rows are in the subset A used to generate this chunk?
+format(nrow(subset_a_pack$df), big.mark = ',')
+
+# How many rows are in the subset B used to generate this chunk?
+format(nrow(subset_b_pack$df), big.mark = ',')
+
+# How many pairs were made?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(pair) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# How many unique pairs were in this set?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(id_1, id_2) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Range of posterior probability values
+paste0(
+  "Min: ",
+  format(min(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5),
+  "; Max: ",
+  format(max(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5)
+  )
+
+# Are there any pairs missing a value for row?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_2))),
+  big.mark = ','
+  )
+
+# Are there any pairs missing a value for id?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(id_1)|is.na(id_2))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_pairs$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_pairs$aps_row_2)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_pairs$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_pairs$id_2)), 
+    big.mark = ','
+    )
+)
+
+# [1] "335,743"
+# [1] "167,916"
+# [1] "167,827"
+# [1] "41,375"
+# [1] "41,359"
+# [1] "Min: 0.20653; Max: 1"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 134,317; Missing Rows from Chunk B: 134,362"
+# [1] "Missing IDs from Chunk A: 130,844; Missing IDs from Chunk B: 131,180"
+```
+
+### Review of Initial ID Assignments
+
+There were 64,493 observations in the initial ID generation for the Chunk 1 + Chunk 2 fold, resulting in the assignment of 33,147 unique ID values. Notably, only 23,118 of these IDs reflected a unique pairing of Chunk 1 to Chunk 2 within-chunk IDs, likely due to matches of multiple rows within these subsets. There were no observations in the ID set that were missing a value for ID or `aps_row`. However, there were 134,317 rows from Chunk 1 and 134,362 rows from Chunk 2 missing from this set, likely due to failure to find a match above the lower posterior probability threshold. Similarly, there were 130,844 within-chunk IDs from Chunk 1 and 131,180 within-chunk IDs from Chunk 2 missing from this set, likely for similar reasons.
+
+```{r, eval = F}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many observations in the ID set?
+format(nrow(chunk_temp_ids), big.mark = ',')
+
+# How many unique IDs were generated?
+format(length(unique(chunk_temp_ids$id)), big.mark = ',')
+
+# Any IDs which reference the same combination of Chunk IDs?
+format(
+  # Number of unique combinations of ID, Chunk A ID, Chunk B ID
+  ((chunk_temp_ids |> 
+      dplyr::select(id, id_1, id_2) |> 
+      dplyr::distinct() |> nrow()
+    ) - (
+  # Number of unique combinations of Chunk A ID and Chunk B ID
+      # removed rows would reflect duplication of these values (one ID that
+      # references the same combination of Chunk A ID to Chunk B ID)
+      chunk_temp_ids |> 
+        dplyr::select(id, id_1, id_2) |> 
+        dplyr::distinct() |> 
+        dplyr::select(-id) |> 
+        dplyr::distinct() |> 
+        nrow())
+  ), big.mark = ','
+)
+
+# Are there any observations in the ID set missing an ID value?
+format(sum(is.na(chunk_temp_ids$id)), big.mark = ',')
+
+# Are there any IDs missing a value for row?
+format(
+  nrow(chunk_temp_ids |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_2))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_ids$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_ids$aps_row_2)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_ids$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_ids$id_2)), 
+    big.mark = ','
+    )
+)
+
+# [1] "64,493"
+# [1] "33,147"
+# [1] "23,118"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 134,317; Missing Rows from Chunk B: 134,362"
+# [1] "Missing IDs from Chunk A: 130,844; Missing IDs from Chunk B: 131,180"
+```
+
+### Within Posterior Probability Range
+
+We examined all pairs within the manual review posterior probability range of 0.20 - 0.70. This resulted in manual review of 11,532 pairs. All pairs contained a unique combination of ID values across 9,549 Chunk A IDs and 9,568 Chunk B IDs. We found no pairs with identical `client_id` values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking <- chunk_temp_pairs |>
+  dplyr::filter(
+    dplyr::between(posterior_probability, posteriors[1], posteriors[2])
+    )
+
+# Number of observations in this subset
+format(nrow(checking), big.mark = ',')
+
+# Number of unique ID combinations
+format(nrow(
+  checking |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "11,532"
+# [1] "11,532"
+# [1] "9,549"
+# [1] "9,568"
+# [1] "0"
+```
+
+In examining our gamma values for our matching variables, we found several trends:
+
+-   The vast majority (8,872) failed to match at all on first name (gamma = 0)
+-   The vast majority (9,831) failed to match on last name (gamma = 0)
+-   The vast majority (9,132) failed to match on birth day (gamma = 0)
+-   The vast majority (8,445) significantly matched on street address (gamma = 2)
+-   The vast majority (11,515) significantly matched on zip code (gamma = 2)
+-   The vast majority (8,710) significantly matched on birth year (gamma = 2)
+-   The vast majority (7,210) significantly matched on birth month (gamma = 2)
+
+```{r, warning = F}
+get_unique_value_summary(
+  checking |>
+    dplyr::select(dplyr::all_of(gamma_cols))
+  )
+```
+
+We initiated our list of pairs to drop, which we would build during our processing.
+
+```{r}
+drop_pairs_temp <- c()
+```
+
+We also initiated a data frame of revisions to ID assignments in each chunk, in case revision was found to be necessary.
+
+```{r}
+chunk_a_revisions <- tibble::tibble(
+  !!!c('aps_row', 'id'), .rows = 0, .name_repair = ~c('aps_row', 'id')
+  )
+
+chunk_b_revisions <- tibble::tibble(
+  !!!c('aps_row', 'id'), .rows = 0, .name_repair = ~c('aps_row', 'id')
+  )
+```
+
+#### Address Failures
+
+##### ZIP Code (Non-Matches)
+
+We first examined pairs with non-matching ZIP Codes (Gamma == 0). Only one Chunk B ID was present more than once. ZIP codes appeared to have significant differences, though all names appeared to be fairly matched. 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(client_zip_code_gamma != 2)
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "17"
+# [1] "Min: 0.20828; Max: 0.52459"
+# [1] "17"
+# [1] "16"
+# [1] "17"
+# [1] "0"
+```
+
+None of these pairs were deemed valid, with matches based on common name values and overlapping elements of street address, but significant differences in other fields. As such, we added all 17 pairs to the drop list.
+
+```{r}
+drop_pairs_temp <- c(drop_pairs_temp, checking_cols$pair)
+
+length(drop_pairs_temp)
+# [1] 17
+```
+
+##### Street Address (Weak Matches)
+
+We examined remaining pairs with weakly matching street address values (Gamma == 1). There were both Chunk A and Chunk B IDs that appeared more than once, though all pairs reflected unique combinations of Chunk A and Chunk B IDs. The vast majority of these records appeared to be very poorly matched, with similarities due to transient commonalities in date of birth, ZIP code, and common name values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(client_street_address_gamma == 1) |>
+  # Omit previous check groups
+  dplyr::filter(client_zip_code_gamma != 0 )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "1,554"
+# [1] "Min: 0.27887; Max: 0.63175"
+# [1] "1,554"
+# [1] "1,399"
+# [1] "1,417"
+# [1] "0"
+```
+
+None of the 1,554 pairs was found to be a true match. As such, we added these 1,554 pair ids to our drop list.
+
+```{r}
+drop_pairs_temp <- unique(c(
+  drop_pairs_temp, checking_cols$pair
+  ))
+
+length(drop_pairs_temp)
+# [1] 1571
+```
+
+We also identified several within-chunk IDs that potentially needed revision. We made the required modifications.
+
+```{r}
+split_rows <- c(232623, 316401, 22763, 94447, 105637, 211341, 77289)
+
+chunk_a_revisions <- chunk_a_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+      id = 1000000 - dplyr::row_number()
+    )
+  )
+
+split_rows <- c(197448)
+
+chunk_b_revisions <- chunk_b_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+      id = 1000000 - dplyr::row_number()
+    )
+  )
+```
+
+##### Street Address (Non-Matches)
+
+We examined remaining pairs with non-matching street address values (Gamma == 0). There were both Chunk A and Chunk B IDs that appeared more than once, though all pairs reflected unique combinations of Chunk A and Chunk B IDs. The vast majority of these records appeared to be very poorly matched, with similarities due to transient commonalities in date of birth, ZIP code, and common name values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(client_street_address_gamma == 0) |>
+  # Omit previous check groups
+  dplyr::filter(client_zip_code_gamma != 0 )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "1,517"
+# [1] "Min: 0.21126; Max: 0.56968"
+# [1] "1,517"
+# [1] "1,333"
+# [1] "1,339"
+# [1] "0"
+```
+
+None of the 1,517 pairs were found to be a true match. As such, we added these 1,517 pair ids to our drop list.
+
+```{r}
+drop_pairs_temp <- unique(c(
+  drop_pairs_temp, checking_cols$pair
+  ))
+
+length(drop_pairs_temp)
+# [1] 3088
+```
+
+We also identified several within-chunk IDs that potentially needed revision. We made the required modifications.
+
+```{r}
+split_rows <- c(46859, 163119, 182461, 208235, 338993)
+
+chunk_a_revisions <- chunk_a_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = min(chunk_a_revisions$id) - dplyr::row_number()
+      )
+  )
+
+split_rows <- c(136200, 214534)
+
+chunk_b_revisions <- chunk_b_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = min(chunk_b_revisions$id) - dplyr::row_number()
+      )
+  )
+```
+
+#### Name Failures
+
+##### Last Name (Weak Matches)
+
+There were no remaining pairs with weakly matching last name values (Gamma == 1). 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(client_last_name_gamma == 1) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    client_zip_code_gamma == 0 | client_street_address_gamma < 2
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "0"
+# [1] "0"
+# [1] "0"
+# [1] "0"
+# [1] "0"
+```
+
+##### Last Name (Non Matches)
+
+We examined remaining pairs with non-matching last name values (Gamma == 0). There were both Chunk A and Chunk B IDs that appeared more than once, though all pairs reflected unique combinations of Chunk A and Chunk B IDs. The vast majority of these records appeared to be very poorly matched, with similarities due to transient commonalities in date of birth, ZIP code, multi-address housing or other common address values, and common name values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  dplyr::filter(client_last_name_gamma == 0) |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    client_zip_code_gamma == 0 | client_street_address_gamma < 2
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "8,444"
+# [1] "Min: 0.20653; Max: 0.52258"
+# [1] "8,444"
+# [1] "7,000"
+# [1] "7,024"
+# [1] "0"
+```
+
+None of the 8,444 pairs found to be a true match. As such, we added the remaining 8,444 pair ids to our drop list.
+
+```{r}
+drop_pairs_temp <- unique(c(
+  drop_pairs_temp, checking_cols$pair
+  ))
+
+length(drop_pairs_temp)
+# [1] 11532
+```
+
+We also identified several within-chunk IDs that potentially needed revision. We made the required modifications.
+
+```{r}
+split_rows <- c(
+  12595, 12829, 31521, 58723, 72701, 82663, 90055, 92401, 103061, 103489, 
+  137605, 139947, 141427, 156135, 169065, 174327, 194255, 213213, 
+  233833, 236569, 238779, 239737, 251519, 287883, 365385, 320153, 320207, 
+  332991, 339341, 342793, 363149, 371365
+  )
+
+chunk_a_revisions <- chunk_a_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = min(chunk_a_revisions$id) - dplyr::row_number()
+      )
+  )
+
+```
+
+##### Remaining Pairs
+
+There were no remaining pairs in the posterior probability range to review.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- checking |>
+  # Omit previous check groups
+  dplyr::filter(!(
+    client_zip_code_gamma == 0 | client_street_address_gamma < 2 | 
+      client_last_name_gamma < 2
+    ))
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "0"
+# [1] "0"
+# [1] "0"
+# [1] "0"
+# [1] "0"
+```
+
+### Above posterior probability range
+
+We examined pairs just above our posterior probability range, to ensure appropriate capture. All pairs within the posterior probability range of 0.70 - 0.90 were examined. This resulted in manual review of 2,565 pairs. There were both Chunk A and Chunk B IDs that appeared more than once, though all pairs reflected unique combinations of Chunk A and Chunk B IDs. 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- chunk_temp_pairs |>
+  dplyr::filter(
+    dplyr::between(posterior_probability, posteriors[2], posteriors[2]+0.2)
+    )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "2,565"
+# [1] "Min: 0.70104; Max: 0.88358"
+# [1] "2,565"
+# [1] "2,361"
+# [1] "2,358"
+# [1] "0"
+```
+
+None of these pairs appeared to be a true match, with significant differences in all fields. We then examined pairs with posterior probabilities greater than or equal to 0.90. This resulted in manual review of 27,278 pairs. There were both Chunk A and Chunk B IDs that appeared more than once, though all pairs reflected unique combinations of Chunk A and Chunk B IDs. 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- chunk_temp_pairs |>
+  dplyr::filter(
+    posterior_probability >= 0.90
+    )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_2) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_2)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_2)
+  ),
+  big.mark = ','
+  )
+
+# [1] "27,278"
+# [1] "Min: 0.90771; Max: 1"
+# [1] "27,263"
+# [1] "24,181"
+# [1] "24,035"
+# [1] "0"
+```
+
+None of these pairs appeared to be a true match, with significant differences in all fields. 
+
+In these checks, we identified several within-chunk IDs that potentially needed revision. We made the required modifications.
+
+```{r}
+split_rows <- c(
+  57591, 122737, 10807, 30597, 48851, 50327, 50361, 72499, 72717, 73529, 
+  75893, 76317, 79231, 81321, 82691, 84953, 130225, 137333, 137725, 138629, 
+  139039, 145283, 151615, 152141, 154275, 157757, 201035, 202297, 202949, 
+  208183, 209897, 214139, 214393, 214529, 226333, 277683, 278123, 278581, 
+  280391, 282953, 289685, 301813, 305229, 305553, 307645, 346317, 347543, 
+  348475, 351967, 16075, 36145, 262287, 237061, 254607, 7547, 54121, 54605, 
+  60833, 61215, 68479, 71119, 88689, 90205, 96181, 96785, 102543, 113627, 
+  117243, 126023, 158461, 160061, 161657, 164197, 179049, 181387, 184281, 
+  189865, 193053, 227955, 228225, 229515, 236805, 242971, 244679, 246225, 
+  247845, 256347, 308241, 312943, 314229, 315251, 315939, 320775, 344849, 
+  346273, 352913, 360463, 377267, 224919, 16583, 255717, 362399, 58165, 6449,
+  24301, 29077, 30851, 34219, 53609, 56283, 106439, 115325, 126175, 129001, 
+  172137
+  )
+
+chunk_a_revisions <- chunk_a_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = min(chunk_a_revisions$id) - dplyr::row_number()
+      )
+  )
+
+split_rows <- c(
+  94738, 13344, 25716, 62958, 64804, 190032, 251670, 290244, 68836, 95138, 
+  109766, 147104, 184576, 346896, 19650, 68596
+  )
+
+chunk_b_revisions <- chunk_b_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = min(chunk_b_revisions$id) - dplyr::row_number()
+      )
+  )
+
+``` 
+
+### Regenerating ID Assignments
+
+As all of our fastLink generated pairs appeared to be false matches, we omitted any of these pairs from our merger. First, we revised our within-chunk IDs.
+
+```{r}
+subset_a_pack$df <- subset_a_pack$df |>
+  dplyr::rows_update(
+    chunk_a_revisions,
+    by = 'aps_row'
+  )
+
+subset_b_pack$df <- subset_b_pack$df |>
+  dplyr::rows_update(
+    chunk_b_revisions,
+    by = 'aps_row'
+  )
+```
+
+We then created a map linking any identical `client_id` values across the two chunks.
+
+```{r}
+client_id_map <- dplyr::left_join(
+  subset_a_pack$df |>
+    dplyr::select(id, client_id) |>
+    dplyr::distinct() |>
+    dplyr::rename_at(c('id'), ~c('id_1')) |>
+    dplyr::filter(client_id %in% subset_b_pack$df$client_id),
+  subset_b_pack$df |>
+    dplyr::select(id, client_id) |>
+    dplyr::distinct() |>
+    dplyr::rename_at(c('id'), ~c('id_2')) |>
+    dplyr::filter(client_id %in% subset_a_pack$df$client_id),
+  by = 'client_id'
+  ) |>
+  dplyr::select(id_1, id_2) |>
+  dplyr::distinct() |>
+  dplyr::mutate(id = dplyr::row_number())
+```
+
+We confirmed that this map did not cross any within-set IDs (e.g., ID 123 in Chunk A matching both ID 987 and 657 in Chunk B, reflecting a possible failed match in Chunk B).
+
+```{r}
+nrow(
+  client_id_map |>
+  dplyr::select(id_1, id_2) |>
+  dplyr::distinct() |>
+    filter(
+      ((duplicated(id_1)|duplicated(id_1, fromLast = T)) & !is.na(id_1)) |
+        ((duplicated(id_2)|duplicated(id_2, fromLast = T)) & !is.na(id_2))
+      )
+  ) == 0
+# [1] TRUE
+```
+
+We then assigned the remaining ID values from each Chunk to a unique cross-set ID value.
+
+```{r}
+# Chunk A remaining values
+# ===========================================================================
+client_id_map <- dplyr::bind_rows(
+  client_id_map,
+  subset_a_pack$df |> 
+  # Extract unique within-chunk ID values not already mapped
+    dplyr::filter(!(id %in% client_id_map$id_1)) |>
+    dplyr::rename_at(c('id'), ~c('id_1')) |>
+    dplyr::select(id_1) |>
+    dplyr::distinct() |>
+    # Add new ID number, blank ID_2
+    dplyr::mutate(
+        id = max(client_id_map$id) + dplyr::row_number(),
+        id_2 = NA_integer_
+    )
+  )
+  
+# Chunk B remaining values
+# ===========================================================================
+client_id_map <- dplyr::bind_rows(
+  client_id_map,
+  subset_b_pack$df |> 
+  # Extract unique within-chunk ID values not already mapped
+    dplyr::filter(!(id %in% client_id_map$id_2)) |>
+    dplyr::rename_at(c('id'), ~c('id_2')) |>
+    dplyr::select(id_2) |>
+    dplyr::distinct() |>
+    # Add new ID number, blank ID_1
+    dplyr::mutate(
+        id = max(client_id_map$id) + dplyr::row_number(),
+        id_1 = NA_integer_
+    )
+  )
+```
+
+We confirmed that this map did not cross any within-set IDs (e.g., ID 123 in Chunk A matching both ID 987 and 657 in Chunk B, reflecting a possible failed match in Chunk B).
+
+```{r}
+nrow(
+  client_id_map |>
+  dplyr::select(id_1, id_2) |>
+  dplyr::distinct() |>
+    filter(
+      ((duplicated(id_1)|duplicated(id_1, fromLast = T)) & !is.na(id_1)) |
+        ((duplicated(id_2)|duplicated(id_2, fromLast = T)) & !is.na(id_2))
+      )
+  ) == 0
+# [1] TRUE
+```
+
+We added these IDs back into our data sets and consolidated our chunk into a single unified data set.
+
+```{r}
+subset_a_pack$df <- dplyr::rows_update(
+  subset_a_pack$df |>
+    dplyr::rename_at(c('id'), ~c('id_1')) |>
+    dplyr::mutate(id_2 = NA_integer_, id = NA_integer_),
+  client_id_map |>
+    dplyr::filter(!is.na(id_1)),
+  by = 'id_1'
+  )
+
+subset_b_pack$df <- dplyr::rows_update(
+  subset_b_pack$df |>
+    dplyr::rename_at(c('id'), ~c('id_2')) |>
+    dplyr::mutate(id_1 = NA_integer_, id = NA_integer_),
+  client_id_map |>
+    dplyr::filter(!is.na(id_2)),
+  by = 'id_2'
+  )
+
+aps_chunk <- dplyr::bind_rows(
+    subset_a_pack$df,
+    subset_b_pack$df
+  )
+```
+
+## Chunk = Chunk + Chunk 3
+
+We performed between-set fastLink matching of our in-progress consolidated chunk with Chunk 3. As chunk 3 omitted name matching due to patterns of missingness in the data, we omitted the name variables from our match variables in fastLink matching and pair generation for this recombination stage.
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+## Fuzzy-Matching Variables
+str_vars <- c(
+  "client_street_address"
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Variables for fastLink output function (basic output)
+fl_ids <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+## Gamma column names
+gamma_cols <- paste(match_vars, "gamma", sep = "_")
+
+## Variables for ID stacking and Generation (all variables)
+pack_id_vars <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+pack_id_vars <- c(pack_id_vars, setdiff(pack_id_vars, colnames(aps)))
+
+# Set seed
+set.seed(doc_seed)
+
+## Packing Subset for Chunk A (1+2)
+subset_a_pack <- list()
+subset_a_pack$df <- aps_chunk
+subset_a_pack$suffix <- '1'
+subset_a_pack$ids <- fl_ids
+
+## Packing Subset for Chunk B (3)
+subset_b_pack <- list()
+subset_b_pack$df <- aps_chunk_3
+subset_b_pack$suffix <- '3'
+subset_b_pack$ids <- fl_ids
+
+#fastLink
+fl_out <- fastLink::fastLink(
+  # Chunk A
+      dfA = subset_a_pack$df,
+  # Chunk B
+      dfB = subset_b_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+      partial.match = str_vars,
+  # Do not deduplicate, lower posterior threshold
+      dedupe.matches = FALSE,
+      threshold.match = min(posteriors)
+    )
+```
+
+We obtained our preliminary pair and ID data from this output.
+
+```{r}
+# Obtain pair data
+chunk_temp_pairs <- get_pair_data(
+  subset_a_pack, subset_b_pack, match_vars, fl_out
+  )
+
+# Add ID values to pairs
+chunk_temp_pairs <- dplyr::left_join(
+  # Add in Chunk A IDs
+    dplyr::left_join(
+      chunk_temp_pairs,
+      subset_a_pack$df |>
+        dplyr::select(id, aps_row) |> 
+        dplyr::distinct() |> 
+        dplyr::rename_at(c('id', 'aps_row'), ~c('id_1', 'aps_row_1')),
+      by = 'aps_row_1'
+      ),
+  # Add in Chunk 3 IDS
+  subset_b_pack$df |>
+    dplyr::select(id, aps_row) |> 
+    dplyr::distinct() |> 
+    dplyr::rename_at(c('id', 'aps_row'), ~c('id_3', 'aps_row_3')),
+    by = 'aps_row_3'
+  ) |> 
+  dplyr::relocate(pair, posterior_probability, id_1, id_3)
+
+# Obtain initial IDs
+chunk_temp_ids <- stack_ids(subset_a_pack, subset_b_pack, chunk_temp_pairs)
+```
+
+### Review of Initial Pairs
+
+Our initial pair data was formed from 337,120 observations (335,743 from our in-progress consolidated chunk, 1,377 from Chunk 3). This resulted in 16,537 pairs, of which 15,771 were unique pairs based on ID combinations. Posterior probabilities ranged from 0.25162 to 1.0000. No pairs were missing a value for row or ID. There were 323,471 rows from our in-progress consolidated chunk and 182 rows from Chunk 3 omitted from the pair data, likely due to failure to obtain a match with a posterior above the lower threshold. Similarly, there were 316,928 IDs from our in-progress consolidated chunk and 181 IDs from Chunk 3 missing, likely for the same reason.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the subsets used to generate this chunk?
+format(nrow(subset_a_pack$df)+nrow(subset_b_pack$df), big.mark = ',')
+
+# How many rows are in the subset A used to generate this chunk?
+format(nrow(subset_a_pack$df), big.mark = ',')
+
+# How many rows are in the subset B used to generate this chunk?
+format(nrow(subset_b_pack$df), big.mark = ',')
+
+# How many pairs were made?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(pair) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# How many unique pairs were in this set?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(id_1, id_3) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Range of posterior probability values
+paste0(
+  "Min: ",
+  format(min(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5),
+  "; Max: ",
+  format(max(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5)
+  )
+
+# Are there any pairs missing a value for row?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_3))),
+  big.mark = ','
+  )
+
+# Are there any pairs missing a value for id?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(id_1)|is.na(id_3))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_pairs$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_pairs$aps_row_3)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_pairs$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_pairs$id_3)), 
+    big.mark = ','
+    )
+)
+
+# [1] "337,120"
+# [1] "335,743"
+# [1] "1,377"
+# [1] "16,537"
+# [1] "15,771"
+# [1] "Min: 0.25162; Max: 1"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 323,471; Missing Rows from Chunk B: 182"
+# [1] "Missing IDs from Chunk A: 316,928; Missing IDs from Chunk B: 181"
+```
+
+### Review of Initial ID Assignments
+
+There were 24,618 observations in the initial ID generation for our in-progress consolidated chunk + Chunk 3 fold, resulting in the assignment of 1,061 unique ID values. Notably, only 7,787 of these IDs reflected a unique pairing of our in-progress consolidated chunk to Chunk 3 within-chunk IDs, likely due to matches of multiple rows within these subsets. There were no observations in the ID set that were missing a value for ID or `aps_row`. However, there were 323,471 rows from our in-progress consolidated chunk and 182 rows from Chunk 2 missing from this set, likely due to failure to find a match above the lower posterior probability threshold. Similarly, there were 316,928 within-chunk IDs from our in-progress consolidated chunk and 181 within-chunk IDs from Chunk 3 missing from this set, likely for similar reasons.
+
+```{r, eval = F}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many observations in the ID set?
+format(nrow(chunk_temp_ids), big.mark = ',')
+
+# How many unique IDs were generated?
+format(length(unique(chunk_temp_ids$id)), big.mark = ',')
+
+# Any IDs which reference the same combination of Chunk IDs?
+format(
+  # Number of unique combinations of ID, Chunk A ID, Chunk B ID
+  ((chunk_temp_ids |> 
+      dplyr::select(id, id_1, id_3) |> 
+      dplyr::distinct() |> nrow()
+    ) - (
+  # Number of unique combinations of Chunk A ID and Chunk B ID
+      # removed rows would reflect duplication of these values (one ID that
+      # references the same combination of Chunk A ID to Chunk B ID)
+      chunk_temp_ids |> 
+        dplyr::select(id, id_1, id_3) |> 
+        dplyr::distinct() |> 
+        dplyr::select(-id) |> 
+        dplyr::distinct() |> 
+        nrow())
+  ), big.mark = ','
+)
+
+# Are there any observations in the ID set missing an ID value?
+format(sum(is.na(chunk_temp_ids$id)), big.mark = ',')
+
+# Are there any IDs missing a value for row?
+format(
+  nrow(chunk_temp_ids |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_3))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_ids$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_ids$aps_row_3)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_ids$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_ids$id_3)), 
+    big.mark = ','
+    )
+)
+# [1] "24,618"
+# [1] "1,061"
+# [1] "7,787"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 323,471; Missing Rows from Chunk B: 182"
+# [1] "Missing IDs from Chunk A: 316,928; Missing IDs from Chunk B: 181"
+```
+
+### Within Posterior Probability Range
+
+We examined all pairs within the manual review posterior probability range of 0.20 - 0.70. This resulted in manual review of 4,831 pairs, all of which had a posterior probability value of 0.25162. Only 4,668 pairs contained a unique combination of ID values across 4,011 Chunk A IDs and 737 Chunk B IDs. We found no pairs with identical `client_id` values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking <- chunk_temp_pairs |>
+  dplyr::filter(
+    dplyr::between(posterior_probability, posteriors[1], posteriors[2])
+    )
+
+# Number of observations in this subset
+format(nrow(checking), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking |> 
+    dplyr::select(id_1, id_3) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking$id_3)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking |> 
+    dplyr::filter(client_id_1 == client_id_3)
+  ),
+  big.mark = ','
+  )
+
+# [1] "4,831"
+# [1] "Min: 0.25162; Max: 0.25162"
+# [1] "4,688"
+# [1] "4,011"
+# [1] "737"
+# [1] "0"
+```
+
+In examining our gamma values for our matching variables, we found several trends. Namely, all of our pairs were partial matches for street address, strong matches for ZIP code, and non-matches for date of birth.
+
+```{r, warning = F}
+get_unique_value_summary(
+  checking |>
+    dplyr::select(dplyr::all_of(gamma_cols))
+  )
+```
+
+None of these pairs appeared to be valid. We initiated our list of pairs to keep, which we would build during our processing.
+
+```{r}
+kept_pairs_temp <- c()
+```
+
+We also initiated a data frame of revisions to ID assignments in each chunk, in case revision was found to be necessary.
+
+```{r}
+chunk_a_revisions <- tibble::tibble(
+  !!!c('aps_row', 'id'), .rows = 0, .name_repair = ~c('aps_row', 'id')
+  )
+
+chunk_b_revisions <- tibble::tibble(
+  !!!c('aps_row', 'id'), .rows = 0, .name_repair = ~c('aps_row', 'id')
+  )
+```
+
+### Above posterior probability range
+
+We examined pairs just above our posterior probability range, to ensure appropriate capture. All pairs within the posterior probability range of 0.70 - 0.90 were examined. This resulted in manual review of 1,498 pairs with a posterior probability of 0.71734. There were 1,454 unique pairs (based on Chunk A and Chunk B ID combination), with multiple Chunk A and Chunk B IDs that appeared more than once. We found no pairs with identical `client_id` values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- chunk_temp_pairs |>
+  dplyr::filter(
+    dplyr::between(posterior_probability, posteriors[2], posteriors[2]+0.2)
+    )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_3) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_3)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_3)
+  ),
+  big.mark = ','
+  )
+
+# [1] "1,498"
+# [1] "Min: 0.71734; Max: 0.71734"
+# [1] "1,454"
+# [1] "1,326"
+# [1] "469"
+# [1] "0"
+```
+
+None of these pairs appeared to be a true match, with significant differences in all fields. 
+
+We then examined pairs with posterior probabilities greater than or equal to 0.90. This resulted in manual review of 10,208 pairs. There were both Chunk A and Chunk B IDs that appeared more than once, and only 9,642 pairs reflected unique combinations of Chunk A and Chunk B IDs. 
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- chunk_temp_pairs |>
+  dplyr::filter(
+    posterior_probability >= 0.90
+    )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_3) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_3)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_3)
+  ),
+  big.mark = ','
+  )
+
+# [1] "10,208"
+# [1] "Min: 0.91853; Max: 1"
+# [1] "9,642"
+# [1] "7,544"
+# [1] "1,056"
+# [1] "0"
+```
+
+Only 8 of these pairs appeared to be valid. We added these pairs to our keep list.
+
+```{r}
+kept_pairs_temp <- c(kept_pairs_temp, 146, 267, 1147, 6198, 6860, 7801, 7865)
+```
+
+We also identified several within-chunk IDs that potentially needed revision. We made the required modifications.
+
+```{r}
+split_rows <- c(
+  3827, 109037, 155711, 99683, 143350, 4641, 210037, 127899, 89747, 
+  102433, 251379, 283385
+  )
+
+chunk_a_revisions <- chunk_a_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = max(subset_a_pack$df$id) + dplyr::row_number()
+      )
+  )
+
+split_rows <- c(
+  250894, 346053, 349928
+
+  )
+
+chunk_b_revisions <- chunk_b_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = 1000000 - dplyr::row_number()
+      )
+  )
+
+```
+
+### Regenerating ID Assignments
+
+We confirmed that there were no values of `client_id` present in both Chunk A and Chunk B.
+
+```{r}
+sum(subset_a_pack$df$client_id %in% subset_b_pack$df$client_id) == 0
+# [1] TRUE
+```
+
+We confirmed that no values in our matched sets were included in our revision maps for either subset.
+
+```{r}
+nrow(
+  chunk_temp_pairs |>
+    dplyr::filter(pair %in% kept_pairs_temp) |>
+    dplyr::filter(
+      (id_1 %in% dplyr::pull(
+        subset_a_pack$df |>
+          dplyr::filter(aps_row %in% chunk_a_revisions$aps_row) |>
+          dplyr::select(id) |>
+          dplyr::distinct()
+        )
+       ) |
+      (id_3 %in% dplyr::pull(
+        subset_b_pack$df |>
+          dplyr::filter(aps_row %in% chunk_b_revisions$aps_row) |>
+          dplyr::select(id) |>
+          dplyr::distinct()
+        )
+       )
+    )
+  ) == 0
+# [1] TRUE
+```
+
+We also confirmed that there were no cross-referenced IDs in our kept pairs (e.g., ID 123 in Chunk A matching both ID 987 and 657 in Chunk B, reflecting a possible failed match in Chunk B).
+
+```{r}
+nrow(
+  chunk_temp_pairs |>
+    dplyr::filter(pair %in% kept_pairs_temp) |>
+    dplyr::filter(
+      duplicated(id_1) | duplicated(id_3)
+    )
+  ) == 0
+# [1] TRUE
+```
+
+We then we revised our within-chunk IDs.
+
+```{r}
+subset_a_pack$df <- subset_a_pack$df |>
+  dplyr::rows_update(
+    chunk_a_revisions,
+    by = 'aps_row'
+  )
+
+subset_b_pack$df <- subset_b_pack$df |>
+  dplyr::rows_update(
+    chunk_b_revisions,
+    by = 'aps_row'
+  )
+```
+
+We added ID values from Chunk A, based on our kept pairs, to Chunk B. We then assigned remaining IDs to sequential cross-set IDs.
+
+```{r}
+id_map <- subset_b_pack$df |>
+  # Get list of unique IDs in Chunk B
+  dplyr::select(id) |>
+  dplyr::distinct() |>
+  # Shift names of ID columns to match combined chunk, with cross-chunk 
+  # ID as NA for now
+  dplyr::rename_at(c('id'), ~c('id_3')) |> 
+  dplyr::mutate(id = NA_integer_, id_1 = NA_integer_, id_2 = NA_integer_) |> 
+  # Add ID values based on matches
+  dplyr::rows_update(
+    chunk_temp_pairs |>
+      dplyr::filter(pair %in% kept_pairs_temp) |>
+      dplyr::select(id_1, id_3) |>
+      dplyr::rename_at(c('id_1'), ~c('id')),
+    by = 'id_3'
+  ) |>
+  # Fill remaining ID values sequentially from the max ID value in the 
+  # combined chunk
+  dplyr::mutate(
+    id = ifelse(
+      is.na(id), 
+      max(subset_a_pack$df$id) + dplyr::row_number(), 
+      id)
+  )
+
+# Add IDs to Chunk B
+subset_b_pack$df <- subset_b_pack$df |>
+  # Shift names of ID columns to match combined chunk, with cross-chunk 
+  # ID as NA for now
+  dplyr::rename_at(c('id'), ~c('id_3')) |> 
+  dplyr::mutate(id = NA_integer_, id_1 = NA_integer_, id_2 = NA_integer_) |>
+  # Add values based on Chunk B ID map
+  dplyr::rows_update(
+    id_map,
+    by = 'id_3'
+  )
+```
+
+We then consolidated Chunks A and B into a single unified data set.
+
+```{r}
+aps_chunk <- dplyr::bind_rows(
+    subset_a_pack$df |>
+      dplyr::mutate(id_3 = NA_integer_),
+    subset_b_pack$df
+  )
+```
+
+We verified that our consolidated data set did not have any repeated values for `aps_row`, reflecting erroneous row duplication.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::filter(duplicated(aps_row))
+  ) == 0
+# [1] TRUE
+```
+
+We similarly verified that no `client_id` was associated with more than one ID value, which would reflect failed pairs.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::group_by(client_id) |>
+    dplyr::mutate(n_ids = dplyr::n_distinct(id)) |>
+    dplyr::ungroup() |>
+    dplyr::filter(n_ids > 1)
+  ) == 0
+```
+
+## Chunk = Chunk + Chunk 4
+
+We performed between-set fastLink matching of our in-progress consolidated chunk with Chunk 4. As Chunk 4 omitted address matching due to patterns of missingness in the data, we omitted the address variables from our match variables in fastLink matching and pair generation for this recombination stage. 
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+## Fuzzy-Matching Variables
+str_vars <- c(
+  "client_first_name", "client_last_name"
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day"
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Variables for fastLink output function (basic output)
+fl_ids <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+## Gamma column names
+gamma_cols <- paste(match_vars, "gamma", sep = "_")
+
+## Variables for ID stacking and Generation (all variables)
+pack_id_vars <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+pack_id_vars <- c(pack_id_vars, setdiff(pack_id_vars, colnames(aps)))
+
+# Set seed
+set.seed(doc_seed)
+
+## Packing Subset for Chunk A (1+2+3)
+subset_a_pack <- list()
+subset_a_pack$df <- aps_chunk
+subset_a_pack$suffix <- '1'
+subset_a_pack$ids <- fl_ids
+
+## Packing Subset for Chunk B (4)
+subset_b_pack <- list()
+subset_b_pack$df <- aps_chunk_4
+subset_b_pack$suffix <- '4'
+subset_b_pack$ids <- fl_ids
+
+#fastLink
+fl_out <- fastLink::fastLink(
+  # Chunk A
+      dfA = subset_a_pack$df,
+  # Chunk B
+      dfB = subset_b_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+      partial.match = str_vars,
+  # Do not deduplicate, lower posterior threshold
+      dedupe.matches = FALSE,
+      threshold.match = min(posteriors)
+    )
+```
+
+We obtained our preliminary pair and ID data from this output.
+
+```{r}
+# Obtain pair data
+chunk_temp_pairs <- get_pair_data(
+  subset_a_pack, subset_b_pack, match_vars, fl_out
+  )
+
+# Add ID values to pairs
+chunk_temp_pairs <- dplyr::left_join(
+  # Add in Chunk A IDs
+    dplyr::left_join(
+      chunk_temp_pairs,
+      subset_a_pack$df |>
+        dplyr::select(id, aps_row) |> 
+        dplyr::distinct() |> 
+        dplyr::rename_at(c('id', 'aps_row'), ~c('id_1', 'aps_row_1')),
+      by = 'aps_row_1'
+      ),
+  # Add in Chunk 4 IDS
+  subset_b_pack$df |>
+    dplyr::select(id, aps_row) |> 
+    dplyr::distinct() |> 
+    dplyr::rename_at(c('id', 'aps_row'), ~c('id_4', 'aps_row_4')),
+    by = 'aps_row_4'
+  ) |> 
+  dplyr::relocate(pair, posterior_probability, id_1, id_4)
+
+# Obtain initial IDs
+chunk_temp_ids <- stack_ids(subset_a_pack, subset_b_pack, chunk_temp_pairs)
+```
+
+### Review of Initial Pairs
+
+Our initial pair data was formed from 349,479 observations (337,120 from our in-progress consolidated chunk, 20,819 from Chunk 4). This resulted in 20,819 pairs, of which 19,949 were unique pairs based on ID combinations. Posterior probabilities ranged from 0.38197 to 0.99921. No pairs were missing a value for row or ID. There were 320,322 rows from our in-progress consolidated chunk and 7,071 rows from Chunk 4 omitted from the pair data, likely due to failure to obtain a match with a posterior above the lower threshold. Similarly, there were 313,819 IDs from our in-progress consolidated chunk and 6,963 IDs from Chunk 4 missing, likely for the same reason.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the subsets used to generate this chunk?
+format(nrow(subset_a_pack$df)+nrow(subset_b_pack$df), big.mark = ',')
+
+# How many rows are in the subset A used to generate this chunk?
+format(nrow(subset_a_pack$df), big.mark = ',')
+
+# How many rows are in the subset B used to generate this chunk?
+format(nrow(subset_b_pack$df), big.mark = ',')
+
+# How many pairs were made?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(pair) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# How many unique pairs were in this set?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(id_1, id_4) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Range of posterior probability values
+paste0(
+  "Min: ",
+  format(min(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5),
+  "; Max: ",
+  format(max(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5)
+  )
+
+# Are there any pairs missing a value for row?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_4))),
+  big.mark = ','
+  )
+
+# Are there any pairs missing a value for id?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(id_1)|is.na(id_4))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_pairs$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_pairs$aps_row_4)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_pairs$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_pairs$id_4)), 
+    big.mark = ','
+    )
+)
+
+# [1] "349,479"
+# [1] "337,120"
+# [1] "12,359"
+# [1] "20,819"
+# [1] "19,949"
+# [1] "Min: 0.38197; Max: 0.99921"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 320,322; Missing Rows from Chunk B: 7,071"
+# [1] "Missing IDs from Chunk A: 313,819; Missing IDs from Chunk B: 6,963"
+```
+
+### Review of Initial ID Assignments
+
+There were 138,885 observations in the initial ID generation for our our in-progress consolidated chunk + Chunk 4 fold, resulting in the assignment of 8,489 unique ID values. Notably, only 113,086 of the ID assignments reflected a unique pairing of our in-progress consolidated chunk to Chunk 4 within-chunk IDs, likely due to matches of multiple rows within these subsets. There were no observations in the ID set that were missing a value for ID or `aps_row`. However, there were 320,322 rows from our in-progress consolidated chunk and 7,071 rows from Chunk 4 missing from this set, likely due to failure to find a match above the lower posterior probability threshold. Similarly, there were 313,807 within-chunk IDs from our in-progress consolidated chunk and 6,963 within-chunk IDs from Chunk 4 missing from this set, likely for similar reasons.
+
+```{r, eval = F}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many observations in the ID set?
+format(nrow(chunk_temp_ids), big.mark = ',')
+
+# How many unique IDs were generated?
+format(length(unique(chunk_temp_ids$id)), big.mark = ',')
+
+# Any IDs which reference the same combination of Chunk IDs?
+format(
+  # Number of unique combinations of ID, Chunk A ID, Chunk B ID
+  ((chunk_temp_ids |> 
+      dplyr::select(id, id_1, id_4) |> 
+      dplyr::distinct() |> nrow()
+    ) - (
+  # Number of unique combinations of Chunk A ID and Chunk B ID
+      # removed rows would reflect duplication of these values (one ID that
+      # references the same combination of Chunk A ID to Chunk B ID)
+      chunk_temp_ids |> 
+        dplyr::select(id, id_1, id_4) |> 
+        dplyr::distinct() |> 
+        dplyr::select(-id) |> 
+        dplyr::distinct() |> 
+        nrow())
+  ), big.mark = ','
+)
+
+# Are there any observations in the ID set missing an ID value?
+format(sum(is.na(chunk_temp_ids$id)), big.mark = ',')
+
+# Are there any IDs missing a value for row?
+format(
+  nrow(chunk_temp_ids |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_4))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_ids$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_ids$aps_row_4)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_ids$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_ids$id_4)), 
+    big.mark = ','
+    )
+)
+
+# [1] "138,885"
+# [1] "8,489"
+# [1] "113,086"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 320,322; Missing Rows from Chunk B: 7,071"
+# [1] "Missing IDs from Chunk A: 313,807; Missing IDs from Chunk B: 6,963"
+```
+
+### Within Posterior Probability Range
+
+We examined all pairs within the manual review posterior probability range of 0.20 - 0.70. This resulted in manual review of 13,523 pairs, with posteriors ranging from 0.38197 to 0.52337. All pairs contained a unique combination of ID values across 11,451 Chunk A IDs and 3,889 Chunk B IDs. We found no pairs with identical `client_id` values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking <- chunk_temp_pairs |>
+  dplyr::filter(
+    dplyr::between(posterior_probability, posteriors[1], posteriors[2])
+    )
+
+# Number of observations in this subset
+format(nrow(checking), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking |> 
+    dplyr::select(id_1, id_4) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking$id_4)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking |> 
+    dplyr::filter(client_id_1 == client_id_4)
+  ),
+  big.mark = ','
+  )
+
+# [1] "13,523"
+# [1] "Min: 0.38197; Max: 0.52337"
+# [1] "13,039"
+# [1] "11,451"
+# [1] "3,889"
+# [1] "0"
+```
+
+In examining our gamma values for our matching variables, we found several trends:
+
+-   The vast majority (13,463) significantly matched on last name (gamma = 0)
+-   The vast majority (12,560) significantly matched on birth month (gamma = 2)
+-   Matching on first name, birth year, and birth month appeared to be roughly 50/50 between non-matches (gamma = 0) and strong matches (gamma = 2)
+
+```{r, warning = F}
+get_unique_value_summary(
+  checking |>
+    dplyr::select(dplyr::all_of(gamma_cols))
+  )
+```
+
+Only 41 of these pairs appeared to be valid. We initiated our list of pairs to keep, which we would build during our processing.
+
+```{r}
+kept_pairs_temp <- c(
+  11, 44, 53, 84, 432, 768, 2109, 2482, 4014, 5334, 5699, 6177, 8581, 9352,
+  10515, 10576, 10583, 10893, 11157, 11266, 11999, 13401, 13896, 14588,
+  15265, 15426, 15762, 15819, 15884, 15921, 16388, 16888, 17700, 17952,
+  18284, 18841, 19636, 19809, 20197, 20229, 20266
+)
+```
+
+We also initiated a data frame of revisions to ID assignments in each chunk, in case revision was found to be necessary.
+
+```{r}
+chunk_a_revisions <- tibble::tibble(
+  !!!c('aps_row', 'id'), .rows = 0, .name_repair = ~c('aps_row', 'id')
+  )
+
+chunk_b_revisions <- tibble::tibble(
+  !!!c('aps_row', 'id'), .rows = 0, .name_repair = ~c('aps_row', 'id')
+  )
+```
+
+### Above posterior probability range
+
+We examined pairs just above our posterior probability range, to ensure appropriate capture. All pairs within the posterior probability range of 0.70 - 0.90 were examined. This resulted in manual review of 1,498 pairs with a posterior probability between 0.70808 and 0.84074. There were 2,647 unique pairs (based on Chunk A and Chunk B ID combination), with multiple Chunk A and Chunk B IDs that appeared more than once. We found no pairs with identical `client_id` values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- chunk_temp_pairs |>
+  dplyr::filter(
+    dplyr::between(posterior_probability, posteriors[2], posteriors[2]+0.2)
+    )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_4) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_4)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_4)
+  ),
+  big.mark = ','
+  )
+
+# [1] "2,751"
+# [1] "Min: 0.70808; Max: 0.84074"
+# [1] "2,647"
+# [1] "2,509"
+# [1] "1,361"
+# [1] "0"
+```
+
+Only 35 of these pairs appeared to be valid. We added these pairs to our keep list.
+
+```{r}
+kept_pairs_temp <- c(
+  kept_pairs_temp,
+  c(
+    51, 278, 705, 1370, 2623, 2645, 2743, 4466, 4599, 4920, 5283, 5894, 6033, 
+    6073, 7171, 8282, 10383, 10415, 10702, 10705, 11367, 11886, 12517, 13014, 
+    13569, 14001, 14115, 14203, 14446, 17149, 17705, 18366, 18470, 19067, 
+    20704
+    )
+  )
+``` 
+
+We then examined pairs with posterior probabilities greater than or equal to 0.90. This resulted in manual review of 4,545 pairs. There were both Chunk A and Chunk B IDs that appeared more than once, and only 4,291 pairs reflected unique combinations of Chunk A and Chunk B IDs. One pair reflected an identical `client_id` value match.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking_cols <- chunk_temp_pairs |>
+  dplyr::filter(
+    posterior_probability >= 0.90
+    )
+
+# Number of rows in this subset
+format(nrow(checking_cols), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking_cols$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking_cols$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking_cols |> 
+    dplyr::select(id_1, id_4) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking_cols$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking_cols$id_4)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking_cols |> 
+    dplyr::filter(client_id_1 == client_id_4)
+  ),
+  big.mark = ','
+  )
+
+# [1] "4,545"
+# [1] "Min: 0.91933; Max: 0.99921"
+# [1] "4,291"
+# [1] "4,057"
+# [1] "2,411"
+# [1] "1"
+```
+
+Only 801 of these pairs appeared to be valid. We added these pairs to our keep list.
+
+```{r}
+kept_pairs_temp <- c(
+  kept_pairs_temp,
+  c(
+    6, 9, 10, 17, 24, 27, 52, 56, 66, 68, 96, 104, 113, 116, 120, 125, 139, 
+    158, 191, 209, 231, 243, 321, 328, 360, 377, 378, 390, 421, 481, 525,
+    590, 645, 647, 656, 677, 678, 694, 699, 700, 704, 708, 709, 745, 763, 775,
+    782, 791, 844, 852, 926, 947, 972, 1015, 1037, 1110, 1126, 1169, 1209, 
+    1210, 1280, 1289, 1307, 1314, 1315, 1316, 1327, 1329, 1351, 1352, 1358,
+    1366, 1371, 1385, 1394, 1419, 1426, 1438, 1554, 1563, 1568, 1591, 1629,
+    1729, 1884, 1908, 1951, 1966, 1972, 1986, 1988, 1991, 2016, 2048, 2051,
+    2055, 2066, 2107, 2110, 2125, 2180, 2301, 2312, 2330, 2345, 2382, 2460,
+    2487, 2488, 2489, 2491, 2492, 2514, 2516, 2551, 2565, 2572, 2582, 2583,
+    2584, 2629, 2637, 2671, 2672, 2751, 2809, 2875, 2895, 3005, 3014, 3023, 
+    3024, 3142, 3153, 3174, 3207, 3237, 3243, 3263, 3364, 3365, 3374, 3394, 
+    3415, 3419, 3425, 3488, 3576, 3726, 3766, 3891, 3933, 3960, 3979, 3980,
+    3981, 3982, 4016, 4017, 4052, 4083, 4099, 4105, 4145, 4207, 4245, 4255, 
+    4256, 4291, 4331, 4362, 4394, 4419, 4420, 4428, 4438, 4443, 4467, 4475, 
+    4482, 4510, 4598, 4618, 4625, 4634, 4660, 4679, 4691, 4737, 4783, 4852, 
+    4981, 4987, 4998, 5020, 5073, 5074, 5134, 5160, 5167, 5186, 5197, 5245, 
+    5258, 5259, 5294, 5299, 5300, 5316, 5330, 5337, 5340, 5357, 5361, 5362, 
+    5382, 5408, 5449, 5458, 5523, 5529, 5612, 5613, 5629, 5643, 5652, 5653, 
+    5669, 5691, 5693, 5783, 5784, 5843, 5875, 5879, 5882, 5883, 5911, 5916, 
+    5967, 5968, 5982, 6000, 6059, 6133, 6161, 6185, 6187, 6188, 6219, 6248, 
+    6269, 6270, 6275, 6276, 6308, 6464, 6503, 6530, 6539, 6549, 6550, 6560,
+    6584, 6645, 6646, 6647, 6648, 6649, 6650, 6675, 6681, 6714, 6715, 6716, 
+    6717, 6734, 6785, 6792, 6827, 6834, 6837, 6901, 6911, 6969, 7054, 7064, 
+    7065, 7076, 7087, 7093, 7166, 7170, 7181, 7185, 7196, 7217, 7238, 7255, 
+    7271, 7287, 7288, 7299, 7300, 7318, 7337, 7342, 7386, 7387, 7392, 7452, 
+    7463, 7468, 7477, 7486, 7498, 7505, 7526, 7527, 7637, 7707, 7749, 7750, 
+    7768, 7775, 7798, 7901, 7906, 7926, 7985, 8027, 8037, 8039, 8042, 8043, 
+    8046, 8108, 8109, 8142, 8181, 8212, 8218, 8268, 8298, 8471, 8497, 8544, 
+    8576, 8606, 8614, 8620, 8636, 8666, 8670, 8686, 8687, 8702, 8732, 8820, 
+    8828, 8854, 8891, 9009, 9026, 9033, 9034, 9068, 9069, 9096, 9103, 9191, 
+    9198, 9218, 9254, 9305, 9307, 9329, 9336, 9339, 9350, 9367, 9382, 9405, 
+    9412, 9431, 9432, 9537, 9598, 9609, 9611, 9659, 9714, 9723, 9751, 9753, 
+    9817, 9891, 9914, 9943, 9982, 9983, 9993, 10049, 10114, 10180, 
+    10209, 10213, 10413, 10417, 10537, 10538, 10549, 10565, 10595, 10608, 
+    10609, 10633, 10639, 10645, 10646, 10663, 10673, 10679, 10687, 10688, 
+    10692, 10694, 10706, 10734, 10744, 10759, 10775, 10791, 10797, 10798, 
+    10807, 10819, 10837, 10839, 10847, 10870, 10894, 10906, 10913, 10948, 
+    10997, 10998, 10999, 11068, 11069, 11139, 11180, 11247, 11258, 11279, 
+    11285, 11307, 11311, 11312, 11313, 11324, 11329, 11342, 11417, 11496, 
+    11511, 11516, 11517, 11525, 11533, 11590, 11607, 11652, 11653, 11674, 
+    11688, 11766, 11769, 11773, 11784, 11785, 11790, 11794, 11801, 11806, 
+    11808, 11826, 11882, 11884, 11885, 12003, 12010, 12012, 12038, 12043, 
+    12051, 12096, 12109, 12135, 12216, 12360, 12411, 12423, 12425, 12431, 
+    12441, 12450, 12471, 12478, 12507, 12508, 12512, 12561, 12562, 12608, 
+    12611, 12612, 12671, 12683, 12710, 12721, 12729, 12733, 12879, 12941, 
+    12991, 13012, 13013, 13020, 13028, 13029, 13082, 13089, 13090, 13095, 
+    13098, 13124, 13125, 13134, 13161, 13164, 13310, 13412, 13502, 13564, 
+    13591, 13611, 13651, 13658, 13691, 13693, 13765, 13775, 13785, 13788, 
+    13799, 13804, 13864, 13889, 14006, 14007, 14071, 14072, 14073, 14074, 
+    14112, 14179, 14201, 14212, 14214, 14222, 14228, 14238, 14239, 14273, 
+    14274, 14288, 14357, 14374, 14375, 14449, 14459, 14461, 14467, 14487, 
+    14488, 14491, 14542, 14556, 14636, 14660, 14727, 14739, 14754, 14761, 
+    14890, 14909, 14965, 14975, 14976, 14984, 15045, 15082, 15101, 15116, 
+    15120, 15123, 15128, 15145, 15209, 15261, 15264, 15345, 15353, 15406, 
+    15425, 15427, 15450, 15451, 15469, 15511, 15517, 15522, 15550, 15581, 
+    15584, 15604, 15612, 15637, 15702, 15706, 15718, 15728, 15761, 15780, 
+    15785, 15853, 15882, 15931, 15947, 15984, 16032, 16058, 16063, 16158, 
+    16196, 16220, 16292, 16303, 16394, 16438, 16442, 16451, 16480, 16499, 
+    16500, 16508, 16531, 16620, 16654, 16716, 16734, 16740, 16757, 
+    16793, 16857, 16873, 16874, 16875, 16951, 16964, 16969, 17067, 17081, 
+    17089, 17105, 17108, 17111, 17135, 17144, 17146, 17153, 17179, 17180, 
+    17216, 17248, 17271, 17327, 17339, 17361, 17369, 17370, 17501, 17510, 
+    17553, 17554, 17677, 17770, 17773, 17813, 17869, 17883, 17888, 17917, 
+    17975, 18021, 18080, 18133, 18158, 18236, 18251, 18279, 18320, 18336, 
+    18337, 18338, 18339, 18340, 18357, 18365, 18367, 18399, 18403, 18406, 
+    18448, 18476, 18512, 18531, 18587, 18650, 18746, 18859, 18860, 18880, 
+    18888, 18892, 18895, 18923, 18927, 18970, 18984, 19006, 
+    19009, 19010, 19017, 19024, 19032, 19039, 19051, 19177, 19194, 19221, 
+    19222, 19342, 19356, 19391, 19416, 19443, 19574, 19583, 
+    19584, 19603, 19606, 19609, 19610, 19633, 19635, 19637, 19659, 19712, 
+    19723, 19726, 19755, 19883, 19987, 20053, 20054, 20074, 20079, 20080, 
+    20085, 20100, 20175, 20237, 20249, 20251, 20256, 20279, 20280, 
+    20291, 20295, 20401, 20516, 20620, 20630, 20664, 20669, 20679, 
+    20683, 20721, 20768
+    )
+  )
+```
+
+We also identified several within-chunk IDs that potentially needed revision. We made the required modifications.
+
+```{r}
+split_rows <- c(
+  5195, 19935, 52873, 105453, 108847, 147083, 157175, 158029, 166235, 182985,
+  378568, 3305, 9291, 55133, 116021, 119105, 196799, 220575, 64006, 991, 5207,
+  145499, 285811, 194905, 261563, 305211, 110165, 142767, 147021, 253081, 
+  280547, 184197, 208865, 210363, 231021, 269769, 283337, 297107, 311707, 
+  349225, 15904, 2413, 29489, 67159, 76557, 79107, 112623, 121567, 270109, 
+  85980, 137581, 124938, 209002, 229040, 335957, 340809, 337559, 
+  294651, 173898, 225852, 334878 
+  )
+
+chunk_a_revisions <- chunk_a_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = max(subset_a_pack$df$id) + dplyr::row_number()
+      )
+  )
+
+split_rows <- c(
+  95724, 145938, 152143
+  )
+
+chunk_b_revisions <- chunk_b_revisions |>
+  rbind(
+    tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = 1000000 - dplyr::row_number()
+      )
+  )
+
+chunk_a_id_revisions <- tibble::tibble(
+  id_a = c(
+    287021, 304369, 303631, 39203, 245427, 288945, 316752, 324832, 55663, 
+    189141, 299759, 176819, 168495, 187720, 221539, 167805, 204835, 223506, 
+    176780, 196765, 244085, 187748, 225268, 181671, 229815, 138353, 80570, 
+    269421, 200942, 204742, 256974, 109942, 290007, 293183, 279786, 219985, 
+    216476, 301132, 71143, 65515, 125323, 137031, 244009, 310616, 193856, 
+    277692, 92752, 299055, 174651, 261867, 313782, 328470, 260155, 166200, 
+    245196, 288324, 322020, 292124, 237816, 303170, 251632, 121239, 291922, 
+    307022, 236311, 82301, 102280, 249954, 172152, 310180, 143090, 225517, 
+    248198, 202336
+    ),
+  id = c(
+    104303, 145686, 258343, 4733, 217558, 217558, 291976, 21723, 109430, 
+    109430, 123650, 26836, 60359, 132013, 132013, 100065, 8860, 105962, 
+    87262, 132178, 92704, 1248, 16061, 1799, 92907, 42970, 42124, 18278, 
+    49532, 22786, 66204, 35166, 35166, 121532, 166726, 13600, 52205, 143269, 
+    47325, 64848, 64848, 64848, 146393, 84782, 144073, 69474, 4304, 84227, 
+    84131, 84131, 84131, 145652, 157482, 155568, 86224, 108086, 11052, 
+    111301, 113434, 154558, 112378, 101795, 101795, 101795, 163166, 
+    12659, 12918, 80985, 109164, 132552, 94858, 153749, 152332, 159035
+
+    )
+)
+
+chunk_b_id_revisions <- tibble::tibble(
+  id_4 = c(4908),
+  id = c(7971)
+)
+
+```
+
+### Regenerating ID Assignments
+
+We applied our revisions to both our pair data sets and our within-chunk subsets.
+
+```{r}
+subset_a_pack$df <- subset_a_pack$df |>
+  dplyr::rows_update(
+    chunk_a_revisions,
+    by = 'aps_row'
+  )
+
+subset_a_pack$df <- subset_a_pack$df |>
+  dplyr::mutate(id_a = id) |>
+  dplyr::rows_update(
+    chunk_a_id_revisions,
+    by = 'id_a'
+  ) |>
+  dplyr::select(-id_a)
+
+subset_b_pack$df <- subset_b_pack$df |>
+  dplyr::rows_update(
+    chunk_b_revisions,
+    by = 'aps_row'
+  )
+
+subset_b_pack$df <- subset_b_pack$df |>
+  dplyr::mutate(id_4 = id) |>
+  dplyr::rows_update(
+    chunk_b_id_revisions,
+    by = 'id_4'
+  ) |>
+  dplyr::select(-id_4)
+
+chunk_temp_pairs <- chunk_temp_pairs |>
+  dplyr::rows_update(
+    chunk_a_revisions |>
+      dplyr::rename_at(c('id', 'aps_row'), ~c('id_1', 'aps_row_1')) |>
+      dplyr::filter('aps_row_1' %in% chunk_temp_pairs$aps_row_1),
+    by = 'aps_row_1'
+  ) |>
+  dplyr::rows_update(
+    chunk_b_revisions |>
+      dplyr::rename_at(c('id', 'aps_row'), ~c('id_4', 'aps_row_4')) |>
+      dplyr::filter('aps_row_1' %in% chunk_temp_pairs$aps_row_4),
+    by = 'aps_row_4'
+  )
+
+chunk_temp_pairs <- chunk_temp_pairs |> 
+  dplyr::mutate(id = id_1) |>
+  dplyr::rename_at(c('id_1'), ~c('id_a')) |>
+  dplyr::rows_update(
+    chunk_a_id_revisions,
+    by = 'id_a'
+  ) |>
+  dplyr::select(-id_a) |>
+  dplyr::rename_at(c('id'), ~c('id_1'))
+
+chunk_temp_pairs <- chunk_temp_pairs |> 
+  dplyr::mutate(id = id_4) |>
+  dplyr::rows_update(
+    chunk_b_id_revisions,
+    by = 'id_4'
+  ) |>
+  dplyr::select(-id_4) |>
+  dplyr::rename_at(c('id'), ~c('id_4'))
+```
+
+We then reduced our pair data to our kept pairs. We then reduced to only unique combinations of within-chunk ID values, and reassigned pair numbers.
+
+```{r}
+chunk_temp_pairs <- chunk_temp_pairs |>
+  dplyr::filter(pair %in% kept_pairs_temp) |>
+  dplyr::select(id_1, id_4) |>
+  dplyr::distinct() |>
+  dplyr::mutate(pair = dplyr::row_number())
+```
+
+
+We also confirmed that there were no cross-referenced IDs in our kept pairs (e.g., ID 123 in Chunk A matching both ID 987 and 657 in Chunk B, reflecting a possible failed match in Chunk B).
+
+```{r}
+nrow(
+  chunk_temp_pairs |>
+    dplyr::filter(pair %in% kept_pairs_temp) |>
+    dplyr::filter(
+      duplicated(id_1) | duplicated(id_4)
+    )
+  ) == 0
+# [1] TRUE
+```
+
+We added ID values from Chunk A, based on our kept pairs, to Chunk B. We then assigned remaining IDs to sequential cross-set IDs.
+
+```{r}
+id_map <- subset_b_pack$df |>
+  # Get list of unique IDs in Chunk B
+  dplyr::select(id) |>
+  dplyr::distinct() |>
+  # Shift names of ID columns to match combined chunk, with cross-chunk 
+  # ID as NA for now
+  dplyr::rename_at(c('id'), ~c('id_4')) |> 
+  dplyr::mutate(
+    id = NA_integer_, id_1 = NA_integer_, id_2 = NA_integer_, 
+    id_3 = NA_integer_
+    ) |> 
+  # Add ID values based on matches
+  dplyr::rows_update(
+    chunk_temp_pairs |>
+      dplyr::select(id_1, id_4) |>
+      dplyr::rename_at(c('id_1'), ~c('id')),
+    by = 'id_4'
+  ) |>
+  # Fill remaining ID values sequentially from the max ID value in the 
+  # combined chunk
+  dplyr::mutate(
+    id = ifelse(
+      is.na(id), 
+      max(subset_a_pack$df$id) + dplyr::row_number(), 
+      id)
+  )
+
+# Add IDs to Chunk B
+subset_b_pack$df <- subset_b_pack$df |>
+  # Shift names of ID columns to match combined chunk, with cross-chunk 
+  # ID as NA for now
+  dplyr::rename_at(c('id'), ~c('id_4')) |> 
+  dplyr::mutate(
+    id = NA_integer_, id_1 = NA_integer_, id_2 = NA_integer_, 
+    id_3 = NA_integer_
+  ) |>
+  # Add values based on Chunk B ID map
+  dplyr::rows_update(
+    id_map,
+    by = 'id_4'
+  )
+```
+
+We then consolidated Chunks A and B into a single unified data set.
+
+```{r}
+aps_chunk <- dplyr::bind_rows(
+    subset_a_pack$df |>
+      dplyr::mutate(id_4 = NA_integer_),
+    subset_b_pack$df
+  )
+```
+
+We verified that our consolidated data set did not have any repeated values for `aps_row`, reflecting erroneous row duplication.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::filter(duplicated(aps_row))
+  ) == 0
+# [1] TRUE
+```
+
+We similarly verified that no `client_id` was associated with more than one ID value, which would reflect failed pairs.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::group_by(client_id) |>
+    dplyr::mutate(n_ids = dplyr::n_distinct(id)) |>
+    dplyr::ungroup() |>
+    dplyr::filter(n_ids > 1)
+  ) == 0
+# [1] TRUE
+```
+
+## Chunk = Chunk + Chunk 5
+
+We performed between-set fastLink matching of our in-progress consolidated chunk with Chunk 5. As Chunk 5 omitted date of birth due to patterns of missingness in the data, we omitted the date of birth variables from our match variables in fastLink matching and pair generation for this recombination stage. 
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+## Fuzzy-Matching Variables
+str_vars <- c(
+  "client_first_name", "client_last_name", "client_street_address"
+  )
+num_vars <- c(
+  "client_zip_code"
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Variables for fastLink output function (basic output)
+fl_ids <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+## Gamma column names
+gamma_cols <- paste(match_vars, "gamma", sep = "_")
+
+## Variables for ID stacking and Generation (all variables)
+pack_id_vars <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+pack_id_vars <- c(pack_id_vars, setdiff(pack_id_vars, colnames(aps)))
+
+# Set seed
+set.seed(doc_seed)
+
+## Packing Subset for Chunk A (1+2+3+4)
+subset_a_pack <- list()
+subset_a_pack$df <- aps_chunk
+subset_a_pack$suffix <- '1'
+subset_a_pack$ids <- fl_ids
+
+## Packing Subset for Chunk B (5)
+subset_b_pack <- list()
+subset_b_pack$df <- aps_chunk_5
+subset_b_pack$suffix <- '5'
+subset_b_pack$ids <- fl_ids
+
+#fastLink
+fl_out <- fastLink::fastLink(
+  # Chunk A
+      dfA = subset_a_pack$df,
+  # Chunk B
+      dfB = subset_b_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+      partial.match = str_vars,
+  # Do not deduplicate, lower posterior threshold
+      dedupe.matches = FALSE,
+      threshold.match = min(posteriors)
+    )
+```
+
+We obtained our preliminary pair and ID data from this output.
+
+```{r}
+# Obtain pair data
+chunk_temp_pairs <- get_pair_data(
+  subset_a_pack, subset_b_pack, match_vars, fl_out
+  )
+
+# Add ID values to pairs
+chunk_temp_pairs <- dplyr::left_join(
+  # Add in Chunk A IDs
+    dplyr::left_join(
+      chunk_temp_pairs,
+      subset_a_pack$df |>
+        dplyr::select(id, aps_row) |> 
+        dplyr::distinct() |> 
+        dplyr::rename_at(c('id', 'aps_row'), ~c('id_1', 'aps_row_1')),
+      by = 'aps_row_1'
+      ),
+  # Add in Chunk 5 IDS
+  subset_b_pack$df |>
+    dplyr::select(id, aps_row) |> 
+    dplyr::distinct() |> 
+    dplyr::rename_at(c('id', 'aps_row'), ~c('id_5', 'aps_row_5')),
+    by = 'aps_row_5'
+  ) |> 
+  dplyr::relocate(pair, posterior_probability, id_1, id_5)
+
+# Obtain initial IDs
+chunk_temp_ids <- stack_ids(subset_a_pack, subset_b_pack, chunk_temp_pairs)
+```
+
+### Review of Initial Pairs
+
+Our initial pair data was formed from 349,507 observations (249,479 from our in-progress consolidated chunk, 28 from Chunk 5). This resulted in 9 pairs, all of which were unique pairs based on ID combinations. Posterior probabilities ranged from 0.66521 to 1. No pairs were missing a value for row or ID. There were 349,470 rows from our in-progress consolidated chunk and 21 rows from Chunk 5 omitted from the pair data, likely due to failure to obtain a match with a posterior above the lower threshold. Similarly, there were 241,623 IDs from our in-progress consolidated chunk and 21 IDs from Chunk 5 missing, likely for the same reason.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the subsets used to generate this chunk?
+format(nrow(subset_a_pack$df)+nrow(subset_b_pack$df), big.mark = ',')
+
+# How many rows are in the subset A used to generate this chunk?
+format(nrow(subset_a_pack$df), big.mark = ',')
+
+# How many rows are in the subset B used to generate this chunk?
+format(nrow(subset_b_pack$df), big.mark = ',')
+
+# How many pairs were made?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(pair) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# How many unique pairs were in this set?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(id_1, id_5) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Range of posterior probability values
+paste0(
+  "Min: ",
+  format(min(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5),
+  "; Max: ",
+  format(max(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5)
+  )
+
+# Are there any pairs missing a value for row?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_5))),
+  big.mark = ','
+  )
+
+# Are there any pairs missing a value for id?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(id_1)|is.na(id_5))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_pairs$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_pairs$aps_row_5)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_pairs$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_pairs$id_5)), 
+    big.mark = ','
+    )
+)
+
+# [1] "349,507"
+# [1] "349,479"
+# [1] "28"
+# [1] "9"
+# [1] "9"
+# [1] "Min: 0.66521; Max: 1"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 349,470; Missing Rows from Chunk B: 21"
+# [1] "Missing IDs from Chunk A: 341,623; Missing IDs from Chunk B: 21"
+```
+
+### Review of Initial ID Assignments
+
+There were 9 observations in the initial ID generation for our our in-progress consolidated chunk + Chunk 5 fold, resulting in the assignment of 7 unique ID values. There were no observations in the ID set that were missing a value for ID or `aps_row`. However, there were 349,470 rows from our in-progress consolidated chunk and 21 rows from Chunk 5 missing from this set, likely due to failure to find a match above the lower posterior probability threshold. Similarly, there were 341,623 within-chunk IDs from our in-progress consolidated chunk and 21 within-chunk IDs from Chunk 4 missing from this set, likely for similar reasons.
+
+```{r, eval = F}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many observations in the ID set?
+format(nrow(chunk_temp_ids), big.mark = ',')
+
+# How many unique IDs were generated?
+format(length(unique(chunk_temp_ids$id)), big.mark = ',')
+
+# Any IDs which reference the same combination of Chunk IDs?
+format(
+  # Number of unique combinations of ID, Chunk A ID, Chunk B ID
+  ((chunk_temp_ids |> 
+      dplyr::select(id, id_1, id_5 ) |> 
+      dplyr::distinct() |> nrow()
+    ) - (
+  # Number of unique combinations of Chunk A ID and Chunk B ID
+      # removed rows would reflect duplication of these values (one ID that
+      # references the same combination of Chunk A ID to Chunk B ID)
+      chunk_temp_ids |> 
+        dplyr::select(id, id_1, id_5 ) |> 
+        dplyr::distinct() |> 
+        dplyr::select(-id) |> 
+        dplyr::distinct() |> 
+        nrow())
+  ), big.mark = ','
+)
+
+# Are there any observations in the ID set missing an ID value?
+format(sum(is.na(chunk_temp_ids$id)), big.mark = ',')
+
+# Are there any IDs missing a value for row?
+format(
+  nrow(chunk_temp_ids |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_5 ))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_ids$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_ids$aps_row_5 )), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_ids$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_ids$id_5 )), 
+    big.mark = ','
+    )
+)
+
+# [1] "9"
+# [1] "7"
+# [1] "0"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 349,470; Missing Rows from Chunk B: 21"
+# [1] "Missing IDs from Chunk A: 341,623; Missing IDs from Chunk B: 21"
+```
+
+### Review of Pairs
+
+We examined all pairs. This resulted in manual review of 9pairs, with posteriors ranging from 0.66521 to 1.00. All pairs contained a unique combination of ID values across 9 Chunk A IDs and 7 Chunk B IDs. We found no pairs with identical `client_id` values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking <- chunk_temp_pairs
+
+# Number of observations in this subset
+format(nrow(checking), big.mark = ',')
+
+# Posterior probability range in this subset
+paste0(
+  "Min: ",
+  format(min(checking$posterior_probability), digits = 5),
+  "; Max: ",
+  format(max(checking$posterior_probability), digits = 5)
+  )
+
+# Number of unique ID combinations
+format(nrow(
+  checking |> 
+    dplyr::select(id_1, id_5) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking$id_5)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking |> 
+    dplyr::filter(client_id_1 == client_id_5)
+  ),
+  big.mark = ','
+  )
+
+# [1] "9"
+# [1] "Min: 0.66521; Max: 1"
+# [1] "9"
+# [1] "9"
+# [1] "7"
+# [1] "0"
+```
+
+None of these pairs appeared to be valid. 
+
+### Regenerating ID Assignments
+
+We confirmed that there were no values of `client_id` present in both Chunk A and Chunk B.
+
+```{r}
+sum(subset_a_pack$df$client_id %in% subset_b_pack$df$client_id) == 0
+# [1] TRUE
+```
+
+We then assigned all IDs in Chunk B to sequential cross-set IDs.
+
+```{r}
+id_map <- subset_b_pack$df |>
+  # Get list of unique IDs in Chunk B
+  dplyr::select(id) |>
+  dplyr::distinct() |>
+  dplyr::rename_at(c('id'), ~c('id_5')) |>
+  # Fill remaining ID values sequentially from the max ID value in the 
+  # combined chunk
+  dplyr::mutate(
+    id = max(subset_a_pack$df$id) + dplyr::row_number(), 
+  )
+
+# Add IDs to Chunk B
+subset_b_pack$df <- subset_b_pack$df |>
+  # Shift names of ID columns to match combined chunk, with cross-chunk 
+  # ID as NA for now
+  dplyr::rename_at(c('id'), ~c('id_5')) |> 
+  dplyr::mutate(
+    id = NA_integer_, id_1 = NA_integer_, id_2 = NA_integer_,
+    id_3 = NA_integer_, id_4 = NA_integer_
+    ) |>
+  # Add values based on Chunk B ID map
+  dplyr::rows_update(
+    id_map,
+    by = 'id_5'
+  )
+```
+
+We then consolidated Chunks A and B into a single unified data set.
+
+```{r}
+aps_chunk <- dplyr::bind_rows(
+    subset_a_pack$df |>
+      dplyr::mutate(id_5 = NA_integer_),
+    subset_b_pack$df
+  )
+```
+
+We verified that our consolidated data set did not have any repeated values for `aps_row`, reflecting erroneous row duplication.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::filter(duplicated(aps_row))
+  ) == 0
+# [1] TRUE
+```
+
+We similarly verified that no `client_id` was associated with more than one ID value, which would reflect failed pairs.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::group_by(client_id) |>
+    dplyr::mutate(n_ids = dplyr::n_distinct(id)) |>
+    dplyr::ungroup() |>
+    dplyr::filter(n_ids > 1)
+  ) == 0
+# [1] TRUE
+```
+
+## Chunk = Chunk + Chunk 6
+
+We performed between-set fastLink matching of our in-progress consolidated chunk with Chunk 6. As Chunk 6 contained missing data in multiple fields, we set the variables utilized for fuzzy matching, the names of all gamma columns, and which variables we wished to include in our side-by-side pair data sets to include all identifiers.
+
+```{r}
+# Set seed
+set.seed(doc_seed)
+
+## Fuzzy-Matching Variables
+str_vars <- c(
+  "client_first_name", "client_last_name", "client_street_address"
+  )
+num_vars <- c(
+  "client_dob_year", "client_dob_month", "client_dob_day", "client_zip_code"
+  )
+
+match_vars <- c(str_vars, num_vars)
+
+## Variables for fastLink output function (basic output)
+fl_ids <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+## Gamma column names
+gamma_cols <- paste(match_vars, "gamma", sep = "_")
+
+## Variables for ID stacking and Generation (all variables)
+pack_id_vars <- c(
+  'aps_row', match_vars, 'client_id', 'client_notes',
+  'flag_unresolvable', 'flag_mult_clients', 'flag_issues'
+  )
+
+pack_id_vars <- c(pack_id_vars, setdiff(pack_id_vars, colnames(aps)))
+
+## Packing Subset for Chunk A (1+2+3+4+5)
+subset_a_pack <- list()
+subset_a_pack$df <- aps_chunk
+subset_a_pack$suffix <- '1'
+subset_a_pack$ids <- fl_ids
+
+## Packing Subset for Chunk B (6)
+subset_b_pack <- list()
+subset_b_pack$df <- aps_chunk_6
+subset_b_pack$suffix <- '6'
+subset_b_pack$ids <- fl_ids
+
+# fastLink
+fl_out <- fastLink::fastLink(
+  # Chunk A
+      dfA = subset_a_pack$df,
+  # Chunk B
+      dfB = subset_b_pack$df,
+  # Matching variables
+      varnames = match_vars,
+      stringdist.match = str_vars,
+      numeric.match = num_vars,
+      partial.match = str_vars,
+  # Do not deduplicate, lower posterior threshold
+      dedupe.matches = FALSE,
+      threshold.match = min(posteriors)
+    )
+```
+
+We obtained our preliminary pair and ID data from this output.
+
+```{r}
+# Obtain pair data
+chunk_temp_pairs <- get_pair_data(
+  subset_a_pack, subset_b_pack, match_vars, fl_out
+  )
+
+# Add ID values to pairs
+chunk_temp_pairs <- dplyr::left_join(
+  # Add in Chunk A IDs
+    dplyr::left_join(
+      chunk_temp_pairs,
+      subset_a_pack$df |>
+        dplyr::select(id, aps_row) |> 
+        dplyr::distinct() |> 
+        dplyr::rename_at(c('id', 'aps_row'), ~c('id_1', 'aps_row_1')),
+      by = 'aps_row_1'
+      ),
+  # Add in Chunk 6 IDS
+  subset_b_pack$df |>
+    dplyr::select(id, aps_row) |> 
+    dplyr::distinct() |> 
+    dplyr::rename_at(c('id', 'aps_row'), ~c('id_6', 'aps_row_6')),
+    by = 'aps_row_6'
+  ) |> 
+  dplyr::relocate(pair, posterior_probability, id_1, id_6)
+
+# Obtain initial IDs
+chunk_temp_ids <- stack_ids(subset_a_pack, subset_b_pack, chunk_temp_pairs)
+```
+
+### Review of Initial Pairs
+
+Our initial pair data was formed from 350,056 observations (349,507 from our in-progress consolidated chunk, 549 from Chunk 6). This resulted in 1,757 pairs, of which 1,713 were unique pairs based on ID combinations. Posterior probabilities ranged from 0.20818 to 0.99993. No pairs were missing a value for row or ID. There were 347,876 rows from our in-progress consolidated chunk and 382 rows from Chunk 6 omitted from the pair data, likely due to failure to obtain a match with a posterior above the lower threshold. Similarly, there were 340,06 IDs from our in-progress consolidated chunk and 382 IDs from Chunk 6 missing, likely for the same reason.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many rows are in the subsets used to generate this chunk?
+format(nrow(subset_a_pack$df)+nrow(subset_b_pack$df), big.mark = ',')
+
+# How many rows are in the subset A used to generate this chunk?
+format(nrow(subset_a_pack$df), big.mark = ',')
+
+# How many rows are in the subset B used to generate this chunk?
+format(nrow(subset_b_pack$df), big.mark = ',')
+
+# How many pairs were made?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(pair) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# How many unique pairs were in this set?
+format(
+  nrow(chunk_temp_pairs |> dplyr::select(id_1, id_6) |> dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Range of posterior probability values
+paste0(
+  "Min: ",
+  format(min(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5),
+  "; Max: ",
+  format(max(
+    chunk_temp_pairs |>
+      dplyr::select(posterior_probability) |> 
+      dplyr::pull()
+    ), digits = 5)
+  )
+
+# Are there any pairs missing a value for row?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_6))),
+  big.mark = ','
+  )
+
+# Are there any pairs missing a value for id?
+format(
+  nrow(chunk_temp_pairs |> dplyr::filter(is.na(id_1)|is.na(id_6))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_pairs$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_pairs$aps_row_6)), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# pair data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_pairs$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_pairs$id_6)), 
+    big.mark = ','
+    )
+)
+
+# [1] "350,056"
+# [1] "349,507"
+# [1] "549"
+# [1] "1,757"
+# [1] "1,713"
+# [1] "Min: 0.20818; Max: 0.99993"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 347,876; Missing Rows from Chunk B: 382"
+# [1] "Missing IDs from Chunk A: 340,061; Missing IDs from Chunk B: 382"
+```
+
+### Review of Initial ID Assignments
+
+There were 1,954 observations in the initial ID generation for our our in-progress consolidated chunk + Chunk 6 fold, resulting in the assignment of 163 unique ID values. There were no observations in the ID set that were missing a value for ID or `aps_row`. However, there were 347,876 rows from our in-progress consolidated chunk and 382 rows from Chunk 6 missing from this set, likely due to failure to find a match above the lower posterior probability threshold. Similarly, there were 340,061 within-chunk IDs from our in-progress consolidated chunk and 382 within-chunk IDs from Chunk 6 missing from this set, likely for similar reasons.
+
+```{r, eval = F}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+# How many observations in the ID set?
+format(nrow(chunk_temp_ids), big.mark = ',')
+
+# How many unique IDs were generated?
+format(length(unique(chunk_temp_ids$id)), big.mark = ',')
+
+# Any IDs which reference the same combination of Chunk IDs?
+format(
+  # Number of unique combinations of ID, Chunk A ID, Chunk B ID
+  ((chunk_temp_ids |> 
+      dplyr::select(id, id_1, id_6 ) |> 
+      dplyr::distinct() |> nrow()
+    ) - (
+  # Number of unique combinations of Chunk A ID and Chunk B ID
+      # removed rows would reflect duplication of these values (one ID that
+      # references the same combination of Chunk A ID to Chunk B ID)
+      chunk_temp_ids |> 
+        dplyr::select(id, id_1, id_6 ) |> 
+        dplyr::distinct() |> 
+        dplyr::select(-id) |> 
+        dplyr::distinct() |> 
+        nrow())
+  ), big.mark = ','
+)
+
+# Are there any observations in the ID set missing an ID value?
+format(sum(is.na(chunk_temp_ids$id)), big.mark = ',')
+
+# Are there any IDs missing a value for row?
+format(
+  nrow(chunk_temp_ids |> dplyr::filter(is.na(aps_row_1)|is.na(aps_row_6 ))),
+  big.mark = ','
+  )
+
+# How many rows in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing Rows from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$aps_row, chunk_temp_ids$aps_row_1)), 
+    big.mark = ','
+    ),
+  "; Missing Rows from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$aps_row, chunk_temp_ids$aps_row_6 )), 
+    big.mark = ','
+    )
+)
+
+# How many IDs in the original APS data for this chunk are missing from the
+# ID data (likely due to no match or match under low threshold)
+paste0(
+  "Missing IDs from Chunk A: ",
+  format(
+    length(setdiff(subset_a_pack$df$id, chunk_temp_ids$id_1)), 
+    big.mark = ','
+    ),
+  "; Missing IDs from Chunk B: ",
+  format(
+    length(setdiff(subset_b_pack$df$id, chunk_temp_ids$id_6 )), 
+    big.mark = ','
+    )
+)
+
+# [1] "1,954"
+# [1] "163"
+# [1] "192"
+# [1] "0"
+# [1] "0"
+# [1] "Missing Rows from Chunk A: 347,876; Missing Rows from Chunk B: 382"
+# [1] "Missing IDs from Chunk A: 340,061; Missing IDs from Chunk B: 382"
+```
+
+### Within Posterior Probability Range
+
+We examined all pairs. This resulted in manual review of 1,757 pairs. Only 1,713 pairs contained a unique combination of ID values across 1,599 Chunk A IDs and 167 Chunk B IDs. We found no pairs with identical `client_id` values.
+
+```{r}
+## ==========================================================================
+## This chunk is meant to have multiple outputs, used by a human using the
+## file to perform a standardized set of data checks in one block.
+## ==========================================================================
+
+checking <- chunk_temp_pairs
+
+# Number of observations in this subset
+format(nrow(checking), big.mark = ',')
+
+# Number of unique ID combinations
+format(nrow(
+  checking |> 
+    dplyr::select(id_1, id_6) |> 
+    dplyr::distinct()), 
+  big.mark = ','
+  )
+
+# Number of unique Chunk A IDs
+format(length(unique(checking$id_1)), big.mark = ',')
+
+# Number of Unique Chunk B IDs
+format(length(unique(checking$id_6)), big.mark = ',')
+
+# Number of rows with identical Client ID values
+format(nrow(
+  checking |> 
+    dplyr::filter(client_id_1 == client_id_6)
+  ),
+  big.mark = ','
+  )
+
+# [1] "1,757"
+# [1] "1,713"
+# [1] "1,599"
+# [1] "167"
+# [1] "0"
+```
+
+In examining our gamma values for our matching variables, we found several trends:
+
+-   It was approximately 50/50 if there would be a significant match on street address, if it was present (gamma = 2)
+-   The vast majority (431) significantly matched on last name, if it was present (gamma = 2)
+-   The vast majority (861) failed to match on birth month (gamma = 0)
+-   The vast majority (954) significantly matched on first name (gamma = 2)
+-   The vast majority (8,445) significantly matched on street address (gamma = 2)
+-   The vast majority (244) significantly matched on zip code, if it was present (gamma = 2)
+-   The vast majority (1,068) significantly matched on birth year (gamma = 2)
+-   The vast majority (1,200) significantly matched on birth day (gamma = 2)
+
+```{r, warning = F}
+get_unique_value_summary(
+  checking |>
+    dplyr::select(dplyr::all_of(gamma_cols))
+  )
+```
+
+No pairs appeared to be valid.
+
+We also initiated a data frame of revisions to ID assignments, to address the identified within-chunk IDs in Chunk A that needed revision.
+
+```{r}
+split_rows <- c(27439, 75481, 76551, 229323, 180550, 299896)
+
+chunk_a_revisions <- tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = max(subset_a_pack$df$id) + dplyr::row_number()
+      )
+```
+
+### Regenerating ID Assignments
+
+We confirmed that there were no values of `client_id` present in both Chunk A and Chunk B.
+
+```{r}
+sum(subset_a_pack$df$client_id %in% subset_b_pack$df$client_id) == 0
+# [1] TRUE
+```
+
+We applied our revisions to our our within-chunk subset.
+
+```{r}
+subset_a_pack$df <- subset_a_pack$df |>
+  dplyr::rows_update(
+    chunk_a_revisions,
+    by = 'aps_row'
+  )
+```
+
+We then assigned all IDs in Chunk B to sequential cross-set IDs.
+
+```{r}
+id_map <- subset_b_pack$df |>
+  # Get list of unique IDs in Chunk B
+  dplyr::select(id) |>
+  dplyr::distinct() |>
+  dplyr::rename_at(c('id'), ~c('id_6')) |>
+  # Fill remaining ID values sequentially from the max ID value in the 
+  # combined chunk
+  dplyr::mutate(
+    id = max(subset_a_pack$df$id) + dplyr::row_number(), 
+  )
+
+# Add IDs to Chunk B
+subset_b_pack$df <- subset_b_pack$df |>
+  # Shift names of ID columns to match combined chunk, with cross-chunk 
+  # ID as NA for now
+  dplyr::rename_at(c('id'), ~c('id_6')) |> 
+  dplyr::mutate(
+    id = NA_integer_, id_1 = NA_integer_, id_2 = NA_integer_,
+    id_3 = NA_integer_, id_4 = NA_integer_, id_5 = NA_integer_
+    ) |>
+  # Add values based on Chunk B ID map
+  dplyr::rows_update(
+    id_map,
+    by = 'id_6'
+  )
+```
+
+We then consolidated Chunks A and B into a single unified data set.
+
+```{r}
+aps_chunk <- dplyr::bind_rows(
+    subset_a_pack$df |>
+      dplyr::mutate(id_6 = NA_integer_),
+    subset_b_pack$df
+  )
+```
+
+We verified that our consolidated data set did not have any repeated values for `aps_row`, reflecting erroneous row duplication.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::filter(duplicated(aps_row))
+  ) == 0
+# [1] TRUE
+```
+
+We similarly verified that no `client_id` was associated with more than one ID value, which would reflect failed pairs.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::group_by(client_id) |>
+    dplyr::mutate(n_ids = dplyr::n_distinct(id)) |>
+    dplyr::ungroup() |>
+    dplyr::filter(n_ids > 1)
+  ) == 0
+# [1] TRUE
+```
+
+## Chunk = Chunk + Chunk 7
+
+Because Chunk 7 contained rows without any identifiers, we could not perform any form of matching aside from `client_id` pairing. We confirmed that there were no values of `client_id` present in both Chunk A and Chunk B.
+
+```{r}
+sum(aps_chunk$client_id %in% aps_chunk_7$client_id) == 0
+# [1] TRUE
+```
+
+We then assigned all IDs in Chunk 7 to sequential cross-set IDs.
+
+```{r}
+id_map <- aps_chunk_7 |>
+  # Get list of unique IDs in Chunk 7
+  dplyr::select(client_id) |>
+  dplyr::distinct() |>
+  dplyr::mutate(id_7 = dplyr::row_number(), id = NA_integer_) |>
+  # Fill remaining ID values sequentially from the max ID value in the 
+  # combined chunk
+  dplyr::mutate(
+    id = max(aps_chunk$id) + dplyr::row_number(), 
+  )
+
+# Add IDs to Chunk B
+aps_chunk_7 <- aps_chunk_7 |>
+  # Shift names of ID columns to match combined chunk, with cross-chunk 
+  # ID as NA for now 
+  dplyr::mutate(
+    id = NA_integer_, id_1 = NA_integer_, id_2 = NA_integer_,
+    id_3 = NA_integer_, id_4 = NA_integer_, id_5 = NA_integer_, 
+    id_7 = NA_integer_
+    ) |>
+  # Add values based on Chunk B ID map
+  dplyr::rows_update(
+    id_map,
+    by = 'client_id'
+  )
+```
+
+We then consolidated our in-progress chunk and Chunk 7 into a single unified data set.
+
+```{r}
+aps_chunk <- dplyr::bind_rows(
+    aps_chunk |>
+      dplyr::mutate(id_7 = NA_integer_),
+    aps_chunk_7
+  )
+```
+
+We verified that our consolidated data set did not have any repeated values for `aps_row`, reflecting erroneous row duplication.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::filter(duplicated(aps_row))
+  ) == 0
+# [1] TRUE
+```
+
+We similarly verified that no `client_id` was associated with more than one ID value, which would reflect failed pairs.
+
+```{r}
+nrow(
+  aps_chunk |>
+    dplyr::group_by(client_id) |>
+    dplyr::mutate(n_ids = dplyr::n_distinct(id)) |>
+    dplyr::ungroup() |>
+    dplyr::filter(n_ids > 1)
+  ) == 0
+# [1] TRUE
+```
+
+## QC Check
+
+We performed a QC check of our newly assigned unique subject IDs. We identified several rows which required revision, most frequently due to lingering spousal/familial matches.
+
+```{r}
+split_rows <- c(
+  4267, 20645, 180255, 24015, 26303, 30449, 68737, 68821, 71957, 78253, 
+  186745, 187275, 189199, 191293, 202203, 208629, 224711, 238607, 291373, 
+  292865, 1203, 1235, 1767, 2287, 3119, 3491, 4531, 8405, 13161, 15227, 
+  17449, 28763, 31661, 34479, 34621, 35607, 36347, 37565, 39649, 42461, 
+  46301, 47287, 49077, 51485, 52425, 52831, 56341, 57757, 61279, 61487, 
+  79669, 80705, 94363, 94641, 106845, 123933, 124689, 138801, 144253, 186027, 
+  11478, 68440, 83494, 84100, 267560, 283326, 252833, 166241, 47504, 136892, 
+  66205, 67085, 67181, 70407, 73265, 74903, 75003, 75457, 76867, 77313, 
+  77589, 77705, 79593, 80815, 85125, 85213, 85805, 87767, 88417, 90671, 
+  96195, 97473, 98141, 139688, 140508, 140806, 147948, 161488, 186498, 
+  197112, 98919, 99729, 100895, 102935, 107053, 108525, 111237, 112165, 
+  118239, 118701, 120771, 125407, 125571, 126261, 127003, 128949, 131175, 
+  135431, 138499, 138695, 140203, 140321, 145543, 146519, 148241, 149733, 
+  149851, 151329, 155857, 156605, 158491, 159819, 164225, 164589, 167983, 
+  171511, 172061, 174007, 174753, 175301, 175355, 178295, 178387, 179307, 
+  183333, 184303, 187321, 188141, 190441, 191447, 195377, 202965, 208049, 
+  208501, 211291, 215407, 218289, 221327, 222491, 225421, 226785, 227599, 
+  227627, 237627, 239477, 241621, 244107, 245945, 247367, 247471, 249133, 
+  256585, 259989, 265201, 265489, 265721, 268001, 268605, 269275, 274285, 
+  274587, 275565, 278163, 279923, 280597, 282541, 291083, 294661, 297835, 
+  302773, 304207, 306105, 308851, 311007, 312089, 313575, 314573, 317473, 
+  220616, 323485, 325379, 326077, 326277, 326315, 326585, 329287, 
+  334015, 336123, 340613, 341553, 343837, 343967, 361217, 361593, 364109, 
+  366543, 366771, 366929, 367117, 367883, 367889, 370751, 372949, 375385, 
+  377345, 4492, 21504, 24122, 34382, 69148, 73494, 106578, 117008, 117036, 
+  130596, 141676, 179818, 227626, 237708, 296768, 298290, 311172, 319602, 
+  326864, 332740, 333921, 126474, 158966, 156549, 26861, 51101, 65969, 77367, 
+  117863, 125599, 143155, 145155, 146763, 165943, 168619, 191107, 197253, 
+  205397, 207391, 219781, 223309, 236019, 258501, 323481, 329115, 330659, 
+  359089, 365859, 371869, 17414, 32706, 47852, 58852, 61148, 95964, 103380, 
+  118722, 125092, 128754, 163552, 196396, 198104, 198714, 223062, 253078, 
+  291624, 293552, 332684, 343370, 363172, 368666, 62823, 184603, 203014, 
+  23953, 187677, 68535, 180643, 299849, 244778, 87699, 172851, 257363, 257365 
+)
+
+chunk_a_revisions <- tibble::tibble(
+      aps_row = split_rows
+      ) |>
+      dplyr::mutate(
+        id = max(aps_chunk$id) + dplyr::row_number()
+      )
+```
+
+We applied these revisions.
+
+```{r}
+aps_chunk <- aps_chunk |>
+  dplyr::rows_update(
+    chunk_a_revisions,
+    by = 'aps_row'
+  )
+```
+
+# Map Creation
+
+We then isolated our desired mapping: `client_id` to our new APS-specific subject ID.
+
+```{r}
+map <- aps_chunk |>
+  dplyr::select(id, client_id) |>
+  dplyr::distinct() |>
+  dplyr::rename_at(c('id'), ~c('aps_id'))
+```
+
+This map reduced our unique subject IDs from 378,418 `client_id` values to  371,072 `aps_id` values, a 1.941% reduction.
+
+```{r}
+paste0(
+  "Reduced ",
+  format(length(unique(map$client_id)), big.mark = ','),
+  " client_id values to ",
+  format(length(unique(map$aps_id)), big.mark = ','),
+  " aps_id values, a ",
+  format( (100*(length(unique(map$client_id)) - length(unique(map$aps_id)))/
+             length(unique(map$client_id))), digits = 4), 
+  "% reduction."
+  )
+
+# [1] "Reduced 378,418 client_id values to 371,072 aps_id values, a 
+# 1.941% reduction."
+```
+
+## Final QC
+
+We performed a final QC of our map based on guidance provided by APS that each `case_id` should only correspond to a single client, but each client may have more than one `case_id` - as such, each `case_id` should correspond to a single value of `aps_id`.
+
+We loaded the original APS data, prior to reduction to unique identifier values (which resulted in the omission of `case_id`).
+
+```{r}
+aps_path <- here::here(
+  "data","cleaned_rds_files", "record_linkage", "aps", "aps_00_clean.rds"
+  )
+
+informative_df_import(
+    "aps", aps_path, overwrite = T
+  )
+
+# 2024-11-13: APS data imported with 568,616 rows and 23 columns.
+# Data last modified on OneDrive: 2024-11-01 16:59:03
+```
+
+We applied our map to this data, omitting any row without `client_id` values (only one row present, without any identifier data).
+
+```{r}
+aps_chunk <- aps |>
+  # Omit known row with a missing client_id value
+  dplyr::filter(!is.na(client_id)) |>
+  dplyr::mutate(aps_id = NA_integer_) |>
+  dplyr::rows_update(
+    map |>
+      dplyr::filter(!is.na(client_id)),
+    by = 'client_id'
+  ) |>
+  # Add map's aps_id value for the single row missing a client_id value
+  rbind(
+    aps[is.na(aps$client_id),] |>
+      dplyr::mutate(aps_id = map[is.na(map$client_id),]$aps_id)
+  )
+```
+
+We found that there were 252 `aps_id` values that were cross-referenced in 125 `case_id` values, potentially indicating failed matches. We manually reviewed these observations.
+
+```{r}
+checking <- aps_chunk |>
+  dplyr::group_by(case_id) |>
+  dplyr::mutate(n_ids = dplyr::n_distinct(aps_id)) |>
+  dplyr::filter(n_ids > 1) |>
+  dplyr::ungroup() |>
+  dplyr::arrange(case_id)
+
+
+paste0(
+  nrow(checking), " observations across ", 
+  length(unique(checking$aps_id)), " aps_id values and ",
+  length(unique(checking$case_id)), " case_id values."
+)
+
+# [1] "252 observations across 252 aps_id values and 125 case_id values."
+```
+
+We found all of these values to be reasonable as true matches. We revised these values for our revised map.
+
+```{r}
+map <- aps_chunk |>
+  dplyr::rows_update(
+    checking |>
+      dplyr::select(case_id, aps_id) |>
+      dplyr::group_by(case_id) |>
+      dplyr::mutate(new_id = dplyr::first(aps_id)) |>
+      dplyr::ungroup() |>
+      dplyr::select(case_id, new_id) |>
+      dplyr::rename_at(c('new_id'), ~c('aps_id')) |>
+      dplyr::distinct(),
+    by = 'case_id'
+    ) |>
+  dplyr::select(client_id, aps_id) |>
+  dplyr::group_by(client_id) |>
+  dplyr::mutate(new_id = dplyr::first(aps_id)) |>
+  dplyr::ungroup() |>
+  dplyr::select(client_id, new_id) |>
+  dplyr::rename_at(c('new_id'), ~c('aps_id')) |>
+  dplyr::distinct()
+```
+
+This map reduced our unique subject IDs from 378,418 `client_id` values to  370,958 `aps_id` values, a 1.971% reduction.
+
+```{r}
+paste0(
+  "Reduced ",
+  format(length(unique(map$client_id)), big.mark = ','),
+  " client_id values to ",
+  format(length(unique(map$aps_id)), big.mark = ','),
+  " aps_id values, a ",
+  format( (100*(length(unique(map$client_id)) - length(unique(map$aps_id)))/
+             length(unique(map$client_id))), digits = 4), 
+  "% reduction."
+  )
+
+# [1] "Reduced 378,418 client_id values to 370,958 aps_id values, a 
+# 1.971% reduction."
+```
+
+# 💾 Save and Export Data
+
+We exported our map, for later use.
+
+```{r}
+saveRDS(
+  map,
+  here::here(
+    "data", "cleaned_rds_files", "record_linkage", "aps", 
+    "00_map-aps_id-to-client_id.rds"
+    )
+)
+```
+
+# 🧹 Clean up
+
+```{r}
+rm(list=ls())
+```
+

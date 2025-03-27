@@ -7,9 +7,24 @@ format: html
 
 # ⭐️ Overview
 
-The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`.
+
+## APS Data Background
+
+The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`. 
+
+## This File
 
 This file performs cleaning of the APS client identifier data in anticipation of fuzzy matching. The most significant modifications were made to street address values, as this field appeared to have been used as a "comment box". 
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ). 
+
+It is recommended that anyone orienting to the task start at the primary task notes document, which provides a high-level overview of the task data, parameters, and process: [notes_01_task_01_00_merging aps and medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_01_task_01_00_merging aps and medstar task.docx?d=w542529e69bd2411da7a2d7efe56269a5&csf=1&web=1&e=8ZF6Rg).
+
+Notes for the APS data are located in the [notes_00_data_aps.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_00_data_aps.docx?d=w854dec51d8b049bdab8b0018f3d4bfff&csf=1&web=1&e=DKCWsI) file. Notes relating to this specific step of processing are in the [notes_01_task_01_01_aps clean and prep task notes.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_01_task_01_01_aps clean and prep task notes.docx?d=wfe9bc014e84f42a4aa62b4718426f66e&csf=1&web=1&e=1RviRD) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
 
 # 📦 Load Packages and Functions
 
@@ -173,22 +188,6 @@ county_list <- unique(tolower(county_list$county_name))
 For fixes that required potential use of PHI, we utilized a CSV file.
 
 ```{r}
-unresolvable_path <- here::here("data","aps_caseids_unresolvables.csv")
-
-informative_df_import("unresolvables", unresolvable_path, show_col_types = F)
-
-unresolvables <- unresolvables |>
-  janitor::clean_names()
-
- # 2024-11-01: UNRESOLVABLES data imported with 368 rows and 1 columns.
- # Data last modified on OneDrive: 2024-11-01 16:35:44 
-```
-
-## Unresolvable Case IDs
-
-Generated during the course of this file, we made a list of Case IDs associated with unresolvable entries. 
-
-```{r}
 pointfix_path <- here::here("data","aps_fuzzy-prep-clean_point-fixes.csv")
 
 informative_df_import("point_fixes", pointfix_path, show_col_types = F)
@@ -198,6 +197,22 @@ point_fixes <- point_fixes |>
 
  # 2024-11-01: POINT FIXES data imported with 31 rows and 3 columns.
  # Data last modified on OneDrive: 2024-11-01 15:32:15   
+```
+
+## Unresolvable Case IDs
+
+Generated during the course of this file, we made a list of Case IDs associated with unresolvable entries. 
+
+```{r}
+unresolvable_path <- here::here("data","aps_caseids_unresolvables.csv")
+
+informative_df_import("unresolvables", unresolvable_path, show_col_types = F)
+
+unresolvables <- unresolvables |>
+  janitor::clean_names()
+
+ # 2024-11-01: UNRESOLVABLES data imported with 368 rows and 1 columns.
+ # Data last modified on OneDrive: 2024-11-01 16:35:44 
 ```
 
 # Initial Data Structure
@@ -12051,7 +12066,7 @@ We exported our data, for further use.
 saveRDS(
   aps,
   here::here(
-    "data", "cleaned_rds_files", "unique_subject_ids", "aps", 
+    "data", "cleaned_rds_files", "record_linkage", "aps", 
     "aps_00_clean.rds"
     )
 )

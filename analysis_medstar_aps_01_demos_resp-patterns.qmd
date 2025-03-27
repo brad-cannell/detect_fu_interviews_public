@@ -1,0 +1,1818 @@
+---
+title: "Analyses"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+[PLACEHOLDER]
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r}
+#| label: imports-libraries
+#| warning: FALSE
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   janitor version 2.2.0
+
+## Functions
+
+```{r}
+#| label: imports-functions
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+# Function that creates a modified version of table output, allowing
+# simplified manual review of unique values in a given column or set of
+# columns
+source(here::here("r", "get_unique_value_summary.R"))
+```
+
+# 📥 Load Data
+
+## MedStar Data
+
+We loaded our MedStar subject linkage map.
+
+```{r}
+#| label: load-ms-subj-map
+# Load MedStar Subject ID Map
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "02_medstar-keys-to-id_ms.rds"
+    )
+
+informative_df_import(
+    "ms_ids", path, overwrite = T
+  )
+
+#[PLACEHOLDER]
+```
+
+We loaded our MedStar record data, which included participant identifiers and variables specific to the MedStar Response, such as DETECT tool responses. We applied our within-set subject linkage map to obtain our within and between-set subject ID values.
+
+```{r}
+#| label: load-ms-data-participants-rds
+# Load MedStar Response Data (EMS recorded demographics, DETECT responses)
+path <- here::here("data", "unique_id_creation", "participant_unique_id.rds")
+
+informative_df_import(
+    "ms_resps", path, overwrite = T
+  )
+
+## Rename variable for compatibility with record linkage map
+ms_resps <- ms_resps |>
+  dplyr::rename_at("ems_response_number", ~"ems_num") |>
+## Rename DETECT tool variables for clarity in code
+  dplyr::rename_at(
+    c(
+      "x_unusual_odor", "x_disarray_hoarding_4cat", "x_health_safety_concern",
+      "x_isolated_home_4cat", "x_poor_personal_hygiene_4cat",
+      "x_inadequately_clothed_4cat", "x_unmet_needs_4cat", "x_depressed_4cat",
+      "x_hoarding_medications", "x_difficulty_medications_4cat",
+      "x_caregiver_lack_knowledge_4cat", "x_caregiver_unengaged_4cat",
+      "x_caregiver_frustrated_4cat", "x_caregiver_anxious_4cat", 
+      "x_aps_reported_2cat", "x_aps_reported_confirmation_number"
+    ), 
+    ~c(
+      "dt_env_odor", "dt_env_hoard", "dt_env_concern", "dt_pt_isolated", 
+      "dt_pt_hygiene", "dt_pt_clothes", "dt_pt_needs", "dt_pt_depress",
+      "dt_pt_med_hoard", "dt_pt_med_diff", "dt_cg_lack", "dt_cg_uneng",
+      "dt_cg_frust", "dt_cg_anx", "dt_aps_reported", "dt_aps_report_num"
+    )
+  )
+
+## Apply Within-Set Subject ID Map
+ms_resps <- ms_resps |>
+  dplyr::mutate(id = NA_integer_, id_ms = NA_integer_) |>
+  dplyr::rows_update(
+    ms_ids,
+    by = c('x_primary_key', 'medstar_internal_id')
+  ) |>
+  dplyr::relocate(id, id_ms)
+
+#[PLACEHOLDER]
+```
+
+We cleared our MedStar within-set subject ID linkage map from memory, as it was no longer necessary.
+
+```{r}
+#| label: load-clear-ms-subj-map
+rm(ms_ids)
+```
+
+## APS Data
+
+We loaded our APS subject linkage map.
+
+```{r}
+#| label: load-aps-subj-map
+# Load APS Subject ID Map
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "01_aps-client_id-to_id-aps.rds"
+    )
+
+informative_df_import(
+    "aps_ids", path, overwrite = T
+  )
+#[PLACEHOLDER]
+```
+
+### APS Investigation Data
+
+We loaded our APS Investigations data, which included APS determined outcomes at the investigation level. We received expected errors, due to values of "blank" written in certain cells that would otherwise contain numeric values. We performed basic cleaning/wrangling of the data, to facilitate use in code for analyses. We applied our within-set subject linkage map to obtain our within and between-set subject ID values, and reduced our data set to only include subjects also present in the MedStar data.
+
+```{r}
+#| label: load-aps-data-investigations
+# Load APS Investigations Data
+path <- here::here(
+  "data", "DETECT Shared with APS", "Investigations.xlsx")
+
+informative_df_import(
+    "aps_invs", path, 
+    #read_excel() arguments                    
+    sheet = "Investigations",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), rep("date", 2), "text", "numeric", "text"
+      )
+  )
+
+## Clean variable names for use in code, minor variable cleaning
+aps_invs <- aps_invs |>
+  ### Rename columns per SOPs
+  janitor::clean_names() |>
+  dplyr::rename_at(
+    c(
+      'investigation_id', 'date_investigation_opened', 
+      'date_investigation_closed', 'overall_disposition',
+      'investigation_closure_reason', 'closure_reason_code'
+      ), 
+    ~c(
+      'inv_id', 'date_open', 'date_close', 'overall_dispo', 'close_reason', 
+      'close_code'
+      )
+  ) |>
+  dplyr::mutate(
+  ### Enforce date format for date items
+    date_open = lubridate::date(date_open),
+    date_close = lubridate::date(date_close),
+  ### Convert string columns to lowercase, trim white spaces
+    overall_dispo = stringr::str_trim(
+      stringr::str_to_lower(overall_dispo), 
+      'both'
+      ),
+    close_reason = stringr::str_trim(
+      stringr::str_to_lower(close_reason), 
+      'both'
+      ),
+  ### Shorten "Unable to Determine" closure reason and disposition to "utd"
+    overall_dispo = ifelse(
+      overall_dispo == "unable to determine", 'utd', overall_dispo
+      ),
+    close_reason = ifelse(
+      close_reason == "unable to determine", 'utd', close_reason
+      )
+    )
+
+## Apply Within-Set Subject ID Map 
+aps_invs <- aps_invs |>
+  dplyr::mutate(id = NA_integer_, id_aps = NA_integer_) |>
+  dplyr::rows_update(
+    aps_ids,
+    by = c('client_id')
+  ) |>
+  dplyr::relocate(id, id_aps) |>
+  ### Reduce to subjects also present in the MedStar data
+  dplyr::filter(id %in% ms_resps$id)
+
+# Warning: Expecting numeric in G276 / R276C7: got 'blank'
+# Warning: Expecting numeric in G51328 / R51328C7: got 'blank'
+# Warning: Expecting numeric in G64351 / R64351C7: got 'blank'
+# Warning: Expecting numeric in G92207 / R92207C7: got 'blank'
+# Warning: Expecting numeric in C145086 / R145086C3: got 'blank'
+#[PLACEHOLDER]
+```
+
+### APS Allegations Data
+
+We loaded our APS Allegations data, which included granular detail as to allegation type and disposition within any single investigation. We received expected errors, due to values of "blank" written in certain cells that would otherwise contain numeric values. We performed basic cleaning/wrangling of the data, to facilitate use in code for analyses. We also pivoted the data from a long format (each row describing a single allegation, for a single victim-perpetrator pair in an investigation) to wide format (each row describing all allegations of each type within a single investigation, with self-perpetrator allegations indicated as a specific allegation type).
+
+```{r}
+#| label: load-aps-data-allegations
+# Load APS Allegations Data
+path <- here::here(
+  "data", "DETECT Shared with APS", "Allegations.xlsx")
+
+informative_df_import(
+    "aps_alleg", path, 
+    #read_excel() arguments                    
+    sheet = "Allegations - Alleg Dtail Block",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), rep("text", 3)
+      )
+  )
+
+## Clean variable names for use in code, cleaning/wrangling, pivot wider
+aps_alleg <- aps_alleg |>
+  ### Rename columns per SOPs
+  janitor::clean_names() |>
+  dplyr::rename_at(
+    c(
+      'investigation_id', 'allegation_id', 'allegation_type', 
+      'allegation_disposition', 'perpetrator_self_not_self_relationship'
+      ), 
+    ~c('inv_id', 'alleg_id', 'alleg_type', 'alleg_dispo', 'perpetrator_self')
+   ) |>
+  ### Filter to only include investigations that are in the Investigation set
+  dplyr::filter(inv_id %in% aps_invs$inv_id) |>
+  dplyr::mutate(
+  ### Convert binary "self/non-self" into TRUE/FALSE
+    perpetrator_self = perpetrator_self == "Self",
+  ### Prep for Pivot: Convert allegation types into reasonable column names
+    alleg_type = dplyr::case_when(
+      # Non-Self Variants
+      alleg_type == 'Exploitation' ~'exploit',
+      alleg_type == 'Sexual Abuse' ~'abuse_sex',
+      alleg_type == 'Physical Abuse' ~'abuse_phys',
+      alleg_type == 'Emot/Verbl Abuse' ~'abuse_verbal',
+      (alleg_type == 'Medical Neglect') & (!perpetrator_self) ~
+        'neglect_med',
+      (alleg_type == 'Men Health Neg.') & (!perpetrator_self) ~
+        'neglect_mental',
+      (alleg_type == 'Physical Neglect') & (!perpetrator_self) ~
+        'neglect_phys',
+      # Self Variants
+      (alleg_type == 'Medical Neglect') & (perpetrator_self) ~
+        'neglect_med_self',
+      (alleg_type == 'Men Health Neg.') & (perpetrator_self) ~
+        'neglect_mental_self',
+      (alleg_type == 'Physical Neglect') & (perpetrator_self) ~
+        'neglect_phys_self',
+      TRUE ~ alleg_type
+    ),
+    ### Prep for Pivot: Flag if disposition includes the term "Blank"
+    blank = stringr::str_detect(
+      stringr::str_to_lower(alleg_dispo), 'blank'
+      ),
+    ### Prep for Pivot: Standardize disposition values
+    alleg_dispo = dplyr::case_when(
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'invalid'
+        ) ~ 'invalid',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'valid'
+        ) ~ 'valid',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'vnf'
+        ) ~ 'valid',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'unable to determine'
+        ) ~ 'utd',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'utd'
+        ) ~ 'utd',
+      #### Note: Per APS documentation, "Other" indicated no allegations with
+      #### dispositions
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'other'
+        ) ~ NA_character_,
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'not specified'
+        ) ~ NA_character_,
+      TRUE ~ alleg_dispo
+    )
+  ) |>
+  ### Prep for Pivot: Shorten name of disposition variable
+  dplyr::rename_at('alleg_dispo', ~'dispo') |>
+  ### Pivot wider (allegation types as columns, disposition and blank flag 
+  ### as values)
+  tidyr::pivot_wider(
+    names_from = alleg_type, 
+    names_glue = "{alleg_type}_{.value}",
+    values_from = c(dispo, blank)
+    ) |>
+  ### Remove columns that are no longer necessary after pivot
+  dplyr::select(-c(alleg_id, perpetrator_self)) |>
+  ### Extend "disposition" and "blank" values to fill blanks within a given
+  ### investigation
+  dplyr::group_by(inv_id) |>
+  tidyr::fill(
+    dplyr::all_of(dplyr::ends_with("_dispo")), 
+    .direction = 'updown') |>
+  tidyr::fill(
+    dplyr::all_of(dplyr::ends_with("_blank")), 
+    .direction = 'updown') |>
+  ### Consolidate any combinations of dispositions to reflect the APS 
+  ### hierarchy of dispositions within a single investigation
+  ### (Valid > UTD > Invalid)
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::all_of(dplyr::ends_with("_dispo")), 
+      ~dplyr::case_when(
+        'valid' %in% .x ~ 'valid',
+        'utd' %in% .x ~ 'utd',
+        'invalid' %in% .x ~ 'invalid',
+        TRUE ~ NA_character_
+        )
+      )
+    ) |>
+  dplyr::ungroup() |>
+  ### Reduce to only unique rows
+  dplyr::distinct()
+
+#[PLACEHOLDER]
+```
+
+### APS Intake Data
+
+We loaded our APS Intake data, which included granular detail as to reporter types and report dates within any single APS case. We received expected errors, due to values of "blank" written in certain cells that would otherwise contain numeric values. We performed basic cleaning/wrangling of the data, to facilitate use in code for analyses. We also flagged any EMS-explicit or EMS-possible reporter type. We applied our within-set subject linkage map to obtain our within and between-set subject ID values.
+
+```{r}
+#| label: load-aps-data-intakes
+# Load APS Intakes Data
+path <- here::here(
+  "data", "DETECT Shared with APS", "Subsequent Intakes.xlsx")
+
+informative_df_import(
+    "aps_intakes", path, 
+    #read_excel() arguments                    
+    sheet = "Initial and Subsequent Intakes",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), "date", "text"
+      )
+  )
+
+## Clean variable names for use in code, minor cleaning/wrangling
+aps_intakes <- aps_intakes |>
+  ### Rename columns per SOPs
+  janitor::clean_names() |>
+    dplyr::rename_at(
+    'caller_relationship_category', ~'reporter_type'
+  ) |>
+  dplyr::mutate(
+  ### Convert string "reporter type" to lower, standardize white space
+    reporter_type = stringr::str_trim(
+      stringr::str_to_lower(reporter_type), 
+      side = 'both'
+      ),
+  ### Flag reporter type as "possibly EMS" if not in an excluded category
+    reporter_possible = !(
+      reporter_type %in% c(
+      'family members and relatives', 'financial institution', 
+      'friends and neighbors', 'law enforcement', 
+      'legal and court-related services', 'state agencies'
+      )
+    ),
+  ### Flag reporter type as "explicitly EMS" if it uses the EMS reporter type
+    reporter_ems = reporter_type == 'health care providers/staff -- ems/emt'
+  )
+
+## Apply Within-Set Subject ID Map 
+aps_intakes <- aps_intakes |>
+  dplyr::mutate(id = NA_integer_, id_aps = NA_integer_) |>
+  dplyr::rows_update(
+    aps_ids,
+    by = c('client_id'),
+    unmatched = 'ignore'
+  ) |>
+  dplyr::relocate(id, id_aps)
+
+# Warning: Expecting numeric in C169722 / R169722C3: got 'blank'
+#[PLACEHOLDER]
+```
+
+We cleared our APS within-set subject ID linkage map from memory, as it was no longer necessary.
+
+```{r}
+#| label: load-clear-aps-subj-map
+rm(aps_ids)
+```
+
+## Record Linkage Maps
+
+We loaded our MedStar Response to APS Case/Investigation record linkage map.
+
+```{r}
+#| label: load-rlink-ms-inv
+# Load MedStar Response to APS Case/Investigation Linkage Map
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "04_medstar-records_to_aps-case-invs.rds"
+    )
+
+informative_df_import(
+    "linked_invs", path, overwrite = T
+  )
+
+#[PLACEHOLDER]
+```
+
+We loaded our MedStar Response to APS Intake record linkage map.
+
+```{r}
+#| label: load-r-link-ms-intake
+# Load MedStar Response to APS Intake Linkage Map
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "05_medstar-records_to_aps-intakes.rds"
+    )
+
+informative_df_import(
+    "linked_intake", path, overwrite = T
+  )
+
+#[PLACEHOLDER]
+```
+
+# Data Preparation
+
+## Patient Demographics
+
+### Response-Level
+
+To facilitate analyses, we processed our demographic variables. 
+
+#### Age and DOB
+
+There were several questionable age values within our data set, in which a calculated age was different from the age calculated from the incident date and date of birth. The vast majority of these entries differed only in a single year or reflected a likely typo, such as the substitution of a digit that would be adjacent on a number pad.
+
+```{r}
+#| label: clean-demo-age-explore
+
+# Identify major trends in Age/DOB discrepancies
+
+## Extract subset of subjects with more than one DOB value
+checking <- ms_resps |>
+  dplyr::select(id, dob) |>
+  dplyr::distinct() |>
+  dplyr::filter(duplicated(id)|duplicated(id, fromLast = T))
+
+## Extract subset of subjects with differences between entered and calculated
+## age values
+checking_cols <- ms_resps |>
+  dplyr::select(id, ems_num, age, dob, incident_timestamp) |>
+  dplyr::mutate(
+    age_calc = lubridate::year(
+      lubridate::as.period(
+        lubridate::interval(
+          start = dob, 
+          end = lubridate::date(incident_timestamp)
+          )
+        )
+      )
+    ) |>
+  dplyr::filter(age != age_calc) |>
+  dplyr::mutate(age_diff = age - age_calc) |>
+  dplyr::arrange(age_diff)
+
+## Generate a brief human-legible summary
+paste0(
+  format(nrow(checking), big.mark = ','),
+  " responses (",
+  format(length(unique(checking$id)), big.mark = ','),
+  " subjects) have multiple DOB values. Entered age =/= calculated age in ",
+  format(nrow(checking_cols), big.mark = ','),
+  " responses (",
+  format(length(unique((checking_cols$id)))),
+  " subjects, ",
+  format(length(unique(checking_cols$id[checking_cols$id %in% checking$id]))),
+  " with multiple DOBs), range ",
+  format(min(checking_cols$age_diff)), " to ",
+  format(max(checking_cols$age_diff)),
+  " years. Average (absolute) difference of ", 
+  format(mean(abs(checking_cols$age_diff)), big.mark = ',', digits = 4),
+  " years. " ,
+  format(
+    nrow(checking_cols[checking_cols$age_diff > 0,])*100 / nrow(checking_cols),
+    digits = 4
+    ),
+  "% positive (entered > calculated). ",
+  format(
+    nrow(checking_cols[
+      (checking_cols$dob == lubridate::date(checking_cols$incident_timestamp)),
+      ])
+    ),
+  " have a DOB that matches the incident date, of which ",
+  format(
+    nrow(checking_cols[
+      (checking_cols$dob == lubridate::date(checking_cols$incident_timestamp))
+      & checking_cols$id %in% checking$id,
+      ])
+    ),
+  " also have more than one DOB value."
+)
+
+# [1] "1,844 responses (908 subjects) have multiple DOB values. 
+# Entered age =/= calculated age in 286 responses (273 subjects, 11 with 
+# multiple DOBs), range -20 to 84 years. Average (absolute) difference of 
+# 4.647 years. 45.1% positive (entered > calculated). 12 have a DOB that 
+# matches the incident date, of which 2 also have more than one DOB value."
+```
+
+For subjects with additional DOB values in the data, we took the consistently present DOB value that resulted in a matching calculated and entered age value to be the "true" value. We removed frankly invalid DOB values, present when the incident date and DOB were identical. We calculated age values, and took the entered age if the DOB was missing (or removed for being invalid).
+
+```{r}
+#| label: clean-demo-age-rows
+
+# Address disparities between age and DOB in individual responses
+ms_resps <- ms_resps |>
+  ## Fix responses with age differences attributable to typo (with multiple 
+  ## DOBs, additional responses with consistent DOBs that match entered and 
+  ## calculated age - replace with those DOBs). 
+  ## Note: IDs 3078 and 27044 had differences due to DOBs that matched the
+  ## incident date (invalid). IDs 29557 and 32562 required additional public
+  ## record searches to resolve.
+  dplyr::rows_update(
+    ms_resps |>
+      dplyr::filter(
+        id %in% c(
+          3078, 27044, 41935, 35681, 10506, 1453, 14880, 2813, 3135, 29957, 
+          32562
+          )
+      ) |>
+      dplyr::select(id, ems_num, dob) |>
+      dplyr::group_by(id) |>
+      ### Manual review indicated that all target IDs had the desired DOB
+      ### at the lowest EMS Number value - this is not an inherent trait of
+      ### all responses, but a convenient coincidence
+      dplyr::filter(ems_num == min(ems_num)) |>
+      dplyr::ungroup() |>
+      dplyr::select(id, dob),
+    by = 'id'
+    ) |>
+  ## Remove DOB from responses with frankly invalid incident-date DOBs
+  dplyr::mutate(
+    ### Use dplyr::if_else (not ifelse) to avoid loss of date format integrity
+    dob = dplyr::if_else(
+      lubridate::date(incident_timestamp) == dob, 
+      NA_Date_, 
+      dob)
+  ) |>
+  ## Calculate age from incident date and date of birth
+  dplyr::mutate(
+    age_calc = dplyr::if_else(
+      !is.na(dob),
+      lubridate::year(
+        lubridate::as.period(
+          lubridate::interval(
+            start = dob, 
+            end = lubridate::date(incident_timestamp)
+            )
+          )
+        ),
+      age
+    )
+  )
+```
+
+#### Sex
+
+Biological sex was input by MedStar medics as a "select one" option. Values for sex were stored in our data as numerical values, representing one of three categorical values: "Male", "Female", or "Unknown (Unable To Determine)". We converted these values into text-based categories.
+
+```{r}
+#| label: clean-demo-sex-rows
+
+# Convert sex into human-understood text for analyses
+ms_resps <- ms_resps |>
+  dplyr::mutate(
+    sex_cat = dplyr::case_when(
+      sex == 1 ~ "male",
+      sex == 2 ~ "female",
+      sex == 7 ~ "uta",
+      TRUE ~ NA_character_
+    )
+  )
+```
+
+#### Race and Ethnicity
+
+We processed our values for race and ethnicity. As the MedStar ePCR platform allows for selection of race and ethnicity from a "select all that apply" list, any combination of these values may be present within a single response. These values appeared to largely follow US Census options. Potential values were noted to be: "White", "Black or African American", "Asian", "American Indian or Alaska Native", "Native Hawaiian or Other Pacific Islander", "Middle Eastern or North African", "Hispanic or Latino", "Other Race", "Not Applicable", and "Not Recorded".
+
+We separated "Hispanic or Latino" into a column separate from race, similar to US Census measures. This impacted 10,685 rows (5,631 subjects). We converted values of "Not Applicable" and "Not Recorded" to missing values (`NA`). We processed race options into individual dummy variables to capture the nuances of the responses. The 297 responses, across 169 subjects, with more than one race value selected had their overall race category changed to "multiracial".
+
+```{r}
+#| label: clean-demo-race-rows
+
+# Convert race and ethnicity into separate single categories
+ms_resps <- ms_resps |>
+  ## Extract Ethnicity (Hispanic or Non-Hispanic)
+dplyr::mutate(
+  hispanic = dplyr::case_when(
+    ### Make flag TRUE if "Hispanic" in race value
+    stringr::str_detect(race, "Hispanic") ~ T,
+    ### Make flag "NA" if race is missing or equivalent to a missing value
+    is.na(race)|race %in% c("Not Recorded", "Not Applicable") ~ NA,
+    ### Make the flag "NA if race had multiple selections that included 
+    ### "Not Applicable" or "Not Recorded" and any race value other than 
+    ### "Hispanic or Latino"
+    (
+      stringr::str_detect(race, "Not") & 
+      stringr::str_detect(race, "(Asian|Other Race|White)")
+    ) ~ NA,
+    ### Otherwise, make the flag FALSE
+    TRUE ~ F
+    ),
+  ## Create new categorical race variable that holds a single race value
+    ### Remove "Hispanic or Latino", "Not Applicable", and "Not Recorded"
+    ### values from race
+    race_cat = stringr::str_remove_all(
+      race, 
+      "(Hispanic or Latino|Not Applicable|Not Recorded)"
+      ),
+    ### Clean commas. Done in separate stages as combined Regex attempts
+    ### continually removed *all* commas, which was undesirable
+    race_cat = stringr::str_remove(race_cat, ", $"),
+    race_cat = stringr::str_replace_all(race_cat, ", ,", ", "),
+    race_cat = stringr::str_remove(race_cat, "^, "),
+    ### Convert missing strings to missing values
+    race_cat = dplyr::na_if(race_cat, ""),
+    ### Create single-category dummy variables for individual race values
+    race_cat_w = stringr::str_detect(race_cat, "White"),
+    race_cat_aa = stringr::str_detect(race_cat, "Black or African American"),
+    race_cat_asian = stringr::str_detect(race_cat, "Asian"),
+    race_cat_aian = stringr::str_detect(race_cat, "American Indian or Alaska Native"),
+    race_cat_nhpi = stringr::str_detect(race_cat, "Native Hawaiian or Other Pacific Islander"),
+    race_cat_mena = stringr::str_detect(race_cat, "Middle Eastern or North African"),
+    race_cat_other = stringr::str_detect(race_cat, "Other Race"),
+    ### If multiple race values exist, convert entire value to "multiracial"
+    ### convert all single-category race values to lowercase
+    race_cat = ifelse(
+      stringr::str_detect(race_cat, ","), 
+      "multiracial", 
+      stringr::str_to_lower(race_cat)
+      )
+  )
+```
+
+### Subject Level
+
+To perform subject-level analyses of demographics, we consolidated all observations for a single subject to determine the single "consensus" value for demographic variables. First, we initiated a frame to store subject-level data.
+
+```{r}
+#| label: clean-demo-subj-init
+
+# Initiate subject-level data set
+ms_subjs <- ms_resps |>
+  ## Calculate number of responses per subject
+  dplyr::group_by(id) |>
+  dplyr::mutate(
+    num_resps = dplyr::n_distinct(ems_num)
+  ) |>
+  dplyr::ungroup() |>
+  ## Reduce to a single row per subject, by IDs
+  dplyr::select(id, id_ms, num_resps) |>
+  dplyr::distinct() |>
+  ## Initiate placeholders for demographic variables
+  dplyr::mutate(
+    ### Age Variables
+    dob = lubridate::NA_Date_, age_avg = NA_real_,
+    ### Sex Variable
+    sex_cat = NA_character_,
+    ### Race/Ethnicity Variables
+    hispanic = NA, race_cat = NA_character_, race_cat_w = NA, 
+    race_cat_aa = NA, race_cat_aian = NA, race_cat_asian = NA, 
+    race_cat_nhpi = NA, race_cat_other = NA, race_cat_mena = NA
+  )
+```
+
+#### Age
+
+There were 897 subjects (4,921 responses) with inconsistent DOB values, reduced to 881 subjects (4,803 responses) if omitting missing values, even after the minor resolutions created in the response-level processing. We consolidated these values by taking the single most common non-missing date of birth value for each subject. We expected subjects to have differing ages due to the multi-year and multi-encounter nature of our data set: 11,153 subjects (52,066 responses) had inconsistent calculated age values, reduced to 11,152 subjects (52,064 responses) after omitting missing age values. We resolved age at the subject level by taking the average value of the ages calculated from the subject-level common date of birth values.
+
+```{r}
+#| label: clean-demo-age-subj
+
+# Consolidate DOB and age into singular values for each subject, and add to
+# subject-level frame
+ms_subjs <- ms_subjs |>
+  dplyr::rows_update(
+    ms_resps |>
+      ## Get updated DOB/Age values from non-NA DOBs. For subjects with only 
+      ## NA DOBs, keep the NA and entered ages.
+      dplyr::rows_update(
+        ms_resps |>
+          dplyr::filter(!is.na(dob)) |>
+        ### Calculate subject-common date of birth from non-NA entries
+          dplyr::group_by(id) |>
+          dplyr::mutate(
+              dob = lubridate::date(names(which.max(table(
+                        na.omit(ms_resps[ms_resps$id %in% id,]$dob)
+                    ))))
+          ) |>
+          dplyr::ungroup() |>
+          dplyr::select(id, dob) |>
+          dplyr::distinct(),
+        by = 'id'
+      ) |>
+      dplyr::group_by(id) |>
+      ## Calculate Age
+      dplyr::mutate(
+        ### Calculate age from incident date and subject-common date of birth
+        age_calc_common = dplyr::if_else(
+          !is.na(dob),
+          lubridate::year(
+            lubridate::as.period(
+              lubridate::interval(
+                start = dob, 
+                end = lubridate::date(incident_timestamp)
+                )
+              )
+            ),
+          age_calc
+        ),
+          ### Consolidate common age by taking the average across encounters
+        age_avg = mean(age_calc_common)
+      ) |>
+      dplyr::ungroup() |>
+      dplyr::select(id, dob, age_avg) |>
+      ## Reduce to one row per subject
+      dplyr::distinct(),
+    by = 'id'
+    )
+```
+
+#### Sex
+
+There were 396 subjects (2,490 responses) with inconsistent values for sex between responses in the data set. "Filling" missing values with values from other observations for the same subject resolved 27 subjects (190 responses), with an additional 48 subjects (345 responses) resolved by similarly filling "unable to assess" values. The remaining 321 subjects (1,955 responses) with a mix of "male" and "female" values were resolved through manual review of trends. Of these, we reviewed all IDs with a majority between 60-75% to one sex (52 "female" majority, 40 "male" majority), with a cursory review of IDs with a greater than 75% majority (77 "female" majority, 43 "male" majority). We additionally inspected the 109 remaining IDs that did not have a majority. Judgements were based on trends, heavy associations of certain names with sex/gender (such as "Daisy" being practically considered as a female-exclusive name), and select review of public records such as obituaries.
+
+```{r}
+#| label: clean-demo-sex-subj
+
+# Consolidate to a single sex for each subject
+ms_subjs <- ms_subjs |>
+  dplyr::rows_update(
+    ms_resps |>
+    dplyr::select(id, sex_cat) |>
+    dplyr::filter(
+      ## For select subjects, resolution is achieved by omitting responses with
+      ## a missing value for sex
+      !(
+        is.na(sex_cat) & id %in% c(
+          5450, 360, 109, 948, 20, 139, 11144, 15717, 15934, 16724, 1333, 2385, 
+          21476, 21653, 21883, 22379, 2075, 24108, 2054, 25203, 28077, 3233, 
+          29941, 32278, 33121, 3023, 40244
+          )
+      ) &
+      ## For select subjects, resolution is achieved by omitting responses with
+      ## a value of "unable to assess" for sex
+      !(
+        sex_cat == 'uta' & id %in% c(
+          4851, 166, 5893, 7197, 7624, 365, 279, 11556, 12382, 14166, 14211, 
+          1064, 14561, 15103, 15762, 1359, 16059, 16910, 18326, 18452, 19382, 
+          19957, 20067, 21304, 2298, 2434, 24176, 2680, 25877, 2532, 27204, 
+          27755, 30107, 2948, 31758, 31863, 32808, 33006, 33968, 3823, 4344, 
+          36003, 36323, 38477, 38505, 3865, 39564, 41486
+          )
+      )
+     ) |>
+    ## Manually assign sex value to subjects
+    dplyr::mutate(
+      sex_cat = dplyr::case_when(
+        id %in% c(
+          4, 40, 98, 154, 158, 231, 284, 428, 434, 850, 868, 1228, 1614, 1708, 
+          1926, 2257, 2365, 2419, 2426, 2435, 2512, 2516, 2615, 3031, 3089, 
+          3262, 3287, 3382, 3545, 3672, 3735, 3742, 3756, 3765, 3812, 3842, 
+          3843, 3845, 3903, 4229, 4280, 4667, 4772, 4927, 5214, 5373, 5841, 
+          5968, 6020, 6131, 6471, 6588, 6737, 6849, 7225, 7427, 7676, 7946, 
+          7967, 7976, 7988, 8016, 8288, 8297, 9140, 9476, 9524, 9790, 10549, 
+          10677, 10888, 11066, 11131, 11235, 11319, 11731, 12370, 12406, 12594, 
+          12864, 13451, 13616, 13702, 13910, 14192, 14285, 14603, 14981, 15165, 
+          15170, 15188, 15423, 16068, 16123, 16136, 16215, 16558, 16893, 17349, 
+          17582, 17657, 17698, 17980, 17989, 18021, 18045, 18083, 18501, 18554, 
+          19052, 19063, 19127, 22048, 23391, 23396, 23542, 23752, 23924, 23981, 
+          24063, 24065, 24500, 24675, 24701, 25620, 25754, 25785, 25947, 26399, 
+          26915, 27053, 27189, 27327, 27714, 27904, 28070, 28277, 28490, 28588, 
+          28629, 28712, 28722, 28835, 28928, 28953, 29048, 29225, 29561, 29968, 
+          31359, 31736, 31741, 31754, 32022, 32249, 33016, 33240, 36124, 36147, 
+          36355, 36365, 36544, 36561, 36772, 37124, 37567, 37578, 37815, 37929, 
+          38024, 38291, 38619, 38736, 38746, 38775, 38831, 40053, 40123, 40258, 
+          40823, 40841, 41057, 41602, 41721, 41743, 41812
+          ) ~ 'female',
+        id %in% c(
+          27, 192, 377, 484, 608, 657, 765, 883, 897, 1019, 1056, 1270, 1272, 
+          1307, 1334, 1495, 1609, 2066, 2575, 2777, 2802, 2980, 3007, 3769, 
+          3962, 3967, 4015, 4095, 4099, 4165, 4400, 4432, 4543, 4778, 5105, 
+          5125, 5268, 6147, 6170, 6394, 7057, 7696, 7794, 7840, 7888, 7908, 
+          7954, 8374, 8439, 9754, 9900, 10283, 10519, 10786, 10984, 11230, 
+          11536, 11554, 11986, 12035, 12061, 12084, 13119, 15648, 15946, 15970, 
+          16329, 16339, 16560, 16763, 16869, 17082, 17105, 17816, 18217, 18729, 
+          18866, 19460, 19505, 19526, 19965, 20876, 21120, 21530, 21652, 21668, 
+          22420, 22421, 22753, 22767, 22891, 23457, 23635, 24846, 25286, 25322, 
+          25411, 25654, 25790, 25913, 26018, 26026, 27341, 28871, 30745, 31841, 
+          32322, 33166, 33183, 33948, 33974, 34130, 34781, 35390, 35893, 36033, 
+          36842, 36867, 36979, 37010, 38357, 38386, 38528, 39059, 39195, 39205, 
+          39389, 39814, 40992, 41303, 41417, 41692, 41732, 41824, 408180
+        ) ~ 'male',
+        TRUE ~ sex_cat
+      )
+    ) |>
+    ## Reduce to one row per subject
+    dplyr::distinct(),
+  by = 'id'
+  )
+```
+
+#### Race and Ethnicity
+
+There were a total of 766 subjects (across 4,382 responses) with inconsistencies in values for race and ethnicity: 292 subjects (1,782 responses) were inconsistent only in race values, 42 subjects (212 responses) were inconsistent only in ethnicity values, and 432 subjects (2,388 responses) had inconsistencies in both columns. 
+
+A significant portion of these were due to missingness in the data, if counting a missing value as a distinct value. "Filling" missing values with values from other observations for the same subject reduced the scope of the issue to 552 subjects (2,979 responses): 279 subjects (1,718 responses) were inconsistent only in race values, 1,155 subjects (263 responses) were inconsistent only in ethnicity values, and 10 subjects (106 responses) had inconsistencies in both columns. 
+
+We resolved inconsistencies with point-fixes, resulting in manual assignment of race and ethnicity values after manual review of trends for each subject. A subject with a single-value majority (over 60% of responses) was assigned that single value. Otherwise, broader trends and patterns were explored to make a judgement. Where judgement could not be determined (or if the broader trends appeared to reflect a multiracial identity that was inconsistently recognized), all appropriate racial values were assigned. Notably, 27 subjects appeared to demonstrate inconsistencies due to a "misclick" error. As the MedStar ePCR platform allows for selection of race and ethnicity from a "select all that apply" list, these subjects had a single value for the majority of responses, with a single response demonstrating a likely accidental selection of an additional value that was not consistently repeated. 
+
+```{r}
+#| label: clean-demo-race-subj
+
+# Consolidate a single race and ethnicity set for each subject, and add to
+# subject-level frame
+ms_subjs <- ms_subjs |>
+  dplyr::rows_update(
+    ms_resps |>
+      ## For select subjects, resolution is achieved by omitting responses
+      ## with more than one race selection
+    dplyr::filter( 
+      !(race_cat == 'multiracial' & id %in% c(
+        141, 901, 1358, 1399, 1933, 2585, 3049, 15051, 15399, 16637, 16998, 
+        17849, 18161, 18226, 18564, 21171, 22569, 24290, 24877, 25265, 28708, 
+        34238, 37457, 38183, 40841, 41691, 41812
+        ))
+    ) |>
+      ## For subjects that required manual assignment of race categories, 
+      ## revert all race category dummy variables to "FALSE" to permit manual
+      ## assignment of more than one race to a single subject
+    dplyr::mutate(dplyr::across(
+      dplyr::all_of(dplyr::starts_with("race_cat_")), 
+      ~ifelse(id %in% c(
+          111, 159, 193, 423, 993, 1032, 1091, 1176, 1275, 1285, 1490, 1508, 
+          1574, 1664, 1919, 1968, 2041, 2160, 2165, 2306, 2392, 2513, 2531, 
+          2560, 2733, 2860, 2983, 2992, 3008, 3078, 3104, 3173, 3278, 3306, 
+          3379, 3392, 3405, 3566, 3727, 3918, 3993, 4253, 4558, 4572, 4844, 
+          4887, 4908, 4927, 5035, 5124, 5125, 5620, 5961, 6020, 6896, 7696, 
+          8066, 8494, 8553, 9094, 9128, 9210, 9247, 9337, 9349, 9859, 10385, 
+          10481, 10557, 10609, 10650, 10703, 11168, 11388, 11394, 11801, 
+          12125, 12201, 12607, 13060, 13926, 14015, 14060, 14222, 14755, 
+          15095, 15137, 16980, 17131, 17655, 18547, 18826, 18910, 18991, 
+          19102, 19570, 20102, 20298, 20382, 20811, 21458, 21476, 21601, 
+          21652, 22269, 22438, 22566, 22930, 23012, 23196, 23412, 23742, 
+          24273, 24726, 24820, 25031, 25049, 25232, 25322, 25524, 25721, 
+          26019, 27685, 29482, 30269, 31044, 31052, 31184, 31224, 31638, 
+          31841, 31863, 31944, 32006, 32185, 32324, 32408, 32679, 33595, 
+          33620, 33780, 33847, 33851, 33854, 33913, 34465, 36343, 36365, 
+          36679, 36802, 37101, 37177, 37242, 37318, 37527, 37696, 37923, 
+          38026, 38094, 38116, 38210, 38254, 38291, 38605, 38684, 39254, 
+          39367, 39964, 40150, 40415, 40432, 40646, 40796, 40925, 41964
+          ), 
+          F, 
+          .x
+          )
+      )) |>
+      ## Manually assign Hispanic ethnicity flag to subjects
+    dplyr::mutate(
+      hispanic = dplyr::case_when(
+        id %in% c(
+          193, 1285, 23196, 32185, 1091, 2513, 5035, 13060, 32324, 52, 78, 226, 
+          231, 539, 628, 905, 1174, 1298, 1389, 1451, 1796, 2108, 2485, 2503, 
+          2607, 2799, 2954, 3089, 3167, 3199, 3211, 3489, 3542, 3742, 3758, 
+          3878, 4462, 4702, 4709, 4738, 4766, 4873, 4930, 4969, 4981, 5034, 
+          5148, 5511, 5625, 5638, 5688, 5718, 6085, 6204, 6267, 6269, 6483, 
+          6495, 6978, 7104, 7534, 7601, 8202, 8456, 9049, 9125, 9126, 9283, 
+          9640, 9787, 10447, 10542, 10621, 11030, 11112, 11115, 11116, 11216, 
+          11400, 11556, 11604, 11629, 11710, 11828, 12571, 14180, 14237, 14347, 
+          14484, 14501, 14647, 15045, 15128, 15197, 15459, 15644, 15833, 15835, 
+          15933, 16295, 16316, 16408, 16410, 16958, 17093, 17223, 17740, 18045, 
+          18764, 18924, 19081, 19367, 19383, 20005, 21034, 21326, 21467, 21469, 
+          21859, 22109, 22163, 22206, 22304, 22397, 22533, 22940, 23208, 23280, 
+          23635, 23739, 23773, 24114, 24492, 25866, 26133, 26300, 26578, 26925, 
+          27161, 27211, 27254, 27755, 28199, 28234, 28335, 28340, 28525, 28588, 
+          28674, 28861, 28962, 29294, 29354, 29643, 29725, 29792, 29818, 29881, 
+          29888, 29923, 30022, 30130, 30954, 30980, 31395, 31409, 31749, 31856, 
+          31969, 32023, 32237, 32302, 32488, 33140, 33373, 33888, 33895, 33971, 
+          34293, 34329, 34526, 34558, 34566, 34864, 35651, 35699, 36124, 36130, 
+          36147, 36175, 36224, 36237, 36258, 36531, 36659, 36666, 37539, 38398, 
+          38568, 38932, 38936, 38942, 39123, 40479, 40701, 41896, 41963
+          ) ~ T,
+        id %in% c(
+          9128, 17655, 40415, 4, 183, 692, 1494, 1835, 1894, 2123, 2666, 2759, 
+          2865, 3068, 3162, 3467, 3485, 3681, 3701, 4422, 4627, 4722, 4780, 
+          5571, 6015, 6066, 6678, 7014, 10574, 11153, 12988, 13644, 15019, 
+          15100, 16127, 16268, 17480, 17725, 18844, 18880, 19162, 22042, 23713, 
+          23779, 24830, 25261, 25546, 25932, 26525, 26791, 26815, 30589, 30683, 
+          31853, 34034, 34262, 35791, 36657, 37354, 37929, 39878, 40338, 40340, 
+          41131, 41436, 41456
+          ) ~ F,
+        TRUE ~ hispanic
+      ),
+      ## Manually assign individual race flags to subjects
+      race_cat_w = ifelse(
+        id %in% c(
+          2306, 8066, 37101, 3392, 22269, 23196, 9247, 15137, 21476, 40150, 993, 
+          1275, 1490, 1508, 1574, 1664, 1919, 2165, 2531, 2560, 2860, 2983, 
+          2992, 3008, 3078, 3104, 3173, 3278, 3379, 3727, 3918, 4253, 5961, 
+          6896, 9210, 10385, 12125, 14222, 14755, 16980, 18910, 18991, 19102, 
+          20102, 20382, 20811, 22566, 24726, 24820, 25232, 26019, 29482, 31044, 
+          31638, 31841, 31863, 31944, 32006, 32679, 33780, 33913, 37177, 37242, 
+          37923, 38026, 38210, 38291, 40432, 38605, 423, 38116, 2513, 5035, 
+          13060
+          ), T, race_cat_w
+        ),
+      race_cat_aa = ifelse(
+        id %in% c(
+          193, 1285, 5620, 19570, 31052, 37101, 3392, 22269, 9247, 40925, 111, 
+          159, 1032, 1968, 2392, 2733, 3306, 3405, 3566, 3993, 4572, 4887, 
+          4908, 4927, 6020, 8553, 9337, 9349, 9859, 10481, 10557, 10609, 10703, 
+          11168, 11388, 13926, 14060, 17131, 18547, 20298, 21458, 22438, 22930, 
+          23012, 23742, 25322, 27685, 36343, 36802, 37696, 38094, 40646, 40796, 
+          12607, 21601, 21652, 1091, 14015
+          ), T, race_cat_aa
+        ), 
+      race_cat_aian = ifelse(
+        id %in% c(5620, 32185, 4844, 5124, 31224), T, race_cat_aian
+      ),
+      race_cat_asian = ifelse(
+        id %in% c(
+          19570, 31052, 30269, 23196, 2041, 2160, 18826, 24273, 25031, 25524, 
+          25721, 33595, 33847, 36365, 36679, 37318, 38254, 39254, 9128, 17655, 
+          32324
+          ), T, race_cat_asian
+      ),
+      race_cat_nhpi = ifelse(
+        id %in% c(30269, 7696, 9094, 11394, 40415), T, race_cat_nhpi
+      ),
+      race_cat_other = ifelse(
+        id %in% c(
+          2306, 8066, 9247, 40150, 1176, 4558, 8494, 10650, 11801, 12201, 15095, 
+          23412, 25049, 31184, 32408, 33620, 33851, 33854, 34465, 37527, 38684, 
+          39367, 39964, 41964, 5125
+          ), T, race_cat_other
+      )
+    ) |>
+    dplyr::group_by(id) |>
+      ## For select subjects, resolution is achieved by accepting all
+      ## race assignments in the data
+    dplyr::mutate(
+      dplyr::across(
+        dplyr::all_of(dplyr::starts_with("race_cat_")), 
+        ~ifelse(id %in% c(
+          1614, 4474, 9880, 11179, 18654, 18751, 22895, 23869, 30405, 34356, 
+          40292, 1694, 4724, 5454, 6982, 12176, 23027, 25192, 27673, 27721, 
+          31314, 34092, 36955, 37444, 39024, 29755, 40715, 708, 1127, 1737, 
+          2132, 2802, 3171, 4243, 5355, 6509, 7839, 7929, 8032, 9083, 9615, 
+          10682, 11245, 11539, 11948, 12777, 14943, 15314, 16530, 19922, 
+          20818, 22328, 22369, 23236, 26174, 28030, 29195, 30202, 31411, 
+          32597, 32993, 33033, 33506, 35023, 35959, 37759, 39272, 40711, 
+          41189, 41269, 41732, 41782, 41901, 41906, 24967, 1810, 2667, 23579, 
+          27002, 31901, 30021, 30113, 5766, 10517, 37308, 1810, 2667, 31398, 
+          33421, 4665, 3986), 
+          sum(.x, na.omit = T) > 0, .x
+          )
+        )
+    ) |>
+      ## Fill missing values for flags with any other value for that subject
+    tidyr::fill(
+      dplyr::all_of(dplyr::starts_with("race_cat_")), 
+      .direction = 'updown'
+      ) |>
+    tidyr::fill(hispanic, .direction = 'updown') |>
+      ## Reduce to one row per subject
+    dplyr::select(
+      id, hispanic, dplyr::all_of(dplyr::starts_with("race_cat_"))
+      ) |>
+    dplyr::distinct() |>
+      ## Generate overall race category from race flags
+    dplyr::mutate(
+      race_cat = dplyr::case_when(
+        sum(
+          race_cat_w, race_cat_aa, race_cat_aian, race_cat_asian,
+            race_cat_nhpi, race_cat_other, race_cat_mena, na.rm = T
+          ) > 1 ~ "multiracial",
+        race_cat_w ~ 'white',
+        race_cat_aa ~ 'black or african american',
+        race_cat_aian ~ 'american indian or alaska native',
+        race_cat_asian ~ 'asian',
+        race_cat_nhpi ~ 'native hawaiian or other pacific islander',
+        race_cat_mena ~ 'middle eastern or north african',
+        race_cat_other ~ 'other race',
+        TRUE ~ NA_character_
+      )
+    ) |>
+    dplyr::ungroup(),
+  by = 'id'
+  )
+
+```
+
+
+# Analyses
+
+## Patient Demographics
+###  Response Level
+#### Age
+
+Across all responses, the age of the subjects in our data set ranged from 51 to 120 years, with a mean of 76.386 years with a standard deviation of 8.256 years. The quartile values for age were 69, 75, and 82 years, respectively. 
+
+```{r}
+#| label: analy-demo-age-resp-summ
+
+stats <- tibble::tibble(
+  stats = names(summary(ms_resps$age_calc)),
+  vals = as.vector(summary(ms_resps$age_calc))
+  ) |>
+  dplyr::bind_rows(
+    tibble::tibble(
+      stats = 'SD',
+      vals = sd(na.omit(ms_resps$age_calc))[1]
+    )
+  )
+
+stats
+```
+
+In examination of the distribution of ages in our subjects, we find the distribution is unimodal at the low range of values with significant right skew. It is not approximately normally distributed.
+
+```{r}
+#| label: analy-demo-age-resp-hist
+
+hist(ms_resps$age_calc)
+```
+
+#### Sex/Gender
+
+Observed counts of sex were isolated. The responses appeared to skew female (59.313%).
+
+```{r}
+#| label: analy-demo-sex-resp-sum
+
+# Summary Statistics for Sex, Response-Level
+## Extract counts into a table
+obs <- as.data.frame(table(ms_resps$sex_cat))
+t_total <- nrow(ms_resps)
+obs <- rbind(obs, tibble(Var1 = "missing", Freq = t_total - sum(obs$Freq)))
+
+## Calculate percentages for each category
+obs <- obs |>
+  dplyr::mutate(
+    perc = paste(format(Freq*100/t_total, digits = 2), "%")
+  )
+
+## Display table
+obs
+```
+
+
+We performed Chi-Square and Fisher's Exact test for association. Expected counts were calculated utilizing [US Census data for Fort Worth](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210), which indicated 51.2% of the population were "Female", with "Male" and "Female" as the only selection options. Chi-Square and Fisher testing both indicated p-value > 0.05, and thus failed to identify any statistically significant heterogeneity. This was consistent when missing values were omitted.
+
+```{r}
+#| label: analy-demo-sex-resp-stats
+
+# Calculate Chi-Square & Fischer Exact for Sex, Response-Level
+## Create table of expected vs observed counts
+obs <- obs |>
+  dplyr::select(-perc) |>
+  tibble::add_column(expected = 0.0) |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      Var1 == "female" ~ t_total*0.512,
+      Var1 == "male" ~ t_total*(1-0.512),
+      Var1 == "uta" ~ t_total*0,
+      Var1 == "missing" ~ t_total*0
+      )
+    ) |>
+  dplyr::rename_at('Var1', ~'sex') |>
+  dplyr::rename_at('Freq', ~'observed')
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Initiate formatted statistics table
+stats <- tibble::tibble(
+  test = c('chi-squared', 'fischer'),
+  method = rep('with NAs',2),
+  stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+  param = c(chisq_vals$parameter[['df']], NA_integer_),
+  pval = c(chisq_vals$p.value, fisher_vals$p.value)
+  ) |>
+  dplyr::mutate(
+    sig = dplyr::case_when(
+      pval < 0.01 ~ "**",
+      pval < 0.05 ~ "*",
+      TRUE ~ ""
+      )
+    )
+
+## Reduce to only binary values for testing (male, female)
+obs <- obs |>
+  dplyr::filter(sex %in% c('female', 'male'))
+t_total <- sum(obs$observed)
+
+## Revise observed vs expected table
+obs <- obs |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      sex == "female" ~ t_total*0.512,
+      sex == "male" ~ t_total*(1-0.512)
+      )
+    )
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Add to formatted statistics table
+stats <- stats |> 
+  dplyr::bind_rows(
+    tibble::tibble(
+    test = c('chi-squared', 'fischer'),
+    method = rep('NA omitted',2),
+    stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+    param = c(chisq_vals$parameter[['df']], NA_integer_),
+    pval = c(chisq_vals$p.value, fisher_vals$p.value)
+    ) |>
+    dplyr::mutate(
+      sig = dplyr::case_when(
+        pval < 0.01 ~ "**",
+        pval < 0.05 ~ "*",
+        TRUE ~ ""
+        )
+      )
+    )
+
+## Display table
+stats
+```
+
+#### Race
+
+Observed counts of race were isolated. The responses appeared to skew White (58.67%).
+
+```{r}
+#| label: analy-demo-race-resp-sum
+
+# Summary Statistics for Race, Response-Level
+## Extract counts into a table
+obs <- as.data.frame(table(ms_resps$race_cat))
+t_total <- nrow(ms_resps)
+obs <- rbind(obs, tibble(Var1 = "missing", Freq = t_total - sum(obs$Freq)))
+
+## Calculate percentages for each category
+obs <- obs |>
+  dplyr::mutate(
+    perc = paste(format(Freq*100/t_total, digits = 2), "%")
+  )
+
+## Display table
+obs
+```
+
+We performed Chi-Square and Fisher's Exact test for association. Observed counts for each race value were isolated. Expected counts were calculated utilizing [US Census data for Fort Worth](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210), which indicated that single racial identifications of "White" were made by 55.8% of the population, "Black or African American" by 18.8% of the population, "American Indian and Alaska Native" by 0.5%, "Asian" by 4.9%, "Native Hawaiian and Other Pacific Islander" by 0.1%, and "Two or More Races" by 8.6%. The remaining 11.3% of the population should be assumed to have reported "Some other race" per Census documentation. There was no category for "Middle Eastern or North African" in the 
+2022 census data, so we consolidated that category into "other race" for sensitivity testing.
+
+Chi-Square and Fisher testing both indicated p-value > 0.05, and thus failed to identify any statistically significant heterogeneity. This was consistent when missing values were omitted.
+
+```{r}
+#| label: analy-demo-race-resp-stats
+
+# Calculate Chi-Square & Fischer Exact for Race, Response-Level
+## Consolidate "Middle Eastern or North African" into "Other Race"
+obs <- ms_resps |>
+  dplyr::mutate(
+    race_cat = ifelse(
+      race_cat == "middle eastern or north african", 
+      "other race", 
+      race_cat
+      )
+  )
+
+obs <- as.data.frame(table(obs$race_cat))
+t_total <- nrow(ms_resps)
+obs <- rbind(obs, tibble(Var1 = "missing", Freq = t_total - sum(obs$Freq)))
+
+## Create table of expected vs observed counts
+obs <- obs |>
+  tibble::add_column(expected = 0.0) |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      Var1 == "white" ~ t_total*0.558,
+      Var1 == "black or african american" ~ t_total*0.188,
+      Var1 == "american indian or alaska native" ~ t_total*0.005,
+      Var1 == "asian" ~ t_total*0.049,
+      Var1 == "native hawaiian or other pacific islander" ~ t_total*0.001,
+      Var1 == "multiracial" ~ t_total*0.086,
+      Var1 == "other race" ~ t_total*0.113,
+      Var1 == "missing" ~ t_total*0
+      )
+    ) |>
+  dplyr::rename_at('Var1', ~'race') |>
+  dplyr::rename_at('Freq', ~'observed')
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Initiate formatted statistics table
+stats <- tibble::tibble(
+  test = c('chi-squared', 'fischer'),
+  method = rep('with NAs',2),
+  stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+  param = c(chisq_vals$parameter[['df']], NA_integer_),
+  pval = c(chisq_vals$p.value, fisher_vals$p.value)
+  ) |>
+  dplyr::mutate(
+    sig = dplyr::case_when(
+      pval < 0.01 ~ "**",
+      pval < 0.05 ~ "*",
+      TRUE ~ ""
+      )
+    )
+
+## Remove missing values for sensitivity testing
+obs <- obs |>
+  dplyr::filter(!race %in% c('missing'))
+t_total <- sum(obs$observed)
+
+## Revise observed vs expected table
+obs <- obs |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      race == "white" ~ t_total*0.558,
+      race == "black or african american" ~ t_total*0.188,
+      race == "american indian or alaska native" ~ t_total*0.005,
+      race == "asian" ~ t_total*0.049,
+      race == "native hawaiian or other pacific islander" ~ t_total*0.001,
+      race == "multiracial" ~ t_total*0.086,
+      race == "other race" ~ t_total*0.113
+      )
+    )
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Add to formatted statistics table
+stats <- stats |> 
+  dplyr::bind_rows(
+    tibble::tibble(
+    test = c('chi-squared', 'fischer'),
+    method = rep('NA omitted',2),
+    stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+    param = c(chisq_vals$parameter[['df']], NA_integer_),
+    pval = c(chisq_vals$p.value, fisher_vals$p.value)
+    ) |>
+    dplyr::mutate(
+      sig = dplyr::case_when(
+        pval < 0.01 ~ "**",
+        pval < 0.05 ~ "*",
+        TRUE ~ ""
+        )
+      )
+    )
+
+## Display table
+stats
+```
+
+#### Ethnicity
+
+Observed counts of Hispanic Ethnicity were isolated. The responses appeared to skew non-Hispanic (87.92%).
+
+```{r}
+#| label: analy-demo-ethn-resp-sum
+
+# Summary Statistics for Hispanic Ethnicity, Response-Level
+## Extract counts into a table
+obs <- as.data.frame(table(ms_resps$hispanic))
+t_total <- nrow(ms_resps)
+obs <- rbind(obs, tibble(Var1 = "missing", Freq = t_total - sum(obs$Freq)))
+
+## Calculate percentages for each category
+obs <- obs |>
+  dplyr::mutate(
+    perc = paste(format(Freq*100/t_total, digits = 2), "%")
+  )
+
+## Display table
+obs
+```
+
+
+We performed Chi-Square and Fisher's Exact test for association. Expected counts were calculated utilizing [US Census data for Fort Worth](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210), which indicated 35.3% of the population were "Hispanic or Latino", with "Hispanic or Latino" and "Not Hispanic or Latino" as the only selection options. Chi-Square and Fisher testing both indicated p-value > 0.05, and thus failed to identify any statistically significant heterogeneity. This was consistent when missing values were omitted.
+
+```{r}
+#| label: analy-demo-ethn-resp-stats
+
+# Calculate Chi-Square & Fischer Exact for Hispanic Ethnicity, Response-Level
+## Create table of expected vs observed counts
+obs <- obs |>
+  dplyr::select(-perc) |>
+  tibble::add_column(expected = 0.0) |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      Var1 == "TRUE" ~ t_total*0.353,
+      Var1 == "FALSE" ~ t_total*(1-0.353),
+      Var1 == "missing" ~ t_total*0
+      )
+    ) |>
+  dplyr::rename_at('Var1', ~'hispanic') |>
+  dplyr::rename_at('Freq', ~'observed')
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Initiate formatted statistics table
+stats <- tibble::tibble(
+  test = c('chi-squared', 'fischer'),
+  method = rep('with NAs',2),
+  stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+  param = c(chisq_vals$parameter[['df']], NA_integer_),
+  pval = c(chisq_vals$p.value, fisher_vals$p.value)
+  ) |>
+  dplyr::mutate(
+    sig = dplyr::case_when(
+      pval < 0.01 ~ "**",
+      pval < 0.05 ~ "*",
+      TRUE ~ ""
+      )
+    )
+
+## Reduce to only binary values for testing (male, female)
+obs <- obs |>
+  dplyr::filter(hispanic != 'missing')
+t_total <- sum(obs$observed)
+
+## Revise observed vs expected table
+obs <- obs |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      hispanic == "TRUE" ~ t_total*0.353,
+      hispanic == "FALSE" ~ t_total*(1-0.353),
+      )
+    )
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Add to formatted statistics table
+stats <- stats |> 
+  dplyr::bind_rows(
+    tibble::tibble(
+    test = c('chi-squared', 'fischer'),
+    method = rep('NA omitted',2),
+    stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+    param = c(chisq_vals$parameter[['df']], NA_integer_),
+    pval = c(chisq_vals$p.value, fisher_vals$p.value)
+    ) |>
+    dplyr::mutate(
+      sig = dplyr::case_when(
+        pval < 0.01 ~ "**",
+        pval < 0.05 ~ "*",
+        TRUE ~ ""
+        )
+      )
+    )
+
+## Display table
+stats
+```
+
+###  Subject Level
+
+#### Number of Responses
+
+Subjects in our data set were represented by # to # responses each, with a mean of # responses with a standard deviation of # responses. The quartile values for the number of responses per subject were 69, 75, and 82 responses, respectively.
+
+```{r}
+#| label: analy-demo-resps-subj-summ
+
+stats <- tibble::tibble(
+  stats = names(summary(ms_subjs$num_resps)),
+  vals = as.vector(summary(ms_subjs$num_resps))
+  ) |>
+  dplyr::bind_rows(
+    tibble::tibble(
+      stats = 'SD',
+      vals = sd(na.omit(ms_subjs$num_resps))[1]
+    )
+  )
+
+stats
+```
+
+In examination of the distribution of the number of responses in our subjects, we find the distribution is unimodal at the low range of values with significant right skew. It is not approximately normally distributed.
+
+```{r}
+#| label: analy-demo-resps-subj-hist
+
+hist(ms_subjs$num_resps)
+```
+
+#### Age
+
+The average age of the subjects in our data set ranged from 51 to 120 years, with a mean of 76.386 years with a standard deviation of 8.256 years. The quartile values for age were 69, 75, and 82 years, respectively. 
+
+```{r}
+#| label: analy-demo-age-subj-summ
+
+stats <- tibble::tibble(
+  stats = names(summary(ms_subjs$age_avg)),
+  vals = as.vector(summary(ms_subjs$age_avg))
+  ) |>
+  dplyr::bind_rows(
+    tibble::tibble(
+      stats = 'SD',
+      vals = sd(na.omit(ms_subjs$age_avg))[1]
+    )
+  )
+
+stats
+```
+
+In examination of the distribution of ages in our subjects, we find the distribution is unimodal at the low range of values with significant right skew. It is not approximately normally distributed.
+
+```{r}
+#| label: analy-demo-age-subj-hist
+
+hist(ms_subjs$age_avg)
+```
+
+#### Sex/Gender
+
+Observed counts of sex were isolated. The responses appeared to skew female (57.58%).
+
+```{r}
+#| label: analy-demo-sex-subj-sum
+
+# Summary Statistics for Sex, Subject-Level
+## Extract counts into a table
+obs <- as.data.frame(table(ms_subjs$sex_cat))
+t_total <- nrow(ms_subjs)
+obs <- rbind(obs, tibble(Var1 = "missing", Freq = t_total - sum(obs$Freq)))
+
+## Calculate percentages for each category
+obs <- obs |>
+  dplyr::mutate(
+    perc = paste(format(Freq*100/t_total, digits = 2), "%")
+  )
+
+## Display table
+obs
+```
+
+
+We performed Chi-Square and Fisher's Exact test for association. Expected counts were calculated utilizing [US Census data for Fort Worth](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210), which indicated 51.2% of the population were "Female", with "Male" and "Female" as the only selection options. Chi-Square and Fisher testing both indicated p-value > 0.05, and thus failed to identify any statistically significant heterogeneity. This was consistent when missing values were omitted.
+
+```{r}
+#| label: analy-demo-sex-subj-stats
+
+# Calculate Chi-Square & Fischer Exact for Sex, Subject-Level
+## Create table of expected vs observed counts
+obs <- obs |>
+  dplyr::select(-perc) |>
+  tibble::add_column(expected = 0.0) |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      Var1 == "female" ~ t_total*0.512,
+      Var1 == "male" ~ t_total*(1-0.512),
+      Var1 == "uta" ~ t_total*0,
+      Var1 == "missing" ~ t_total*0
+      )
+    ) |>
+  dplyr::rename_at('Var1', ~'sex') |>
+  dplyr::rename_at('Freq', ~'observed')
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Initiate formatted statistics table
+stats <- tibble::tibble(
+  test = c('chi-squared', 'fischer'),
+  method = rep('with NAs',2),
+  stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+  param = c(chisq_vals$parameter[['df']], NA_integer_),
+  pval = c(chisq_vals$p.value, fisher_vals$p.value)
+  ) |>
+  dplyr::mutate(
+    sig = dplyr::case_when(
+      pval < 0.01 ~ "**",
+      pval < 0.05 ~ "*",
+      TRUE ~ ""
+      )
+    )
+
+## Reduce to only binary values for testing (male, female)
+obs <- obs |>
+  dplyr::filter(sex %in% c('female', 'male'))
+t_total <- sum(obs$observed)
+
+## Revise observed vs expected table
+obs <- obs |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      sex == "female" ~ t_total*0.512,
+      sex == "male" ~ t_total*(1-0.512)
+      )
+    )
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Add to formatted statistics table
+stats <- stats |> 
+  dplyr::bind_rows(
+    tibble::tibble(
+    test = c('chi-squared', 'fischer'),
+    method = rep('NA omitted',2),
+    stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+    param = c(chisq_vals$parameter[['df']], NA_integer_),
+    pval = c(chisq_vals$p.value, fisher_vals$p.value)
+    ) |>
+    dplyr::mutate(
+      sig = dplyr::case_when(
+        pval < 0.01 ~ "**",
+        pval < 0.05 ~ "*",
+        TRUE ~ ""
+        )
+      )
+    )
+
+## Display table
+stats
+```
+
+#### Race
+
+Observed counts of race were isolated. The responses appeared to skew White (61.52%).
+
+```{r}
+#| label: analy-demo-race-subj-sum
+
+# Summary Statistics for Race, Subject-Level
+## Extract counts into a table
+obs <- as.data.frame(table(ms_subjs$race_cat))
+t_total <- nrow(ms_subjs)
+obs <- rbind(obs, tibble(Var1 = "missing", Freq = t_total - sum(obs$Freq)))
+
+## Calculate percentages for each category
+obs <- obs |>
+  dplyr::mutate(
+    perc = paste(format(Freq*100/t_total, digits = 2), "%")
+  )
+
+## Display table
+obs
+```
+
+We performed Chi-Square and Fisher's Exact test for association. Observed counts for each race value were isolated. Expected counts were calculated utilizing [US Census data for Fort Worth](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210), which indicated that single racial identifications of "White" were made by 55.8% of the population, "Black or African American" by 18.8% of the population, "American Indian and Alaska Native" by 0.5%, "Asian" by 4.9%, "Native Hawaiian and Other Pacific Islander" by 0.1%, and "Two or More Races" by 8.6%. The remaining 11.3% of the population should be assumed to have reported "Some other race" per Census documentation. There was no category for "Middle Eastern or North African" in the 
+2022 census data, so we consolidated that category into "other race" for sensitivity testing.
+
+Chi-Square and Fisher testing both indicated p-value > 0.05, and thus failed to identify any statistically significant heterogeneity. This was consistent when missing values were omitted.
+
+```{r}
+#| label: analy-demo-race-subj-stats
+
+# Calculate Chi-Square & Fischer Exact for Race, Subject-Level
+## Consolidate "Middle Eastern or North African" into "Other Race"
+obs <- ms_subjs |>
+  dplyr::mutate(
+    race_cat = ifelse(
+      race_cat == "middle eastern or north african", 
+      "other race", 
+      race_cat
+      )
+  )
+
+obs <- as.data.frame(table(obs$race_cat))
+t_total <- nrow(ms_subjs)
+obs <- rbind(obs, tibble(Var1 = "missing", Freq = t_total - sum(obs$Freq)))
+
+## Create table of expected vs observed counts
+obs <- obs |>
+  tibble::add_column(expected = 0.0) |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      Var1 == "white" ~ t_total*0.558,
+      Var1 == "black or african american" ~ t_total*0.188,
+      Var1 == "american indian or alaska native" ~ t_total*0.005,
+      Var1 == "asian" ~ t_total*0.049,
+      Var1 == "native hawaiian or other pacific islander" ~ t_total*0.001,
+      Var1 == "multiracial" ~ t_total*0.086,
+      Var1 == "other race" ~ t_total*0.113,
+      Var1 == "missing" ~ t_total*0
+      )
+    ) |>
+  dplyr::rename_at('Var1', ~'race') |>
+  dplyr::rename_at('Freq', ~'observed')
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Initiate formatted statistics table
+stats <- tibble::tibble(
+  test = c('chi-squared', 'fischer'),
+  method = rep('with NAs',2),
+  stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+  param = c(chisq_vals$parameter[['df']], NA_integer_),
+  pval = c(chisq_vals$p.value, fisher_vals$p.value)
+  ) |>
+  dplyr::mutate(
+    sig = dplyr::case_when(
+      pval < 0.01 ~ "**",
+      pval < 0.05 ~ "*",
+      TRUE ~ ""
+      )
+    )
+
+## Remove missing values for sensitivity testing
+obs <- obs |>
+  dplyr::filter(!race %in% c('missing'))
+t_total <- sum(obs$observed)
+
+## Revise observed vs expected table
+obs <- obs |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      race == "white" ~ t_total*0.558,
+      race == "black or african american" ~ t_total*0.188,
+      race == "american indian or alaska native" ~ t_total*0.005,
+      race == "asian" ~ t_total*0.049,
+      race == "native hawaiian or other pacific islander" ~ t_total*0.001,
+      race == "multiracial" ~ t_total*0.086,
+      race == "other race" ~ t_total*0.113
+      )
+    )
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Add to formatted statistics table
+stats <- stats |> 
+  dplyr::bind_rows(
+    tibble::tibble(
+    test = c('chi-squared', 'fischer'),
+    method = rep('NA omitted',2),
+    stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+    param = c(chisq_vals$parameter[['df']], NA_integer_),
+    pval = c(chisq_vals$p.value, fisher_vals$p.value)
+    ) |>
+    dplyr::mutate(
+      sig = dplyr::case_when(
+        pval < 0.01 ~ "**",
+        pval < 0.05 ~ "*",
+        TRUE ~ ""
+        )
+      )
+    )
+
+## Display table
+stats
+```
+
+#### Ethnicity
+
+Observed counts of Hispanic Ethnicity were isolated. The responses appeared to skew non-Hispanic (86.27%).
+
+```{r}
+#| label: analy-demo-ethn-subj-sum
+
+# Summary Statistics for Hispanic Ethnicity, Subject-Level
+## Extract counts into a table
+obs <- as.data.frame(table(ms_subjs$hispanic))
+t_total <- nrow(ms_subjs)
+obs <- rbind(obs, tibble(Var1 = "missing", Freq = t_total - sum(obs$Freq)))
+
+## Calculate percentages for each category
+obs <- obs |>
+  dplyr::mutate(
+    perc = paste(format(Freq*100/t_total, digits = 2), "%")
+  )
+
+## Display table
+obs
+```
+
+
+We performed Chi-Square and Fisher's Exact test for association. Expected counts were calculated utilizing [US Census data for Fort Worth](https://www.census.gov/quickfacts/fact/table/fortworthcitytexas/POP060210), which indicated 35.3% of the population were "Hispanic or Latino", with "Hispanic or Latino" and "Not Hispanic or Latino" as the only selection options. Chi-Square and Fisher testing both indicated p-value > 0.05, and thus failed to identify any statistically significant heterogeneity. This was consistent when missing values were omitted.
+
+```{r}
+#| label: analy-demo-ethn-subj-stats
+
+# Calculate Chi-Square & Fischer Exact for Hispanic Ethnicity, Subject-Level
+## Create table of expected vs observed counts
+obs <- obs |>
+  dplyr::select(-perc) |>
+  tibble::add_column(expected = 0.0) |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      Var1 == "TRUE" ~ t_total*0.353,
+      Var1 == "FALSE" ~ t_total*(1-0.353),
+      Var1 == "missing" ~ t_total*0
+      )
+    ) |>
+  dplyr::rename_at('Var1', ~'hispanic') |>
+  dplyr::rename_at('Freq', ~'observed')
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Initiate formatted statistics table
+stats <- tibble::tibble(
+  test = c('chi-squared', 'fischer'),
+  method = rep('with NAs',2),
+  stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+  param = c(chisq_vals$parameter[['df']], NA_integer_),
+  pval = c(chisq_vals$p.value, fisher_vals$p.value)
+  ) |>
+  dplyr::mutate(
+    sig = dplyr::case_when(
+      pval < 0.01 ~ "**",
+      pval < 0.05 ~ "*",
+      TRUE ~ ""
+      )
+    )
+
+## Reduce to only binary values for testing (male, female)
+obs <- obs |>
+  dplyr::filter(hispanic != 'missing')
+t_total <- sum(obs$observed)
+
+## Revise observed vs expected table
+obs <- obs |>
+  dplyr::mutate(
+    expected = dplyr::case_when(
+      hispanic == "TRUE" ~ t_total*0.353,
+      hispanic == "FALSE" ~ t_total*(1-0.353),
+      )
+    )
+
+## Calculate statistical tests
+chisq_vals <- suppressWarnings(stats::chisq.test(obs$observed, obs$expected))
+fisher_vals <- suppressWarnings(stats::fisher.test(obs$observed, obs$expected))
+
+## Add to formatted statistics table
+stats <- stats |> 
+  dplyr::bind_rows(
+    tibble::tibble(
+    test = c('chi-squared', 'fischer'),
+    method = rep('NA omitted',2),
+    stat = c(chisq_vals$statistic[['X-squared']], NA_real_),
+    param = c(chisq_vals$parameter[['df']], NA_integer_),
+    pval = c(chisq_vals$p.value, fisher_vals$p.value)
+    ) |>
+    dplyr::mutate(
+      sig = dplyr::case_when(
+        pval < 0.01 ~ "**",
+        pval < 0.05 ~ "*",
+        TRUE ~ ""
+        )
+      )
+    )
+
+## Display table
+stats
+```
+
+
+## CONSTRUCTION ZONE PARKING
+
+
+```{r}
+#| label: placeholder
+
+```
+
+# BOTTOM
+
+# 🧹 Clean up
+
+```{r}
+#| label: end-cleanup
+#| eval: FALSE # for now - remove before publishing - PLACEHOLDER
+rm(list=ls())
+```
