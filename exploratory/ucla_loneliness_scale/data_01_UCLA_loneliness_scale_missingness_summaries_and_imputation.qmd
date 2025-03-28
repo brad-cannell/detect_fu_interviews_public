@@ -583,7 +583,7 @@ all_ms
 # Missingness Imputation
 
 ```{r}
-mice_out <- mice(all_new, m = 5, seed = 11, maxit = 50)
+mice_out <- mice(all_new, m = 50, seed = 11, maxit = 50)
 ```
 
 ```{r, eval =FALSE}

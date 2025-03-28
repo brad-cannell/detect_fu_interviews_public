@@ -13,6 +13,8 @@ library(here)
 library(purrr, include.only = "reduce")
 library(ggplot2)
 library(mice)
+library(miceadds)
+library(miceafter)
 library(expss, include.only = "apply_labels")
 library(ggplot2)
 ```
@@ -304,9 +306,7 @@ mice_out_df_dum <- mice_out_df %>%
 
 ```{r}
 # Loneliness scale variables
-ls_vars <- c(# "ls_lack_companionship_3cat_f", "ls_feel_left_out_3cat_f", 
-             # "ls_feel_isolated_3cat_f", 
-             "ls_total", "ls_total_9cat_f", "loneliness_det_2cat_f")
+ls_vars <- c("ls_total", "ls_total_9cat_f", "loneliness_det_2cat_f")
 
 # 3 Item Pain Assessment Scale
 peg_vars <- c("peg_total")
@@ -322,48 +322,37 @@ mos_vars <- c("outcomes_month_social_5cat_f", "outcomes_month_nervous_5cat_f",
 # Sociodemographic Information 
 
 ## Race/ Ethnicity
-race_vars <- c(# "sode_race_eth_6cat", "sode_race_eth_4cat_f", 
-  "hispanic", "black", "white", "other_race")
+race_vars <- c("hispanic", "black", "white", "other_race")
 
 ## Sexual orientation
-so_vars <- c(# "sogi_orientation_8cat", "sogi_orientation_4cat_f", 
-  "straight", "gay_man", "lesbian", "bisexual", "other_or")
+so_vars <- c("straight", "gay_man", "lesbian", "bisexual", "other_or")
 
 ## Marital status
-mar_vars <- c(# "sode_marital_8cat", "sode_marital_6cat_f", 
-  "married", "common_law", "separated", "divorced", "widowed", "single", 
+mar_vars <- c("married", "common_law", "separated", "divorced", "widowed", "single", 
               "sode_marital_2cat_f")
 
 ## Household size
 house_vars <- c("sode_people_9cat", "live_alone_2cat_f")
 
 ## Education status
-edu_vars <- c(# "sode_school_9cat", "sode_school_7cat_f", 
-  "some_high_school", "high_school", "some_college", "associate", "bachelor", 
+edu_vars <- c("some_high_school", "high_school", "some_college", "associate", "bachelor", 
               "some_graduate", "graduate")
 
 ## Employment status
-job_vars <- c(# "sode_employed_11cat", "sode_employed_9cat_f", 
-  "full_time", "part_time", "in_military", "unemployed", "retired", "student", 
+job_vars <- c("full_time", "part_time", "in_military", "unemployed", "retired", "student", 
   "homemaker", "disabled", "other_emp")
 
 ## Income
-income_vars <- c(# "sode_income_9cat", "sode_income_7cat_f", 
-  "inc_10", "inc_20", "inc_35", "inc_50", "inc_75", "inc_100", "inc_above_100")
+income_vars <- c("inc_10", "inc_20", "inc_35", "inc_50", "inc_75", "inc_100", "inc_above_100")
 
 ## Military status
-mil_vars <- c(# "sode_military_4cat", 
-  "sode_military_2cat_f")
+mil_vars <- c("sode_military_2cat_f")
 
 # Sex
-sex_vars <- c(# "sex_2cat", 
-  "sex_2cat_f" # , "female", "male"
-  )
+sex_vars <- c("sex_2cat_f")
 
 # Age
-age_vars <- c("age", 
-              # "age_4cat_f", 
-              "age_65_74", "age_75_84", "age_85_94", "age_95"
+age_vars <- c("age", "age_65_74", "age_75_84", "age_85_94", "age_95"
 )
 
 soc_vars <- c(race_vars, so_vars, mar_vars, house_vars, 
@@ -371,10 +360,9 @@ soc_vars <- c(race_vars, so_vars, mar_vars, house_vars,
                                      sex_vars, age_vars)
 
 # Abuse Self Report
-sr_vars <- c(# "over_65_abuse_any_2cat", 
-             "over_65_abuse_any_2cat_f")
+sr_vars <- c("over_65_abuse_any_2cat_f")
 
-all_pred_vars <- c(soc_vars, sr_vars, peg_vars, gds_vars, mos_vars)
+all_pred_vars <- c(soc_vars, sr_vars, peg_vars, gds_vars, mos_vars, "total_py_visits")
 ```
 
 
@@ -547,19 +535,19 @@ ls_plot
 ## List of imputed datasets
 
 ```{r}
-imp_list <- mice_out_df_dum %>% filter(impute != 0) %>%
+imp_df <- mice_out_df_dum %>% filter(impute != 0)
+
+imp_list <- imp_df %>%
  group_split(impute, .keep = FALSE)
 ```
 
 ## Functions
 
-```{r}
-df_test <- imp_list[[1]]
-```
-
 ### Pooling resultd for categorical variables
 Chisquare and Fisher's test
 <https://stefvanbuuren.name/fimd/sec-multiparameter.html#sec:chi> Citation for converting p-values to z-scores and then back
+
+Rubin's rules <https://bookdown.org/mwheymans/bookmi/rubins-rules.html>
 
 ```{r}
 pooled_imp_desc_table_cat <- function(imp_list, x, group_var){
@@ -567,11 +555,11 @@ pooled_imp_desc_table_cat <- function(imp_list, x, group_var){
   not_lonely_perc <- NULL
   
   # Fishers test only
-  fish_z_scores <- NULL
+  fish_p_vals <- c()
   
   # Chi-square test only
-  chi_sqs <- NULL
-  d_frs <- NULL
+  chi_sqs <- c()
+  d_frs <- c()
   
   for(imp in imp_list){
     stat_test <- tryCatch(
@@ -593,68 +581,29 @@ pooled_imp_desc_table_cat <- function(imp_list, x, group_var){
     
     if(grepl("Fisher", stat_test$method) == TRUE){
       test_name <- "Fisher's test"
-      z_pval <- round(stat_test$p.value, 10)
-      # For cases where p = 1, adjust to number slightly less than 1 
-      # to avoid -Inf in z-scores
-      if(z_pval == 1){
-        fish_z_score <- qnorm(1 - (z_pval - 1e-16))
-      } else if(z_pval != 1){
-        fish_z_score <- qnorm(1 - z_pval)
-      }    
-      fish_z_scores <- cbind(fish_z_scores, fish_z_score)
+      fish_p_val <- stat_test$p.value
+      fish_p_vals <- c(fish_p_vals, fish_p_val)
       
     }else if(grepl("Pearson's Chi-squared", stat_test$method) == TRUE){ 
       test_name <- "Chi-square test"
       chi_sq <- as.numeric(stat_test$statistic)
-      chi_sqs <- cbind(chi_sqs, chi_sq)
+      chi_sqs <- c(chi_sqs, chi_sq)
       # Get degrees of freedom to calculate variance for chi-square test
       tbl <- table(imp[[x]], imp[[group_var]])
       d_fr <- (nrow(tbl) - 1) * (ncol(tbl) - 1)
-      d_frs <- cbind(d_frs, d_fr)
+      d_frs <- c(d_frs, d_fr) 
     }
   }
   # Calculate the pooled p-values
   
   if(test_name == "Fisher's test"){
-    # Calculate pooled p-value from the z-scores using Rubin's rules
-    m <- length(fish_z_scores)
-    mean_z <- mean(fish_z_scores)
-    between_var <- apply(fish_z_scores, 1, var)
-    within_var <- 1  # Variance of Z under null hypothesis
-    total_var <- within_var + between_var + (between_var/m)
-    if(between_var == 0){
-      p_value <- stat_test$p.value
-      }
-    else{
-      # Combine Z-scores
-      z_combined <- mean_z / sqrt(total_var)
-      # Calculate combined p-value
-      p_value <- 2 * (1 - pnorm(abs(z_combined)))
-      }
+    # Calculate pooled p-values by taking the median
+    p_value <- median(fish_p_vals)
     } 
   else if(test_name == "Chi-square test"){
-    # Calculate pooled p-value from the chi_square output using Rubin's rules
-    m <- length(imp_list) # Number of imputations
-    mean_chi_sq <- mean(chi_sqs)
-    between_var <- apply(chi_sqs, 1, var)
-    within_var <- mean(chi_sqs / d_frs)
-    total_var <- within_var + between_var + (between_var/m)
-    
-    lambda <- (between_var + (between_var/m))/total_var
-    n <- max(sapply(imp_list, nrow))  # Sample size of imputed set
-    k <- 1 # number of parameters
-    df_old <- (m - 1)/ (lambda)^2
-    
-    df_observed <- (((n - k) + 1)/ ((n - k) + 3)) * (n - k)*(1 - lambda)
-    df_adjusted <- (df_old * df_observed)/ (df_old + df_observed)
-    
-    if(between_var == 0){
-      p_value <- 1 - pchisq(mean_chi_sq, mean(d_frs))
-    } 
-    else{
-      # Calculate p-value from the pooled chi-square statistic
-      p_value <- 1 - pchisq(mean_chi_sq, df_adjusted)          
-    }
+    # Obtain the pooled p-value 
+    out <- micombine.chisquare(dk = chi_sqs, df = d_frs[1], display = FALSE)
+    p_value <- as.numeric(out[["p"]])
   }
   
   # Create summary data frame
@@ -696,15 +645,13 @@ pooled_imp_desc_table_cat <- function(imp_list, x, group_var){
       not_lonely_perc <- cbind(not_lonely_perc, est_perc[["est_not_lonely"]])
     }
   
-  # Pooled proportions and standard errors
+  # Pooled proportions
   # Pooled estimates
   lonely_perc_pool <- apply(lonely_perc, 1, mean)
   not_lonely_perc_pool <- apply(not_lonely_perc, 1, mean)
   
-  n <- max(sapply(imp_list, nrow)) # sample size
-  
-  # Add pooled proportions and standard errors to dataframe
-  sum_df <- cbind(sum_df, lonely_perc_pool, not_lonely_perc_pool, between_var) %>% 
+  # Add pooled proportions to dataframe
+  sum_df <- cbind(sum_df, lonely_perc_pool, not_lonely_perc_pool) %>% 
     as.data.frame() %>% 
     # Order by category level
     arrange(group)
@@ -716,29 +663,26 @@ pooled_imp_desc_table_cat <- function(imp_list, x, group_var){
 ### Pooling t-test results for numeric variables
 
 ```{r}
-pooled_imp_desc_table_num <- function(imp_list, x, group_var){
-  s_errors <- NULL
+pooled_imp_desc_table_num <- function(imp_list, imp_df, x, group_var){
+  
   sd_lonely <- NULL
   sd_not_lonely <- NULL
   est_lonely <- NULL
   est_not_lonely <- NULL
-  est <- NULL
   min_lonely <- NULL
   min_not_lonely <- NULL
   max_lonely <- NULL
   max_not_lonely <- NULL
   
+  # Get pooled p-values
+  milist <- df2milist(imp_df, impvar = "impute")
+  paste_expr <- paste0("expr = ", "t_test(", x, " ~ ", group_var, ")")
+  res_stats <- with(data = milist,
+  expr = eval(parse(text = paste_expr)))
+  res <- pool_t_test(res_stats, statistic = TRUE)
+  pvalue <- res[7]
+  
   for(imp in imp_list){
-    stat_test <- t.test(eval(parse(text = x)) ~ 
-                          eval(parse(text = group_var)), data = imp)
-    # Extract standard errors
-    se <- stat_test$stderr 
-    s_errors <- cbind(s_errors, se)
-    
-    # Extract mean differences
-    mean_diff <- abs(diff(as.numeric(stat_test$estimate)))
-    est <- cbind(est, mean_diff)
-    
     # Compute the means, min, max and medians
     sum_df <- imp %>%
       reframe(
@@ -779,39 +723,10 @@ pooled_imp_desc_table_num <- function(imp_list, x, group_var){
   est_not_lonely_pool <- apply(est_not_lonely, 1, mean)
   sd_lonely_pool <- apply(sd_lonely, 1, mean)
   sd_not_lonely_pool <- apply(sd_not_lonely, 1, mean)
-  est_pool <- apply(est, 1, mean)
-
-  # Pooled SE
-  m <- length(imp_list) # number of imputations
-  between_var <- apply(est, 1, var)
-  within_var <- mean(s_errors^2) #apply(s_errors^2, 1, mean)
-  var_total_pool <- within_var + between_var + (between_var/m)
-  se_pool <- sqrt(var_total_pool)
-  # pooled t_values
-  t_pool <- est_pool/se_pool
-  n <- max(sapply(imp_list, nrow)) # sample size
-
-  # Pooled p-values
-  if(between_var == 0){
-    pvalue <- 2 * pt(-abs(t_pool), df = n - 2)  # Standard t-test degrees of freedom 
-  }
-  else{
-    # Lambda is equal to the fraction of missing information
-    lambda <- (between_var + (between_var/m))/var_total_pool
-    k <- 1 # number of parameters
-    df_old <- (m - 1)/ (lambda)^2
-  
-    df_observed <- (((n - k) + 1)/ ((n - k) + 3)) * (n - k)*
-      (1 - lambda)
-    df_adjusted <- (df_old * df_observed)/
-      (df_old + df_observed)
-    
-    pvalue <- 2 * pt(-abs(t_pool), df_adjusted) 
-  }
 
   sum_df <- cbind(sum_df, min_min_lonely, min_min_not_lonely, max_max_lonely, 
                   max_max_not_lonely, est_lonely_pool, est_not_lonely_pool, 
-                  sd_lonely_pool, sd_not_lonely_pool, between_var, pvalue) %>% 
+                  sd_lonely_pool, sd_not_lonely_pool, pvalue) %>% 
     as.data.frame()
 
   sum_df
@@ -825,7 +740,8 @@ pooled_imp_desc_table_num <- function(imp_list, x, group_var){
 all_vars <- list()
 for(p in all_pred_vars){
   if(is.numeric(imp_list[[1]][[p]]) == TRUE){
-    p_sum <- pooled_imp_desc_table_num(imp_list, p, "loneliness_det_2cat_f") %>%
+    p_sum <- pooled_imp_desc_table_num(imp_list, imp_df, p, 
+                                       "loneliness_det_2cat_f") %>%
       mutate(
         ct_lonely = paste0(format(round(est_lonely_pool, 1), nsmall = 1),
                         " (", format(round(sd_lonely_pool, 1), nsmall = 1), ")"),
@@ -845,8 +761,7 @@ for(p in all_pred_vars){
         )
       ) %>%
       rename(not_lonely = notlonely) %>%
-      select(var, est_name, group_sum_stat, not_lonely, lonely, stat_name, pvalue, 
-             between_var)
+      select(var, est_name, group_sum_stat, not_lonely, lonely, stat_name, pvalue)
   }
   else if(is.factor(imp_list[[1]][[p]]) == TRUE){
     p_sum <- pooled_imp_desc_table_cat(imp_list, p, "loneliness_det_2cat_f") %>%
@@ -856,8 +771,7 @@ for(p in all_pred_vars){
                             "%")) %>% rename(
         group_sum_stat = group
         ) %>%
-      select(var, est_name, group_sum_stat, not_lonely, lonely, stat_name, pvalue, 
-             between_var)   
+      select(var, est_name, group_sum_stat, not_lonely, lonely, stat_name, pvalue)   
   }
   all_vars <- append(all_vars, list(p_sum))
 }
@@ -883,12 +797,7 @@ sum_table <- all_vars %>%
       (pvalue <= 0.01 & pvalue > 0.001) ~
         paste(format(round(pvalue, 3), nsmall = 3)),
       pvalue <= 0.001 ~ paste("< 0.01")
-      ),
-    between_var = case_when(
-      between_var == 0 ~ "Little to no variation",
-      between_var < 0.01 & between_var != 0 ~ "< 0.01",
-      TRUE ~ format(round(between_var, 2), nsmall = 2)
-    )
+      )
   ) %>% left_join(all_labels, by = "var") %>% relocate(label) %>% 
   select(-c(var, est_name)) %>% 
   # Group by label to keep each label on a separate line in flextable
@@ -937,16 +846,15 @@ ft <- prep_table %>%
                     lonely = "Lonely\n (pooled estimates)",
                     not_lonely = "Not lonely \n(pooled estimates)",
                     stat_name = "Test",
-                    pvalue = "P-value\n (pooled estimate)",
-                    between_var = "Variance between \ntest estimates") %>%
+                    pvalue = "P-value\n (pooled estimate)") %>%
   bold(i = ~ !is.na(label)) %>%
   align(i = ~ !is.na(label), align = "left") %>%
   font(fontname = "Arial", part = "all") %>%
   fontsize(size = 10, part = "all") %>%
   width(j = 1, width = 2) %>%
-  delete_columns(j = 7)
+  delete_columns(j = 6)
 
-for(j in 4:6){
+for(j in 4:5){
   for(s in start_stop){
     ft <-  merge_at(ft, i = s[[1]]:s[[2]], j = j)
   }  
