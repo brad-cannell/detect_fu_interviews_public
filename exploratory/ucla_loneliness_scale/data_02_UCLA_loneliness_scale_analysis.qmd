@@ -391,7 +391,18 @@ pvalue <- function(x, ...) {
             p <- chisq.test(table(y, g))$p.value
             }
         # The initial empty string places the output on the line below the variable label.
-        c("", format.pval(p, digits=3, eps=0.001))
+        if(p > 0.2){
+          c("", format(round(p, 2), nsmall = 2))
+        }else if(p <= 0.2 & p > 0.05){
+          c("", format(round(p, 3), nsmall = 3))
+        }else if(p <= 0.05 & p > 0.01){
+          c("", paste(format(round(p, 3), nsmall = 3), "*"))
+        }else if((p <= 0.01 & p > 0.001)){
+          c("", paste(format(round(p, 3), nsmall = 3), "**"))
+        }else if(p <= 0.001){
+          c("", paste("< 0.001 ***"))
+        }
+        
         },
       error=function(e) {
         message('An Error Occurred')
@@ -402,14 +413,23 @@ pvalue <- function(x, ...) {
       warning=function(w) {
         if(w$message == "Chi-squared approximation may be incorrect"){
           p <- fisher.test(table(y, g))$p.value
-          c("", format.pval(p, digits=3, eps=0.001))
+        if(p > 0.2){
+          c("", format(round(p, 2), nsmall = 2))
+        }else if(p <= 0.2 & p > 0.05){
+          c("", format(round(p, 3), nsmall = 3))
+        }else if(p <= 0.05 & p > 0.01){
+          c("", paste(format(round(p, 3), nsmall = 3), "*"))
+        }else if((p <= 0.01 & p > 0.001)){
+          c("", paste(format(round(p, 3), nsmall = 3), "**"))
+        }else if(p <= 0.001){
+          c("", paste("< 0.001 ***"))
+        }
         
         }
         }
     )
 }
 ```
-
 
 ### Statistical test
 
@@ -444,6 +464,26 @@ test <- function(x, ...) {
 }
 ```
 
+### Formatting continupus variables
+
+```{r}
+my_render_cont <- function(x) {
+    with(stats.default(x), 
+         c("",
+           
+          "Mean (SD)" = sprintf("%s (%s)",
+                                round_pad(MEAN, 1),
+                                round_pad(SD, 1)),
+         
+          "Median [Min, Max]" = sprintf("%s [%s, %s]",
+                                       round_pad(MEDIAN, 0), 
+                                       round_pad(MIN, 0), 
+                                       round_pad(MAX, 0)))
+    )
+}
+```
+
+
 ### Add variable labels
 
 ```{r}
@@ -475,9 +515,10 @@ create_formula <- function(predictors, target){
 ### Create and format flextable
 
 ```{r}
-desc_flex <- function(df){
-  table1(create_formula(all_pred_vars, "loneliness_det_2cat_f"),
-    data = df, overall = F , extra.col=list(`Test` = test, `P-value`= pvalue)
+desc_flex <- function(df, pred_vars){
+  table1(create_formula(pred_vars, "loneliness_det_2cat_f"),
+    data = df, overall = F, render.continuous = my_render_cont,
+    extra.col=list(`Test` = test, `P-value`= pvalue)
     ) %>% t1flex(tablefn = c("qflextable", "flextable", "regulartable")) %>% 
   font(fontname = "Arial", part = "all") %>%
   fontsize(size = 10, part = "all") %>%
@@ -511,10 +552,11 @@ ls_tab
 ## Predictors
 
 ```{r}
-original_tab <- desc_flex(original)
+original_tab <- desc_flex(original, all_pred_vars)
 
 original_tab
 ```
+
 
 ```{r}
 quintile_ls <- quantile(original$ls_total, prob=c(0.2,0.4,0.6,0.8, 1), type=1)
@@ -530,7 +572,7 @@ ls_plot <- ggplot(original, aes(ls_total)) +
 ls_plot
 ```
 
-# Imputed data
+# Imputed data + non-imputed
 
 ## List of imputed datasets
 
@@ -540,6 +582,32 @@ imp_df <- mice_out_df_dum %>% filter(impute != 0)
 imp_list <- imp_df %>%
  group_split(impute, .keep = FALSE)
 ```
+
+# List of variables with and without missing data
+
+## without missing
+
+```{r}
+no_missing <- c("sex_2cat_f", "age", "age_65_74", "age_75_84", "age_85_94",
+                "age_95", "total_py_visits")
+```
+
+## With missing
+
+```{r}
+has_missing <- all_pred_vars[!(all_pred_vars %in% no_missing)]
+
+has_missing
+```
+
+# Predictors without missing data
+
+```{r}
+no_missing_tab <- desc_flex(original, no_missing)
+
+no_missing_tab
+```
+
 
 ## Functions
 
@@ -738,7 +806,7 @@ pooled_imp_desc_table_num <- function(imp_list, imp_df, x, group_var){
 
 ```{r}
 all_vars <- list()
-for(p in all_pred_vars){
+for(p in has_missing){
   if(is.numeric(imp_list[[1]][[p]]) == TRUE){
     p_sum <- pooled_imp_desc_table_num(imp_list, imp_df, p, 
                                        "loneliness_det_2cat_f") %>%
@@ -791,12 +859,7 @@ sum_table <- all_vars %>%
         paste(format(round(pvalue, 3), nsmall = 3), "*"),
       (pvalue <= 0.01 & pvalue > 0.001) ~
         paste(format(round(pvalue, 3), nsmall = 3), "**"),
-      pvalue <= 0.001 ~ paste("< 0.01 ***"),
-      (pvalue <= 0.05 & pvalue > 0.01) ~
-        paste(format(round(pvalue, 3), nsmall = 3)),
-      (pvalue <= 0.01 & pvalue > 0.001) ~
-        paste(format(round(pvalue, 3), nsmall = 3)),
-      pvalue <= 0.001 ~ paste("< 0.01")
+      pvalue <= 0.001 ~ paste("< 0.001 ***")
       )
   ) %>% left_join(all_labels, by = "var") %>% relocate(label) %>% 
   select(-c(var, est_name)) %>% 
@@ -884,7 +947,12 @@ ucla_desc_tables_doc <- ucla_desc_tables_doc %>%
   body_add_flextable(original_tab, align = "left") %>%
   body_add_par(value = "") %>%
   
-  # Imputated data
+  # Original data excluding imputed data
+  body_add_par("Variables without Missing Values", style = "heading 1") %>%
+  body_add_flextable(no_missing_tab, align = "left") %>%
+  body_add_par(value = "") %>%  
+  
+  # Imputed data
   body_add_par("Imputed Data", style = "heading 1") %>%
   body_add_flextable(ft, align = "left") %>%
   body_add_par(value = "") 
