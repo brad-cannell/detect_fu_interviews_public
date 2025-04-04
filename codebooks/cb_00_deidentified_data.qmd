@@ -1,0 +1,911 @@
+---
+title: "Create Codebooks for the Deidentifed Versions of Data"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## This File
+
+This file creates codebooks for the de-identified version of the APS, MedStar, and Record Linkage data sets.
+
+# 📥 Load
+
+## Packages
+
+## Library Imports
+
+```{r, warning = FALSE}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(codebookr)
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   codebookr version 0.1.8
+
+## Functions
+
+```{r}
+#| label: imports-functions
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+# Function to use a CSV to add column attributes for Codebookr
+source(here::here("r", "cb_add_col_attributes_from_csv_file.R"))
+```
+
+# Create Codebooks
+
+## MedStar Data
+
+### "Participants.RDS" (Encounter/Record Level, Pre-Cleaned)
+
+We loaded and processed the MedStar Participant data (record level).
+
+```{r}
+#| label: codebook-medstar-records
+# MedStar Response Records
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "medstar", "01_medstar_records.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "medstar", 
+  "01_medstar_records_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "medstar", 
+  "cb_01_medstar_records.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = paste0(
+   "DETECT 5-Year Data: MedStar (EMS) Participant Records, ", 
+   "Record-Level, Deidentified"
+   ),
+ description = paste0(
+   "From pre-processing of 'participant_import.csv' file from FileMaker Pro"
+   ),
+ no_summary_stats = c('x_primary_key')
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### "Participants.RDS" (Subject Level, Pre-Cleaned)
+
+We loaded and processed the MedStar Participant data (subject level).
+
+```{r}
+#| label: codebook-medstar-subjects
+# MedStar Response Subject Data
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "medstar", "02_medstar_subjects.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "medstar", 
+  "02_medstar_subjects_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "medstar", 
+  "cb_02_medstar_subjects.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = paste0(
+   "DETECT 5-Year Data: MedStar (EMS) Participant Records, ", 
+   "Subject-Level, Deidentified"
+   ),
+ description = paste0(
+   "From pre-processing of 'participant_import.csv' file from",
+   " FileMaker Pro, aggregated to subject level"
+   ),
+ no_summary_stats = c('x_primary_key')
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### "Observational Measures"
+
+We loaded and processed the MedStar Follow-up Interview Observational Measures data.
+
+```{r}
+#| label: codebook-medstar-obs
+# MedStar Observational Measures
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "medstar", "03_medstar_observational.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "medstar", 
+  "03_medstar_observational_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "medstar", 
+  "cb_03_medstar_observational.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "DETECT 5-Year Data: Follow-Up Interviews: Observational Measures",
+ description = paste0(
+   "From 'observational_measures_import.csv' file from FileMaker Pro"
+   ),
+ no_summary_stats = c(
+   'x_primary_key', 'at_self_why', 'at_fina_why', 'at_neg_why', 
+   'at_emot_why', 'at_sex_why', 'at_phys_why', 'abuse_indicators_comments', 
+   'general_assessment_comments', 'summary_comments', 'abandonment_comments', 
+   'exploitation_comments', 'neglect_comments'
+   )
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### "Sociodemographic Measures"
+
+We loaded and processed the MedStar Follow-up Interview Sociodemographic Data.
+
+```{r}
+#| label: codebook-medstar-sdi
+# MedStar Follow-Up Interview Sociodemographic Measures
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "medstar", "04_medstar_sociodemographics.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "medstar", 
+  "04_medstar_sociodemographics_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "medstar", 
+  "cb_04_medstar_sociodemographics.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "DETECT 5-Year Data: Follow-Up Interviews: Sociodemographics",
+ description = paste0(
+   "From 'sociodemographic_information_import.csv' file from FileMaker Pro"
+   ),
+ no_summary_stats = c('x_primary_key')
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### "General Health"
+
+We loaded and processed the MedStar Follow-up Interview General Health Data.
+
+```{r}
+#| label: codebook-medstar-gh
+# MedStar Follow-up Interview General Health Measures
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "medstar", "05_medstar_general_health.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "medstar", 
+  "05_medstar_general_health_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "medstar", 
+  "cb_05_medstar_general_health.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "DETECT 5-Year Data: Follow-Up Interviews: General Health Measures",
+ description = paste0(
+   "From 'general_health_import.csv' file from FileMaker Pro"
+   ),
+ no_summary_stats = c('x_primary_key')
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### "Self Report"
+
+We loaded and processed the MedStar Follow-up Interview Self Report Data.
+
+```{r}
+#| label: codebook-medstar-sr
+# MedStar Follow-up Interview Self Report Measures
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "medstar", "06_medstar_self_report.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "medstar", 
+  "06_medstar_self_report_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "medstar", 
+  "cb_06_medstar_self_report.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "DETECT 5-Year Data: Follow-Up Interviews: Self-Report",
+ description = paste0(
+   "From 'self_report_import.csv' file from FileMaker Pro"
+   ),
+ no_summary_stats = c('x_primary_key')
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### "LEAD Panel Assessment"
+
+We loaded and processed the MedStar LEAD Panel Assessment Data.
+
+```{r}
+#| label: codebook-medstar-lead
+# MedStar LEAD Panel Measures
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "medstar", "07_medstar_lead.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "medstar", 
+  "07_medstar_lead_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "medstar", 
+  "cb_07_medstar_lead.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "DETECT 5-Year Data: Lead Panel Assessment",
+ description = paste0(
+   "From 'lead_panel_assessment_import.csv' file from FileMaker Pro"
+   ),
+ no_summary_stats = c('x_primary_key')
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+## APS Data
+
+### Clients.xlsx
+
+We loaded and processed the APS Client Data.
+
+```{r}
+#| label: codebook-aps-clients
+# APS Clients.xlsx
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "aps", "01_aps_clients.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "aps", 
+  "01_aps_clients_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "aps", 
+  "cb_01_aps_clients.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "Texas APS: Client Data",
+ description = paste0(
+   "From pre-processed 'Clients.xlsx' file from Texas APS"
+   )
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### Investigations.xlsx
+
+We loaded and processed the APS Investigation Data.
+
+```{r}
+#| label: codebook-aps-investigations
+# APS Investigations.xlsx
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "aps", "02_aps_investigations.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "aps", 
+  "02_aps_investigations_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "aps", 
+  "cb_02_aps_investigations.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "Texas APS: Investigation Data",
+ description = paste0(
+   "From 'Investigations.xlsx' file from Texas APS"
+   )
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### Allegations.xlsx
+
+We loaded and processed the APS Allegations Data.
+
+```{r}
+#| label: codebook-aps-allegs
+# APS Allegations.xlsx
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "aps", "03_aps_allegations.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "aps", 
+  "03_aps_allegations_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "aps", 
+  "cb_03_aps_allegations.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "Texas APS: Allegations Data",
+ description = paste0(
+   "From 'Allegations.xlsx' file from Texas APS"
+   )
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### Subsequent Intakes.xlsx
+
+We loaded and processed the APS Intakes Data.
+
+```{r}
+#| label: codebook-aps-intakes
+# APS Subsequent Intakes.xlsx
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "aps", "04_aps_intakes.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "aps", 
+  "04_aps_intakes_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "aps", 
+  "cb_04_aps_intakes.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "Texas APS: Intakes Data",
+ description = paste0(
+   "From 'Subsequent Intakes.xlsx' file from Texas APS"
+   )
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+## Record Linkage Maps
+
+### Subject Linkage
+
+We loaded and processed the Record Linkage Map connecting MedStar Subjects to APS Subjects.
+
+```{r}
+#| label: codebook-rec-link-subj
+# Record Linkage Map: Subjects
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "record_linkage", "01_medstar_to_aps-subjs.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "record_linkage", 
+  "01_medstar_to_aps-subjs_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "record_linkage", 
+  "cb_01_medstar_to_aps-subjs.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "Record Linkage Map: MedStar Subjects to APS Subjects"
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### Response-Investigation Linkage
+
+We loaded and processed the Record Linkage Map connecting MedStar Subjects to APS Investigations.
+
+```{r}
+#| label: codebook-rec-link-invs
+# Record Linkage Map: Responses to Investigations
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "record_linkage", 
+  "02_medstar_to_aps-investigation.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "record_linkage", 
+  "02_medstar_to_aps-investigation_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "record_linkage", 
+  "cb_02_medstar_to_aps-investigation.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "Record Linkage Map: MedStar Responses to APS Investigations"
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+### Response-Intake Linkage
+
+We loaded and processed the Record Linkage Map connecting MedStar Subjects to APS Intakes.
+
+```{r}
+#| label: codebook-rec-link-intakes
+# Record Linkage Map: Responses to Intakes
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "record_linkage", 
+  "03_medstar_to_aps-intake.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "record_linkage", 
+  "03_medstar_to_aps-intake_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "record_linkage", 
+  "cb_03_medstar_to_aps-intake.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "Record Linkage Map: MedStar Responses to APS Intakes"
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
+# 🧹 Clean up
+
+```{r}
+rm(list=ls())
+```

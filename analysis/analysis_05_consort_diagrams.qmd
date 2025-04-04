@@ -1,0 +1,1032 @@
+---
+title: "Analyses Section 5: Consort Diagrams"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## This File
+
+This file creates consort diagrams for the APS-MedStar DETECT 5-year follow-up data, internally referred to as "Section 5: Consort Diagrams".
+
+## MedStar Data Background
+
+The MedStar records were originally recorded in Filemaker Pro. Processing of this data was extensive and across multiple data files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki).
+
+The primary files of interest for subject-level interest included participant demographic data in the `participant_import.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd), and the original within-set unique subject ID assignment in `participant_unique_ids.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+These files originally contained 92,160 observations of approximately 30 demographic variables. Refinement of unique subject ID assignments in subject-linkage to APS resulted in 41,955 values of `ms_id`.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [5-year data manuscript directory](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update?csf=1&web=1&e=fhfOfL).
+
+**Notes for analyses** start at the parent document["00_DETECT 5-year Analysis Notes.docx"](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update/tables/00_DETECT%205-Year%20Analysis%20Notes.docx?d=w09a61782c9ef4fe78780683996fdbd1b&csf=1&web=1&e=OWsgTv). Notes for this file are in ["section 5 - consort diagrams.docx"](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update/tables/section%205%20-%20consort%20diagrams.docx?d=w1ee2d8817d644999a9e6080c73027b46&csf=1&web=1&e=QDoyeY).
+
+Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r}
+#| label: imports-libraries
+#| warning: FALSE
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(consort)
+  library(ggplot2)
+  library(patchwork)
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   consort version 1.2.2
+-   ggplot2 version 3.5.1
+-   patchwork version 1.3.0
+
+## Functions
+
+```{r}
+#| label: imports-functions
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+```
+
+# 📥 Load Data
+
+## MedStar Data
+
+We loaded our MedStar record-level data.
+
+```{r}
+#| label: load-ms-records
+# Load MedStar Record Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_01_record-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_records", path, overwrite = T
+  )
+
+ # [PLACEHOLDER]
+```
+
+We loaded our MedStar subject-level data.
+
+```{r}
+#| label: load-ms-subjs
+# Load MedStar Subject Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_02_subj-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_subjs", path, overwrite = T
+  )
+
+ # [PLACEHOLDER]
+```
+
+# Analyses
+
+## Section 5: Consort Tables
+
+We set the path to where we wished to save our plot files.
+
+```{r}
+#| label: set-plot-path
+# Set path to directory to save plot image files
+plot_path <- paste0(here::here('data', 'figs'), '/')
+```
+
+We created a version of our record-level data that was compatible with consort table generation with the consort package.
+
+```{r}
+#| label: sec5-record-consort-df
+# Create record-level consort compatible data frame
+record_df <- ms_records |>
+  ## Isolate columns of interest, which flag the "stages"
+  dplyr::select(
+    id, ems_num, dt_screened, dt_positive,
+    dt_aps_reported, dplyr::all_of(dplyr::starts_with('aps'))
+    ) |>
+  ## Convert to consort compatible values
+  dplyr::mutate(
+    ### Unique subject ID for each record (combine ID, EMS_NUM into a var)
+    resp_key = paste(id, ems_num, sep = "_"),
+    ### If screened, have the record ID
+    screenings = ifelse(dt_screened, resp_key, NA),
+    ### Mark the reason why the record was excluded (not screened)
+    record_exclusion = ifelse(
+      is.na(screenings), 
+      "No Recorded\nDETECT Screening", NA
+      ),
+    ### Mark "arm" of Screening Result
+    screen_result = dplyr::case_when(
+      dt_positive ~ "Positive Screening \n(1+ 'yes' response)",
+      !dt_positive ~ "Negative Screening \n(no 'yes' responses)",
+      TRUE ~ NA
+    ),
+    ### Mark "arm3" of Reporting Intent
+    report_intent = dplyr::case_when(
+      dt_aps_reported ~ "Intent to Report",
+      !dt_aps_reported ~ "No Intent to Report",
+      TRUE ~ NA
+    ),
+    ### PLACEHOLDERS
+    window_match = ifelse(aps_inv_window, resp_key, NA),
+    window_dispo = aps_inv_window_dispo,
+    window_dispo_best = aps_inv_window_dispo_best,
+    exact_match = ifelse(aps_inv_exact, resp_key, NA),
+    exact_dispo = aps_inv_exact_dispo,
+    exact_dispo_best = aps_inv_exact_dispo_best,
+    intake_any = ifelse(aps_intake, resp_key, NA),
+    intake_poss = ifelse(aps_intake_poss, resp_key, NA),
+    intake_ems = ifelse(aps_intake_ems, resp_key, NA),
+    ### PLACEHOLDERS
+    mitt = screenings,
+    present = screenings
+  ) |>
+  ### Format text labels for APS Dispositions and Reporter Type Labels
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::all_of(dplyr::contains("dispo")), 
+      ~factor(
+        .x,
+        levels = c('valid', 'mixed_validity', 'invalid', 'utd', 'other'),
+        labels = c(
+          'Valid', 'Mix of Valid\n and Invalid', 'Invalid', 
+          'Unable to\n Determine', 'Other (Not \n Investigated'
+          ),
+        ordered = T
+        )
+    )
+  ) |>
+  dplyr::mutate(
+    aps_intake_type = factor(
+      aps_intake_type,
+      levels = c("EMS (explicit)", "EMS reasonable", "Not likely to be EMS"),
+      ordered = T
+    )
+  )
+```
+
+We also processed the subject level data set.
+
+```{r}
+#| label: sec5-subj-consort-df
+# Create subject-level consort compatible data frame
+subj_df <- ms_subjs |>
+  ## Isolate columns of interest, which flag the "stages"
+  dplyr::select(
+    id, dt_screened, dt_positive, dt_aps_reported, 
+    dplyr::all_of(dplyr::starts_with('aps'))
+    ) |>
+  ## Convert to consort compatible values
+  dplyr::mutate(
+    ### Unique subject ID for each record (for consistency with record set)
+    resp_key = id,
+    ### If screened, have the record ID
+    screenings = ifelse(dt_screened, resp_key, NA),
+    ### Mark the reason why the record was excluded (not screened)
+    record_exclusion = ifelse(
+      is.na(screenings), 
+      "No Recorded\nDETECT Screening", NA
+      ),
+    ### Mark "arm" of Screening Result
+    screen_result = dplyr::case_when(
+      dt_positive ~ "Ever Positive Screening \n(1+ 'yes' response)",
+      !dt_positive ~ "Negative Screenings \n(no 'yes' responses)",
+      TRUE ~ NA
+    ),
+    ### Mark "arm3" of Reporting Intent
+    report_intent = dplyr::case_when(
+      dt_aps_reported ~ "Ever Intent to Report",
+      !dt_aps_reported ~ "No Intent to Report",
+      TRUE ~ NA
+    ),
+    ### PLACEHOLDERS
+    window_match = ifelse(aps_inv_window, resp_key, NA),
+    window_dispo = aps_inv_window_dispo,
+    window_dispo_best = aps_inv_window_dispo_best,
+    exact_match = ifelse(aps_inv_exact, resp_key, NA),
+    exact_dispo = aps_inv_exact_dispo,
+    exact_dispo_best = aps_inv_exact_dispo_best,
+    intake_any = ifelse(aps_intake, resp_key, NA),
+    intake_poss = ifelse(aps_intake_poss, resp_key, NA),
+    intake_ems = ifelse(aps_intake_ems, resp_key, NA),
+    ### PLACEHOLDERS
+    mitt = screenings,
+    present = screenings
+  ) |>
+  ### Format text labels for APS Dispositions and Reporter Type Labels
+  dplyr::mutate(
+    dplyr::across(
+      dplyr::all_of(dplyr::contains("dispo")), 
+      ~factor(
+        .x,
+        levels = c('valid', 'mixed_validity', 'invalid', 'utd', 'other'),
+        labels = c(
+          'Valid', 'Mix of Valid\n and Invalid', 'Invalid', 
+          'Unable to\n Determine', 'Other (Not \n Investigated'
+          ),
+        ordered = T
+        )
+    )
+  ) |>
+  dplyr::mutate(
+    aps_intake_type = factor(
+      aps_intake_type,
+      levels = c("EMS (explicit)", "EMS reasonable", "Not likely to be EMS"),
+      ordered = T
+    )
+  )
+```
+
+
+### Response
+
+#### Figure 5.1: Response to Reporting Intent (#sec5-f1-resps-reporting)
+
+We plotted a consort table demonstrating the flow of records to DETECT-reported intent to report.
+
+```{r}
+#| label: sec5-f1-resps-reporting-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = record_df,
+  orders = c(
+   resp_key = "EMS Response Records",
+   record_exclusion = "Excluded",
+   screenings = "Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = ""
+             ),
+  ### At least one side_box is required, or we could omit this
+  side_box = c("record_exclusion"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT"
+    ),
+  ### Set to false to avoid it giving a bunch of 0 values
+  kickoff_sidebox = F,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = 'Flow of MedStar Record Reporting Intent'
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-1-resps-reporting.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+#### Response to APS Investigation
+
+##### Broader Temporal Matching
+
+###### Figure 5.2: Response to Broad-Matched APS Investigation, Aggregate Disposition (#sec5-f2-resps-window-match-all)
+
+We plotted a consort table demonstrating the flow of records to matched APS Investigations. Matched APS Investigations were for the same subject, open within 30 days of the MedStar response in either temporal direction. Dispositions were aggregated for all matched investigations for each response.
+
+```{r}
+#| label: sec5-f2-resps-window-match-all-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = record_df,
+  orders = c(
+   resp_key = "EMS Response Records",
+   screenings = "Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   window_match = "Matched APS Investigation\n (30 day window)",
+   window_dispo = 
+     "APS Investigation Dispositions\n(All matched investigations)",
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Investigation"
+             ),
+  side_box = c("window_dispo"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Investigation"
+    ),
+  ### Set to false to avoid it giving a bunch of 0 values
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = 'APS Temporal Matching (30 day window), Aggregate Dispositions'
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-2-resps-window-match-all.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+###### Figure 5.3: Response to Broad-Matched APS Investigation, "Best" Disposition (#sec5-f3-resps-window-match-best)
+
+We plotted a consort table demonstrating the flow of records to DETECT-reported intent to report. Matched APS cases were for the same subject, open within 30 days of the MedStar response in either temporal direction. Dispositions were aggregated from the single "best" matching investigation for each response.
+
+```{r}
+#| label: sec5-f3-resps-window-match-best-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = record_df,
+  orders = c(
+   resp_key = "EMS Response Records",
+   screenings = "Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   window_match = "Matched APS Investigation\n (30 day window)",
+   window_dispo_best = 
+     'APS Investigation Disposition\n("Best" matching investigation)',
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Investigation"
+             ),
+  side_box = c("window_dispo_best"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Investigation"
+    ),
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = 
+      'APS Temporal Matching (30 day window), "Best Match" Dispositions'
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-3-resps-window-match-best.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+##### Exact Matching (Investigation Open During Response)
+
+###### Figure 5.4: Response to Exact-Matched APS Investigation, Aggregate Dispositions (#sec5-f4-resps-exact-match-all)
+
+We plotted a consort table demonstrating the flow of records to matched APS Investigations. Matched APS Investigations were for the same subject, open at the time of the response. Dispositions were aggregated for all matched investigations for each response.
+
+```{r}
+#| label: sec5-f4-resps-exact-match-all-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = record_df,
+  orders = c(
+   resp_key = "EMS Response Records",
+   screenings = "Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   exact_match = "Matched APS Investigation \n(direct overlap)",
+   exact_dispo = 
+     "APS Investigation Dispositions\n(All matched investigations)",
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Investigation"
+             ),
+  side_box = c("exact_dispo"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Investigation"
+    ),
+  ### Set to false to avoid it giving a bunch of 0 values
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = 
+      'APS Temporal Matching (direct overlap), Aggregate Dispositions'
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-4-resps-exact-match-all.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+###### Figure 5.5: Response to Exact-Matched APS Investigation, "Best" Disposition (#sec5-f5-resps-exact-match-best)
+
+We plotted a consort table demonstrating the flow of records to matched APS Investigations. Matched APS Investigations were for the same subject, open at the time of the response. Dispositions were aggregated from the single "best" matching investigation for each response.
+
+```{r}
+#| label: sec5-f5-resps-exact-match-best-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = record_df,
+  orders = c(
+   resp_key = "EMS Response Records",
+   screenings = "Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   exact_match = "Matched APS Investigation\n (direct overlap)",
+   exact_dispo_best = 
+     'APS Investigation Disposition\n("Best" matching investigation)',
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Investigation"
+             ),
+  side_box = c("exact_dispo_best"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Investigation"
+    ),
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = 
+      'APS Temporal Matching (direct overlap), "Best Match" Dispositions'
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-5-resps-exact-match-best.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+#### Response to APS Intake
+
+##### Figure 5.6: Response to APS Intake (#sec5-f6-resps-intake)
+
+We plotted a consort table demonstrating the flow of records to matched APS Intakes. Matched intakes occurred within the 72 hours following the MedStar Response. All reporter types are included in this diagram.
+
+```{r}
+#| label: sec5-f6-resps-intake-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = record_df,
+  orders = c(
+   resp_key = "EMS Response Records",
+   screenings = "Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   aps_intake = "Matched APS Intake",
+   aps_intake_type = 
+     "Reporter Type",
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Intake"
+             ),
+  side_box = c("aps_intake_type"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Intake"
+    ),
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = 
+      'MedStar Response to APS Intake'
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-6-resps-intake.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+### Subject Level
+
+#### Figure 5.7: Response to Reporting Intent (#sec5-f7-subj-reporting)
+
+We plotted a consort table demonstrating the flow of subjects to DETECT-reported intent to report.
+
+```{r}
+#| label: sec5-f7-subj-reporting-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = subj_df,
+  orders = c(
+   resp_key = "Subject in EMS Response Records",
+   record_exclusion = "Never Screened",
+   screenings = "Ever Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = ""
+             ),
+  ### At least one side_box is required, or we could omit this
+  side_box = c("record_exclusion"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT"
+    ),
+  ### Set to false to avoid it giving a bunch of 0 values
+  kickoff_sidebox = F,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = 'Flow of MedStar Record Reporting Intent, Subject Level'
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-7-subj-reporting.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+#### Subject to APS Investigation
+
+##### Broader Temporal Matching
+
+###### Figure 5.8: Subject to Broad-Matched APS Investigation, Aggregate Disposition (#sec5-f8-subj-window-match-all)
+
+We plotted a consort table demonstrating the flow of records to matched APS Investigations, aggregated at the subject level. Matched APS Investigations were for the same subject, open within 30 days of the MedStar response in either temporal direction. Dispositions were aggregated for all matched investigations for each response.
+
+```{r}
+#| label: sec5-f8-subj-window-match-all-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = subj_df,
+  orders = c(
+   resp_key = "Subject in EMS Response Records",
+   screenings = "Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   window_match = "Ever Matched APS Investigation\n (30 day window)",
+   window_dispo = 
+     "APS Investigation Dispositions\n(All matched investigations)",
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Investigation"
+             ),
+  side_box = c("window_dispo"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Investigation"
+    ),
+  ### Set to false to avoid it giving a bunch of 0 values
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = paste0(
+      'APS Temporal Matching (30 day window), Aggregate Dispositions',
+      ', Subject Level'
+      )
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-8-subj-window-match-all.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+###### Figure 5.9: Response to Broad-Matched APS Investigation, "Best" Disposition (#sec5-f9-subj-window-match-best)
+
+We plotted a consort table demonstrating the flow of records to DETECT-reported intent to report, aggregated at the subject level. Matched APS cases were for the same subject, open within 30 days of the MedStar response in either temporal direction. Dispositions were aggregated from the single "best" matching investigation for each response.
+
+```{r}
+#| label: sec5-f9-subj-window-match-best-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = subj_df,
+  orders = c(
+   resp_key = "Subject in EMS Response Records",
+   screenings = "Ever Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   window_match = "Ever Matched APS Investigation\n (30 day window)",
+   window_dispo_best = 
+     'APS Investigation Disposition\n("Best" matching investigation)',
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Investigation"
+             ),
+  side_box = c("window_dispo_best"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Investigation"
+    ),
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = paste0(
+      'APS Temporal Matching (30 day window), "Best Match"  Dispositions',
+      ', Subject Level'
+      )
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-9-subj-window-match-best.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+##### Exact Matching (Investigation Open During Response)
+
+###### Figure 5.10: Response to Exact-Matched APS Investigation, Aggregate Dispositions (#sec5-f10-subj-exact-match-all)
+
+We plotted a consort table demonstrating the flow of records to matched APS Investigations, aggregated at the subject level. Matched APS Investigations were for the same subject, open at the time of the response. Dispositions were aggregated for all matched investigations for each response.
+
+```{r}
+#| label: sec5-f10-subj-exact-match-all-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = subj_df,
+  orders = c(
+   resp_key = "Subject in EMS Response Records",
+   screenings = "Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   exact_match = "Ever Matched APS Investigation \n(direct overlap)",
+   exact_dispo = 
+     "APS Investigation Dispositions\n(All matched investigations)",
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Investigation"
+             ),
+  side_box = c("exact_dispo"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Investigation"
+    ),
+  ### Set to false to avoid it giving a bunch of 0 values
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = paste0(
+      'APS Temporal Matching (direct overlap), Aggregate Dispositions',
+      ', Subject Level'
+      )
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-10-subj-exact-match-all.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+###### Figure 5.11: Response to Exact-Matched APS Investigation, "Best" Disposition (#sec5-f11-subj-exact-match-best)
+
+We plotted a consort table demonstrating the flow of records to matched APS Investigations, aggregated at the subject level. Matched APS Investigations were for the same subject, open at the time of the response. Dispositions were aggregated from the single "best" matching investigation for each response.
+
+```{r}
+#| label: sec5-f11-subj-exact-match-best-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = subj_df,
+  orders = c(
+   resp_key = "Ever EMS Response Records",
+   screenings = "Ever Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   exact_match = "Ever Matched APS Investigation\n (direct overlap)",
+   exact_dispo_best = 
+     'APS Investigation Disposition\n("Best" matching investigation)',
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Investigation"
+             ),
+  side_box = c("exact_dispo_best"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Investigation"
+    ),
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = paste0(
+      'APS Temporal Matching (direct overlap), "Best Match" Dispositions',
+      ', Subject level'
+      )
+  )
+
+## Save plot
+ggplot2::ggsave(
+  filename = paste0(
+    plot_path,
+    'f5-11-subj-exact-match-best.png'
+    ),
+  plot = consort_plot
+  )
+
+## Display plot
+consort_plot
+```
+
+#### Subject to APS Intake
+
+##### Figure 5.12: Response to APS Intake (#sec5-f12-subj-intake)
+
+We plotted a consort table demonstrating the flow of records to matched APS Intakes, aggregated at the subject level. Matched intakes occurred within the 72 hours following the MedStar Response. All reporter types are included in this diagram.
+
+```{r}
+#| label: sec5-f12-subj-intake-plot
+
+## Create Consort Plot
+consort_plot <- consort::consort_plot(
+  data = subj_df,
+  orders = c(
+   resp_key = "Subject in EMS Response Records",
+   screenings = "Ever Screened with DETECT",
+   ### Omit text to omit a parent-level box from displaying
+   screen_result = "",
+   report_intent = "",
+   aps_intake = "Ever Matched APS Intake",
+   aps_intake_type = 
+     "Reporter Type",
+   ### Last node can't be a call-out box, so this gives remainder
+   present = "No Matched APS Intake"
+             ),
+  side_box = c("aps_intake_type"),
+  allocation = c("screen_result", "report_intent"),
+  labels = c(
+    #### Level of "resp_key"
+    "1" = "EMS Response", 
+    #### Level of "screenings"
+    "2" = "Screening with DETECT",
+    #### Level of "report_intent"
+    "4" = "EMS Reporting",
+    #### Level of "window_match"
+    "5" = "APS Intake"
+    ),
+  kickoff_sidebox = T,
+  ### Sets font size multiplier - default of 0.8 gives errors
+  cex = 0.7
+  )
+
+## Add Title and Subtitle
+consort_plot <- patchwork::wrap_elements(
+  consort::build_grid(consort_plot)
+  ) + 
+  patchwork::plot_annotation(
+    title = 'Consort Diagram',
+    subtitle = 
+      'MedStar Response to APS Intake, Subject Level'
+  )
+
+## Save plot
+ggplot2::ggsave(
+filename = paste0(
+  plot_path,
+  'f5-12-subj-intake.png'
+  ),
+plot = consort_plot
+)
+
+## Display plot
+consort_plot
+```
+
+# 🧹 Clean up
+
+```{r}
+#| label: end-cleanup
+rm(list=ls())
+```
