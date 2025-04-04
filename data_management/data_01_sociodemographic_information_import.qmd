@@ -473,7 +473,8 @@ value_labels <- c(
   "American Indian or Alaskan Native" = 1, "Asian" = 2, 
   "Black or African American" = 3, 
   "Native Hawaiian or Other Pacific Islander" = 4,
-  "White" = 5, "Other race or multiple races" = 6, "Don't know" = 7, "Refused" = 9
+  "White" = 5, "Other race or multiple races" = 6, "Don't know" = 7, 
+  "Refused" = 9
   )
 
 # NA values
