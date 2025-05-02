@@ -1,0 +1,2013 @@
+---
+title: "Create Deidentifed Versions of Data"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## This File
+
+This file creates a de-identified version of the APS and MedStar Data sets in compliance with [HIPAA](https://www.hhs.gov/hipaa/for-professionals/special-topics/de-identification/index.html#standard) standards.
+
+## APS Data Background
+
+The APS records data set was divided into 5 separate, interconnected excel files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). 
+
+The primary file of interest for subject-level linkage is the "Clients.xlsx" file. This file contained 568,562 observations of 11 variables, including 378,418 values for `client_id`. Refinement of unique subject ID assignments in subject-linkage to MedStar resulted in 370,825 values of `aps_id`.
+
+The primary file of interest for case-level temporal linkage is the "Investigations.xlsx" file. This file contained 57,407 observations of 8 variables, including 378,418 values for `client_id` (linked to 370,825 values of `aps_id`, including 1 observation without a value for `client_id` or `aps_id`), 568,386 values for `case_id`, and 571,407 values for `investigation_id`. A subject may have more than one investigation associated with a single `case_id` value, though each subject should (ideally) only have one `investigation_id` at any one time. Through the `case_id` variable, these values could be linked to Intakes through the "Intakes.xlsx" file (primary file of interest for 1:1 record linkage of MedStar Response to APS Intake) and investigation outcomes in the "Allegations.xlsx" file.
+
+## MedStar Data Background
+
+The MedStar records were originally recorded in Filemaker Pro. Processing of this data was extensive and across multiple data files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki). 
+
+The primary files of interest for subject-level interest included participant demographic data in the `participant_import.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd), and the within-set unique subject ID assignment in `participant_unique_ids.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+These files contained 92,160 observations of approximately 30 demographic variables. Refinement of unique subject ID assignments in subject-linkage to APS resulted in 41,951 values of `ms_id`.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [task notes folder](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents?csf=1&web=1&e=gLWUzJ). 
+
+Notes for the APS data are located in the [notes_00_data_aps.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared Documents/DETECT R01 2018/02 Shared Folders/DETECT Follow-up Interview Data Shared/data/notes_documents/notes_00_data_aps.docx?d=w854dec51d8b049bdab8b0018f3d4bfff&csf=1&web=1&e=DKCWsI) file. Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# 📥 Load Data
+
+## Packages
+
+## Library Imports
+
+```{r, warning = FALSE}
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(readr)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   janitor version 2.2.0
+-   readr version 2.1.5
+
+## Functions
+
+```{r}
+#| label: imports-functions
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+```
+
+## Verification Data
+
+### ZIP-Code Map
+
+We loaded a data set that mapped ZIP Code values to HIPAA-compliant versions.
+
+```{r}
+#| label: load-verification-hipaa-zip
+# Load HIPAA Compliant ZIP Code Map
+## Path to data
+path <- here::here(
+    "data", "verification_data", "2020 Census USA",
+    "usa_hipaa_zip3.csv"
+    )
+
+## Load
+informative_df_import(
+    "hipaa_zip", path, overwrite = T,
+    show_col_types = F
+  )
+
+ # 2025-04-04: HIPAA ZIP data imported with 33,774 rows and 3 columns.
+ # Data last modified on OneDrive: 2024-12-18 11:15:50 
+```
+
+## MedStar Data
+
+### "Participants.RDS" (Record Level, Pre-Cleaned)
+
+We loaded our MedStar record-level data.
+
+```{r}
+#| label: load-ms-records
+# Load MedStar Record Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_01_record-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_records", path, overwrite = T
+  )
+
+ # 2025-04-04: MS RECORDS data imported with 92,156 rows and 157 columns.
+ # Data last modified on OneDrive: 2025-03-27 11:17:10 
+```
+
+### "Participants.RDS" (Subject Level, Pre-Cleaned)
+
+We loaded our MedStar subject-level data.
+
+```{r}
+#| label: load-ms-subjs
+# Load MedStar Subject Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_02_subj-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_subjs", path, overwrite = T
+  )
+
+ # 2025-04-04: MS SUBJS data imported with 41,952 rows and 90 columns.
+ # Data last modified on OneDrive: 2025-03-27 11:17:09 
+```
+
+### "Observational Measures"
+
+We loaded a pre-processed data set containing observational measures.
+
+```{r}
+#| label: load-ms-obs
+# Load MedStar Observation Measures Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", 
+    "observational_measures_import.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_obs", path, overwrite = T
+  )
+
+ # 2025-04-04: MS OBS data imported with 935 rows and 229 columns.
+ # Data last modified on OneDrive: 2025-03-27 09:07:15
+```
+
+### "Sociodemographic Measures"
+
+We loaded a pre-processed data set containing sociodemographic measures.
+
+```{r}
+#| label: load-ms-sdi
+# Load MedStar Sociodemographic Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files",
+    "sociodemographic_information_import.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_sdi", path, overwrite = T
+  )
+
+ # 2025-04-04: MS SDI data imported with 957 rows and 58 columns.
+ # Data last modified on OneDrive: 2025-03-27 09:07:18
+```
+
+### "General Health"
+
+We loaded a pre-processed data set containing General Health measures.
+
+```{r}
+#| label: load-ms-gh
+# Load MedStar General Health Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", 
+    "general_health_import.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_gh", path, overwrite = T
+  )
+
+ # 2025-04-04: MS GH data imported with 955 rows and 135 columns.
+ # Data last modified on OneDrive: 2025-03-27 09:07:11
+```
+
+### "Self Report"
+
+We loaded a pre-processed data set containing Self Report measures.
+
+
+```{r}
+#| label: load-ms-sr
+# Load MedStar Self Report Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", 
+    "self_report_import.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_sr", path, overwrite = T
+  )
+
+ # 2025-04-04: MS SR data imported with 953 rows and 574 columns.
+ # Data last modified on OneDrive: 2025-03-27 09:07:18
+```
+
+### "LEAD Panel Assessment"
+
+We loaded a pre-processed data set containing LEAD panel assessment measures.
+
+
+```{r}
+#| label: load-ms-lead
+# Load MedStar LEAD Panel Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", 
+    "lead_panel_assessment_import.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_lead", path, overwrite = T
+  )
+
+ #  2025-04-04: MS LEAD data imported with 6,838 rows and 42 columns.
+ #  Data last modified on OneDrive: 2025-03-27 09:07:13 
+```
+
+## APS Data
+
+### Clients.xlsx (Pre-Cleaned)
+
+We loaded our APS participant data.
+
+```{r}
+#| label: load-aps-clients
+# Load APS Subject Data
+## Path to data
+path <- here::here(
+  "data","cleaned_rds_files", "record_linkage", "aps", 
+  "aps_01_prepped_for_fl.rds"
+  )
+
+## Load
+informative_df_import(
+    "aps_par", path, overwrite = T
+  )
+
+ # 2025-04-04: APS PAR data imported with 378,604 rows and 26 columns.
+ # Data last modified on OneDrive: 2025-03-27 11:17:22
+```
+
+### Investigations.xlsx
+
+APS Investigation/Case data was originally in XLSX format. It had been cleaned and exported to an RDS file with 571,407 rows and 8 columns. We had expected warning messages, due to the presence of several rows with the word "blank" instead of being left blank.
+
+```{r}
+#| label: load-aps-invs
+# Load APS Investigation Data
+## Path to data
+path <- here::here(
+  "data","DETECT Shared with APS","Investigations.xlsx")
+
+## Load
+informative_df_import(
+    "aps_invs", path, 
+    #read_excel() arguments                    
+    sheet = "Investigations",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), rep("date", 2), "text", "numeric", "text"
+      )
+  )
+
+## Standardize Column Names
+aps_invs <- aps_invs |>
+  janitor::clean_names() |>
+  ### Rename columns for code
+  dplyr::rename_at(
+    c(
+      'investigation_id', 'date_investigation_opened', 
+      'date_investigation_closed', 'overall_disposition',
+      'investigation_closure_reason'
+      ), 
+    ~c('inv_id', 'date_open', 'date_close', 'overall_dispo', 'close_reason')
+  ) |>
+  ### Enforce date format for date items
+  dplyr::mutate(
+    date_open = lubridate::date(date_open),
+    date_close = lubridate::date(date_close)
+  )
+
+# Warning: Expecting numeric in G276 / R276C7: got 'blank'
+# Warning: Expecting numeric in G51328 / R51328C7: got 'blank'
+# Warning: Expecting numeric in G64351 / R64351C7: got 'blank'
+# Warning: Expecting numeric in G92207 / R92207C7: got 'blank'
+# Warning: Expecting numeric in C145086 / R145086C3: got 'blank'
+ # 2025-04-04: APS INVS data imported with 571,407 rows and 8 columns.
+ # Data last modified on OneDrive: 2024-03-21 18:47:51 
+```
+
+### Allegations.xlsx
+
+We loaded our APS Allegation (outcomes) data.
+
+```{r}
+#| label: load-aps-allegs
+# Load APS Allegation Data
+## Path to data
+aps_path <- here::here(
+  "data","DETECT Shared with APS","Allegations.xlsx")
+
+## Load
+informative_df_import(
+    "aps_alleg", aps_path, 
+    #read_excel() arguments                    
+    sheet = "Allegations - Alleg Dtail Block",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), rep("text", 3)
+      )
+  )
+
+## Standardize Column Names
+aps_alleg <- aps_alleg |>
+  janitor::clean_names() |>
+  ### Rename variables for use in code per SOPs
+  dplyr::rename_at(
+    c(
+      'investigation_id', 'allegation_id', 'allegation_type', 
+      'allegation_disposition', 'perpetrator_self_not_self_relationship'
+      ), 
+    ~c('inv_id', 'alleg_id', 'alleg_type', 'alleg_dispo', 'perpetrator_self')
+   ) |>
+  dplyr::mutate(
+    ### Convert "self/non-self" into TRUE/FALSE
+    perpetrator_self = perpetrator_self == "Self",
+    ### Convert Allegation Types into reasonable column names
+    alleg_type = dplyr::case_when(
+      # Non-Self Variants
+      alleg_type == 'Exploitation' ~'exploit',
+      alleg_type == 'Sexual Abuse' ~'abuse_sex',
+      alleg_type == 'Physical Abuse' ~'abuse_phys',
+      alleg_type == 'Emot/Verbl Abuse' ~'abuse_verbal',
+      (alleg_type == 'Medical Neglect') & (!perpetrator_self) ~
+        'neglect_med',
+      (alleg_type == 'Men Health Neg.') & (!perpetrator_self) ~
+        'neglect_mental',
+      (alleg_type == 'Physical Neglect') & (!perpetrator_self) ~
+        'neglect_phys',
+      # Self Variants
+      (alleg_type == 'Medical Neglect') & (perpetrator_self) ~
+        'neglect_med_self',
+      (alleg_type == 'Men Health Neg.') & (perpetrator_self) ~
+        'neglect_mental_self',
+      (alleg_type == 'Physical Neglect') & (perpetrator_self) ~
+        'neglect_phys_self',
+      TRUE ~ alleg_type
+    ),
+    ### Flag Disposition if it includes the term "Blank"
+    blank = stringr::str_detect(
+      stringr::str_to_lower(alleg_dispo), 'blank'
+      ),
+    ### Standardize dispositions
+    alleg_dispo = dplyr::case_when(
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'invalid'
+        ) ~ 'invalid',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'valid'
+        ) ~ 'valid',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'vnf'
+        ) ~ 'vnf',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'unable to determine'
+        ) ~ 'utd',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'utd'
+        ) ~ 'utd',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'other'
+        ) ~ 'other',
+      stringr::str_detect(
+        stringr::str_to_lower(alleg_dispo), 'not specified'
+        ) ~ 'not specified',
+      TRUE ~ alleg_dispo
+    )
+  )
+
+ # 2025-04-04: APS ALLEG data imported with 926,197 rows and 6 columns.
+ # Data last modified on OneDrive: 2024-06-14 12:02:14 
+```
+
+### Subsequent Intakes.xlsx
+
+We loaded our APS Intakes data.
+
+```{r}
+#| label: load-aps-intakes
+# Load APS Intake Data
+## Path to data
+aps_path <- here::here(
+  "data","DETECT Shared with APS","Subsequent Intakes.xlsx")
+
+## Load
+informative_df_import(
+    "aps_intakes", aps_path, 
+    #read_excel() arguments                    
+    sheet = "Initial and Subsequent Intakes",
+    overwrite = T,
+    col_types = c(
+      rep("numeric", 3), "date", "text"
+      )
+  )
+
+## Standardize Column Names
+aps_intakes <- aps_intakes |>
+  janitor::clean_names() |>
+  ### Rename columns for code
+  dplyr::rename_at(
+    'caller_relationship_category', ~'reporter_type'
+  ) |>
+  ### Enforce date format for date items
+  dplyr::mutate(
+    intake_date = lubridate::date(intake_date)
+  )
+# Warning: Expecting numeric in C169722 / R169722C3: got 'blank'
+ # 2025-04-04: APS INTAKES data imported with 664,280 rows and 5 columns.
+ # Data last modified on OneDrive: 2024-03-21 18:42:20 
+```
+
+## Record Linkage Maps
+
+### APS Within-Set IDs
+
+We also loaded our APS within-set subject linkage map, connecting our generated values of `id_aps` to `client_id` values that appear across the APS data sets.
+
+```{r}
+#| label: load-rec-link-aps-ids
+# Load Record Linkage Map: APS Within-Set IDs
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "01_aps-client_id-to_id-aps.rds"
+    )
+
+## Load
+informative_df_import(
+    "aps_ids", path, overwrite = T
+  )
+
+ # 2025-04-04: APS IDS data imported with 378,418 rows and 3 columns.
+ # Data last modified on OneDrive: 2025-03-27 11:17:10 
+```
+
+### Subject-Linkage (APS to MedStar)
+
+We loaded our unique subject identifier maps.
+
+```{r}
+#| label: load-rec-link-subj-ids
+# Load Record Linkage Map: Cross-Set Subject IDS (APS-MedStar)
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "03_aps_to_ms-subject-links.rds"
+    )
+
+## Load
+informative_df_import(
+    "map_subjs", path, overwrite = T
+  )
+
+ # 2025-04-04: MAP SUBJS data imported with 408,126 rows and 3 columns.
+ # Data last modified on OneDrive: 2025-03-27 11:17:10 
+```
+
+### Response-Investigation Linkage
+
+We loaded our record linkage map connecting MedStar Responses to APS Investigations.
+
+```{r}
+#| label: load-rec-link-ms-inv
+# Load MedStar Response - APS Investigation Record Linkage Map
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "04_medstar-records_to_aps-case-invs.rds"
+    )
+
+## Load
+informative_df_import(
+    "map_aps_inv", path, overwrite = T
+  )
+
+ # 2025-04-04: MAP APS INV data imported with 7,186 rows and 12 columns.
+ # Data last modified on OneDrive: 2025-03-27 11:17:11 
+```
+
+### Response-Intake Linkage
+
+We loaded our record linkage map connecting MedStar Responses to APS Intakes.
+
+```{r}
+#| label: load-rec-link-ms-intake
+# Load MedStar Response - APS Intake Record Linkage Map
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "record_linkage", "maps", 
+    "05_medstar-records_to_aps-intakes.rds"
+    )
+
+## Load
+informative_df_import(
+    "map_aps_intake", path, overwrite = T
+  )
+
+ # 2025-04-04: MAP APS INTAKE data imported with 1,813 rows and 10 columns.
+ # Data last modified on OneDrive: 2025-03-27 11:17:12 
+```
+
+# Generate Proxy ID Maps
+
+## MedStar Data
+
+We created a map which would connect the MedStar-created `medstar_id`, to the DETECT-Created `id` and `id_ms`. We additionally mapped the `medstar_id` variable to `ms_resp_num` and `ms_record_num`, which would sequentially number each individual EMS response and record (respectively) in a way that would separate these records from their source data.
+
+```{r}
+#| label: map-proxy-ms-resp
+# Create a map of record proxy IDs:
+# ms_resp_num for individual EMS responses, ms_record_num for ePCR records
+proxy_ms_resp <- dplyr::rows_update(
+  ## Initiate backbone. 
+  ### From DETECT: cross-set subject ID, MS specific subject ID
+  ### from original data: EMS Response Number, MedStar Record ID Number
+  ms_records |>
+    dplyr::select(id, id_ms, ems_num, medstar_id) |>
+    dplyr::mutate(
+      temp_key = paste(id, ems_num, sep = "_"),
+      ms_resp_num = NA_integer_
+      ),
+  ## Generate sequential proxy EMS Response ID
+  ### Group by ID and EMS Response Number. Sort by Incident timestamp.
+  ### Number sequentially
+  ms_records |>
+    dplyr::select(id, id_ms, ems_num, medstar_id, incident_timestamp) |>
+    dplyr::group_by(id, ems_num) |>
+    dplyr::arrange(incident_timestamp) |>
+    dplyr::ungroup() |>
+    dplyr::select(id, ems_num) |>
+    dplyr::distinct() |>
+    dplyr::mutate(
+      ms_resp_num = dplyr::row_number(),
+      temp_key = paste(id, ems_num, sep = "_")
+      ) |>
+    dplyr::select(temp_key,ms_resp_num),
+  by = "temp_key"
+  ) |>
+  dplyr::arrange(ms_resp_num) |>
+  dplyr::select(-temp_key) |>
+  ## Generate sequential proxy Record ID
+  dplyr::mutate(
+    ms_record_num = dplyr::row_number()
+  )
+```
+
+## APS Data
+
+We created proxy maps which would connect the APS-created `client_id`, `case_id`, `investigation_id`, `intake_id`, and `allegation_id`, to DETECT created proxies. The APS-created `client_id` was mapped to the DETECT created `id_aps` and `id`. The remainder were mapped to sequential proxies to separate these records from their source data.
+
+```{r}
+#| label: map-proxy-aps
+# Create maps of APS proxy ID values
+## id_aps, id, and aps_client_num for each client_id
+proxy_aps_client <- aps_ids |>
+  dplyr::mutate(
+    aps_client_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+  aps_ids |>
+    dplyr::select(client_id) |>
+    dplyr::distinct() |>
+    dplyr::arrange(client_id) |>
+    dplyr::mutate(
+      aps_client_num = dplyr::row_number()
+    ),
+  by = 'client_id'
+  )
+
+## aps_case_num for each case_id
+proxy_aps_case <- aps_invs |>
+  dplyr::select(case_id) |>
+  dplyr::arrange(case_id) |>
+  dplyr::distinct() |>
+  dplyr::mutate(
+    aps_case_num = dplyr::row_number()
+  )
+
+## aps_inv_num for each inv_id
+proxy_aps_inv <- aps_invs |>
+  dplyr::select(inv_id) |>
+  dplyr::arrange(inv_id) |>
+  dplyr::distinct() |>
+  dplyr::mutate(
+    aps_inv_num = dplyr::row_number()
+  )
+
+## aps_alleg_num for each alleg_id
+proxy_aps_alleg <- aps_alleg |>
+  dplyr::select(alleg_id) |>
+  dplyr::arrange(alleg_id) |>
+  dplyr::distinct() |>
+  dplyr::mutate(
+    aps_alleg_num = dplyr::row_number()
+  )
+
+## aps_intake_num for each intake_id
+proxy_aps_intake <- aps_intakes |>
+  dplyr::select(intake_id) |>
+  dplyr::arrange(intake_id) |>
+  dplyr::distinct() |>
+  dplyr::mutate(
+    aps_intake_num = dplyr::row_number()
+  )
+```
+
+# Process Data into De-Identified Version
+
+## MedStar
+
+### "Participants.RDS" (Record Level, Pre-Cleaned)
+
+We processed the record-level data for our participant data (EMS Responses).
+
+#### Remove Potential PHI from "APS Record Number" Comments
+
+We removed names and phone numbers from the `dt_aps_report_num` values that contained them. We also removed any actual APS report confirmation numbers.
+
+```{r}
+#| label: process-ms-par-dt-comments
+# Redact potential PHI from APS Report Number Field
+ms_records <- ms_records |>
+  dplyr::mutate(
+    dt_aps_report_num = dplyr::case_when(
+      ## If the entire field was just the report number and APS staffer name,
+      ## redact all
+      ((dt_comment_report_num | dt_comment_aps_staffer) &
+        !stringr::str_detect(
+          dt_aps_report_num, 
+          "(care giver was cont|for previous assa|friend relay)"
+          )
+       ) ~ "[redacted]",
+      ## Otherwise, point-fix redaction of names or report numbers
+      stringr::str_detect(dt_aps_report_num, "\\(care giver was cont") ~ 
+        stringr::str_replace(
+          dt_aps_report_num, 
+          stringr::str_match(dt_aps_report_num, "^(.+) \\(care giver was")[,2], 
+          "[redacted]"
+        ),
+      stringr::str_detect(dt_aps_report_num, "for previous assa") ~ 
+        stringr::str_replace(
+          dt_aps_report_num, 
+          stringr::str_match(dt_aps_report_num, "^(.+);")[,2], 
+          "[redacted]"
+        ),
+      stringr::str_detect(dt_aps_report_num, "friend relay") ~ 
+        stringr::str_replace(
+          dt_aps_report_num, 
+          stringr::str_match(dt_aps_report_num, "APS (.+)$")[,2], 
+          "[redacted]"
+        ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "Dr. ([A-Za-z]+ )"
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(dt_aps_report_num, "Dr. ([A-Za-z]+ )")[,2],
+           "[redacted] "
+         ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "(v([a-z]+)y)$"
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(dt_aps_report_num, "(v([a-z]+)y)$")[,2],
+           "[redacted] "
+         ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "case manager on scene ([A-Za-z ]+)$"
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(
+             dt_aps_report_num, 
+             "case manager on scene ([A-Za-z ]+)$"
+             )[,2],
+           "[redacted] "
+         ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "scene called 911 ([A-Za-z]+) "
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(
+             dt_aps_report_num, 
+             "scene called 911 ([A-Za-z]+ [A-Za-z]+) "
+             )[,2],
+           "[redacted] "
+         ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "^([a-z]+) [0-9]"
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(dt_aps_report_num, "^([a-z]+) [0-9]")[,2],
+           "[redacted] "
+         ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "name is (.+)\\."
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(dt_aps_report_num, "name is (.+)\\.")[,2],
+           "[redacted] "
+         ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "case worker- ([A-Za-z ]+)-"
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(
+             dt_aps_report_num, 
+             "case worker- ([A-Za-z ]+)-"
+             )[,2],
+           "[redacted] "
+         ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "(M[a-z]+ [a-z]+) aps on scene"
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(
+             dt_aps_report_num, 
+             "(M[a-z]+ [a-z]+) aps on scene"
+             )[,2],
+           "[redacted] "
+         ),
+      stringr::str_detect(
+         dt_aps_report_num, 
+         "^([A-Za-z]+ [A-Za-z]+) APS case worker on scene"
+         ) ~ stringr::str_replace(
+           dt_aps_report_num,
+           stringr::str_match(
+             dt_aps_report_num, 
+             "^([A-Za-z]+ [A-Za-z]+) APS case worker on scene"
+             )[,2],
+           "[redacted] "
+         ),
+      TRUE ~ dt_aps_report_num
+    ),
+  ## Redact phone numbers
+  dt_aps_report_num = ifelse(
+    stringr::str_detect(dt_aps_report_num, "([0-9]{3}-[0-9]{3}-[0-9]{4})"),
+    stringr::str_replace(
+      dt_aps_report_num,
+       stringr::str_match(
+         dt_aps_report_num, 
+         "([0-9]{3}-[0-9]{3}-[0-9]{4})"
+         )[,2],
+       "[redacted] "
+      ), 
+    dt_aps_report_num
+    )
+  )
+```
+
+#### Process PHI Fields
+
+We processed PHI containing fields, such as Phone Number, Age, Date of Birth, and Dates into HIPAA-compliant formats. We used our validation data to convert ZIP Code into a HIPAA Compliant 3-digit value.
+
+```{r}
+#| label: process-ms-par-phi
+# Process PHI-containing Fields
+ms_records <- ms_records |>
+  ## Process AGE And DOB into HIPAA-compliant de-identified format
+  dplyr::group_by(id) |>
+  ### Obtain the max age (recorded or calculated) for each subject
+  dplyr::mutate(
+    max_subj_age = max(age, age_calc)
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    ### If Maximum Age is over 89, or the year could ever give an age of 89,
+    ### flag the entry as belonging to a "90+" age category
+    age_90cat = (
+      (max_subj_age > 89) | 
+        (lubridate::year(max(incident_timestamp)) - lubridate::year(dob) > 89)
+      )
+  ) |>
+  dplyr::group_by(id)|>
+  dplyr::mutate(
+    age_90cat = sum(age_90cat) > 0
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    ### If not within the "90+" age category, extract the year of DOB.
+    ### If within the "90+" age category, remove DOB year and make age "90"
+    dob_year = ifelse(!age_90cat, lubridate::year(dob), NA),
+    age = ifelse(!age_90cat, age, 90),
+    age_calc = ifelse(!age_90cat, age_calc, 90)
+  ) |>
+  ## Process Phone Number into Categories
+  ### Get the number of unique digits in each phone number
+  dplyr::mutate(
+    phone_nums = stringr::str_trim(
+      stringr::str_remove_all(phone, '[^0-9]'), 
+      side = 'both'
+      )
+    ) |>
+  dplyr::rowwise() |>
+  dplyr::mutate(
+    unique_phone_nums = length(
+      unique(stringr::str_split(phone_nums, "")[[1]])
+      )
+  ) |>
+  dplyr::ungroup() |>
+  ### Classify, where < 10 digits is incomplete and less than 3 unique
+  ### digits is unlikely to be valid (999-991-9999, etc.)
+  dplyr::mutate(
+    phone_cat = dplyr::case_when(
+      !is.na(phone) & nchar(phone_nums) > 0 & nchar(phone_nums) < 10 ~ 
+        'incomplete',
+      !is.na(phone) & nchar(phone_nums) == 1 ~ 
+        'no numbers',
+      !is.na(phone) & unique_phone_nums < 3 ~ 
+        'not likely to be valid',
+      !is.na(phone) & unique_phone_nums > 2 ~ 
+        'present',
+      is.na(phone) ~ 
+        'missing'
+    )
+  ) |>
+  ## Add HIPAA-compliant version of ZIP code (3 digit)
+  dplyr::mutate(
+    zip3_hipaa = NA_character_
+  ) |>
+  dplyr::rows_update(
+  hipaa_zip |> 
+    dplyr::select(-zip3_hipaa_65) |>
+    dplyr::rename_at(c('zip', 'zip3_hipaa_all'), ~c('zip_code', 'zip3_hipaa')),
+  by = 'zip_code',
+  unmatched = 'ignore'
+  ) |>
+  ## Extract HIPAA Compliant versions of Date Elements
+  dplyr::mutate(
+    ### Pull year of response
+    incident_year = lubridate::year(incident_timestamp),
+    ### Calculate study month
+    incident_study_month = 1 + lubridate::interval(
+        '2019-07-01', 
+        lubridate::as_date(incident_timestamp)
+        ) %/% months(1),
+    ### Calculate study week
+    incident_study_week = 1 + lubridate::interval(
+      '2019-07-01',
+      lubridate::as_date(incident_timestamp)
+      ) %/% lubridate::dweeks(1),
+    ### Determine which day of the week each response occured
+    incident_weekday = lubridate::wday(lubridate::as_date(incident_timestamp)),
+    incident_weekday = dplyr::case_when(
+      incident_weekday == 1 ~ 'sunday',
+      incident_weekday == 2 ~ 'monday',
+      incident_weekday == 3 ~ 'tuesday',
+      incident_weekday == 4 ~ 'wednesday',
+      incident_weekday == 5 ~ 'thursday',
+      incident_weekday == 6 ~ 'friday',
+      incident_weekday == 7 ~ 'saturday'
+    ),
+    ### Calculate time between incident and unit arrival, in seconds
+    incident_to_arrival = 
+      as.numeric(lubridate::as.duration(
+          lubridate::interval(incident_timestamp, unit_arrived_timestamp)
+          ), "seconds"
+      )
+  )
+```
+
+#### Apply Proxy Map
+
+We applied our proxy map to replace the internal `medstar_id` with our proxy values representing the EMS Response Number and Record Number.
+
+```{r}
+#| label: process-ms-par-proxy
+# Apply Proxy Map (ms_resp_num, ms_record_num)
+ms_records <- ms_records |>
+  dplyr::mutate(
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::select(medstar_id, ms_resp_num, ms_record_num),
+    by = 'medstar_id'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version.
+
+```{r}
+#| label: process-ms-par-reduce
+# Reduce to non-PHI Columns
+ms_records <- ms_records |>
+  dplyr::select(
+    ### Flag for which responses to drop as duplicates
+    dup_drop,
+    ### ID Variables
+    id, id_ms, ms_resp_num, ms_record_num,
+    ### Administrative Variables (DETECT-Created)
+    x_primary_key, x_created_timestamp, x_created_by, x_modified_by, 
+    x_modified_timestamp, x_record_status, x_record_year, x_record_month, 
+    x_error_message, x_randomizer, x_call_order, xc_call_order_even_odd, 
+    x_call_order_initial, x_is_archived, x_do_not_call_2cat, 
+    x_exclusion_reason,
+    ### Response-Related Variables
+    incident_year, incident_study_month, incident_study_week, 
+    incident_weekday, incident_to_arrival, complaint_reported, 
+    incident_result, symptom_list,
+    ### Subject Demographics
+    age_90cat, dob_year, age, age_calc, sex_cat, hispanic,
+    dplyr::all_of(dplyr::starts_with("race_cat")),
+    state, zip3_hipaa, phone_cat,
+    ### DETECT Tool Variables
+    dplyr::all_of(dplyr::starts_with("dt_")),
+    ### APS Outcome Variables
+    dplyr::all_of(dplyr::starts_with("aps_"))
+  )
+```
+
+### "Participants.RDS" (Subject Level, Pre-Cleaned)
+
+We processed the subject-level data for our participant data (EMS Responses).
+
+#### Process PHI Fields
+
+We processed PHI containing fields such as Age and Date of Birth into HIPAA-compliant formats.
+
+```{r}
+#| label: process-ms-subj-phi
+# Process PHI-containing Fields
+ms_subjs <- ms_subjs |>
+  dplyr::mutate(
+    age_90cat = FALSE
+  ) |>
+  dplyr::rows_update(
+    ms_records |>
+      dplyr::select(id, age_90cat) |>
+      dplyr::filter(!is.na(age_90cat)) |>
+      dplyr::distinct(),
+    by = 'id'
+  ) |>
+  dplyr::mutate(
+    age_avg = ifelse(!is.na(age_avg) & age_90cat, 90, age_avg),
+    dob_year = ifelse(age_90cat, NA, lubridate::year(dob))
+  ) |>
+  dplyr::select(-c('dob'))
+```
+
+### "Observational Measures"
+
+We processed our observational measures data. 
+
+#### Process PHI Fields
+
+We redacted names and APS report numbers from comment fields.
+
+```{r}
+#| label: process-ms-obs-phi
+# Process PHI Columns
+ms_obs <- ms_obs |>
+  ## Comment Fields
+  dplyr::mutate(
+    ### Redact Names in Fields
+    summary_comments = ifelse(
+      stringr::str_detect(
+        summary_comments,
+        "Ms\\. ([A-Za-z]+)'s daughter ([A-Za-z]+) "
+        ),
+      stringr::str_replace_all(
+        summary_comments,
+        stringr::str_match(
+          summary_comments,
+          "Ms\\. ([A-Za-z])+'s daughter ([A-Za-z]+) "
+        )[,3],
+        "[redacted]"
+      ),
+      summary_comments
+    ),
+    summary_comments = ifelse(
+      stringr::str_detect(
+        summary_comments,
+        "Ms\\. ([A-Za-z]+) "
+        ),
+      stringr::str_replace_all(
+        summary_comments,
+        stringr::str_match(
+          summary_comments,
+          "Ms\\. ([A-Za-z]+) "
+        )[,2],
+        "[redacted]"
+      ),
+      summary_comments
+    ),
+    general_assessment_comments = ifelse(
+      stringr::str_detect(
+        general_assessment_comments,
+        "Ms\\. ([A-Za-z]+)"
+        ),
+      stringr::str_replace_all(
+        general_assessment_comments,
+        stringr::str_match(
+          general_assessment_comments,
+          "Ms\\. ([A-Za-z]+)"
+        )[,2],
+        "[redacted]"
+      ),
+      general_assessment_comments
+    ),
+    ### Redact APS Report Number and Staffer Name
+    summary_comments = ifelse(
+      stringr::str_detect(summary_comments, "APS ([A-Za-z]+) ID #"),
+      "[redacted]",
+      summary_comments
+    )
+  ) |>
+  ## Convert "APS Report Confirmation Number" to a Boolean/Logical, TRUE
+  ## if a value is present
+  dplyr::mutate(
+    aps_reported_confirmation_number = ifelse(
+      !is.na(aps_reported_confirmation_number), T, F
+    )
+  )
+  
+```
+
+#### Apply Proxy Map
+
+We applied our proxy map to replace the internal `medstar_id` with our proxy values representing the EMS Response Number and Record Number.
+
+```{r}
+#| label: process-ms-obs-proxy
+# Apply Proxy Map (id, id_ms, ms_resp_num, ms_record_num)
+ms_obs <- ms_obs |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_ms = NA_integer_,
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::select(-ems_num),
+    by = 'medstar_id',
+    unmatched = 'ignore'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version by removing the subject's name and `medstar_id`.
+
+```{r}
+#| label: process-ms-obs-reduce
+# Reduce to non-PHI Columns
+ms_obs <- ms_obs |>
+  dplyr::select(-c('medstar_id', 'name_full', 'xc_case_id'))
+```
+
+### "Sociodemographic Measures"
+
+We processed our Sociodemographic Data Set.
+
+#### Apply Proxy Map
+
+We applied our proxy map to replace the internal `medstar_id` with our proxy values representing the EMS Response Number and Record Number.
+
+```{r}
+#| label: process-ms-sdi-proxy
+# Apply Proxy Map (id, id_ms, ms_resp_num, ms_record_num)
+ms_sdi <- ms_sdi |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_ms = NA_integer_,
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::select(-ems_num),
+    by = 'medstar_id',
+    unmatched = 'ignore'
+  )
+```
+
+#### Process PHI Fields
+
+With the common identifiers in place, we added the "Age 90+" category and anonymized any relevant ages.
+
+```{r}
+#| label: process-ms-sdi-add-agecat
+# "Age 90+" category from records
+ms_sdi <- ms_sdi |>
+  dplyr::mutate(
+    sode_age_years_90cat = NA
+  ) |>
+  dplyr::rows_update(
+    ms_records |>
+      dplyr::select(id, age_90cat) |>
+      dplyr::rename_at('age_90cat', ~'sode_age_years_90cat') |>
+      dplyr::distinct(),
+    by = 'id',
+    unmatched = 'ignore'
+  ) |>
+  dplyr::mutate(
+    sode_age_years = dplyr::case_when(
+      is.na(sode_age_years) ~ NA,
+      !is.na(sode_age_years) & sode_age_years_90cat ~ 90,
+      !is.na(sode_age_years) & !sode_age_years_90cat ~ sode_age_years
+    )
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version by removing the subject's name and `medstar_id`.
+
+```{r}
+#| label: process-ms-sdi-reduce
+# Reduce to non-PHI Columns
+ms_sdi <- ms_sdi |>
+  dplyr::select(
+    -c('name_full', 'medstar_id', 'xc_case_id')
+  )
+```
+
+### "General Health"
+
+We processed our General Health Data Set.
+
+#### Apply Proxy Map
+
+We applied our proxy map to replace the internal `medstar_id` with our proxy values representing the EMS Response Number and Record Number.
+
+```{r}
+#| label: process-ms-gh-proxy
+# Apply Proxy Map (id, id_ms, ms_resp_num, ms_record_num)
+ms_gh <- ms_gh |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_ms = NA_integer_,
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::select(-ems_num),
+    by = 'medstar_id',
+    unmatched = 'ignore'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version by removing the subject's name and `medstar_id`.
+
+```{r}
+#| label: process-ms-sdi-reduce
+# Reduce to non-PHI Columns
+ms_gh <- ms_gh |>
+  dplyr::select(
+    -c('name_full', 'medstar_id', 'xc_case_id')
+  )
+```
+
+
+
+### "Self Report"
+
+We processed our Self-Report Data Set.
+
+#### Apply Proxy Map
+
+We applied our proxy map to replace the internal `medstar_id` with our proxy values representing the EMS Response Number and Record Number.
+
+```{r}
+#| label: process-ms-sr-proxy
+# Apply Proxy Map (id, id_ms, ms_resp_num, ms_record_num)
+ms_sr <- ms_sr |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_ms = NA_integer_,
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::select(-ems_num),
+    by = 'medstar_id',
+    unmatched = 'ignore'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version by removing the subject's name and `medstar_id`.
+
+```{r}
+#| label: process-ms-sr-reduce
+# Reduce to non-PHI Columns
+ms_sr <- ms_sr |>
+  dplyr::select(
+    -c('name_full', 'medstar_id', 'xc_case_id')
+  )
+```
+
+### "LEAD Panel Assessment"
+
+We processed our LEAD panel data.
+
+#### Apply Proxy Map
+
+We applied our proxy map to replace the internal `medstar_id` with our proxy values representing the EMS Response Number and Record Number.
+
+```{r}
+#| label: process-ms-sdi-proxy
+# Apply Proxy Map (id, id_ms, ms_resp_num, ms_record_num)
+ms_lead <- ms_lead |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_ms = NA_integer_,
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::select(-c('ems_num')) |>
+      dplyr::distinct(),
+    by = 'medstar_id',
+    unmatched = 'ignore'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version by removing the subject's name and `medstar_id`.
+
+```{r}
+#| label: process-ms-lead-reduce
+# Reduce to non-PHI Columns
+ms_lead <- ms_lead |>
+  dplyr::select(
+    -c('name_full', 'medstar_id', 'case_id')
+  )
+```
+
+## APS
+
+### Clients.xlsx
+
+We processed our client data.
+
+#### Process PHI Fields
+
+We created HIPAA compliant variants of Date of Birth and ZIP Code.
+
+```{r}
+#| label: process-aps-par-phi
+# Process PHI-containing Fields
+aps_par <- aps_par |>
+  ## Process DOB into HIPAA-compliant de-identified format
+  dplyr::mutate(
+    age_90cat = dplyr::case_when(
+      is.na(client_dob_year) ~ NA,
+      2022 - client_dob_year > 89 ~ T,
+      TRUE ~ F
+      ),
+    dob_year = ifelse(!age_90cat, client_dob_year, NA)
+    ) |>
+  ## Convert PO Box into a boolean/logical indicating if one was given
+  dplyr::mutate(
+    pobox = !is.na(client_pobox)
+  ) |>
+  ## Rename columns for state and country
+  dplyr::rename_at(
+    c('client_state', 'client_country'), ~c('state', 'country')
+  ) |>
+  ## Add HIPAA-compliant version of ZIP code (3 digit)
+  dplyr::mutate(
+    zip3_hipaa = NA_character_
+  ) |>
+  dplyr::rows_update(
+  hipaa_zip |> 
+    dplyr::select(-zip3_hipaa_65) |>
+    dplyr::mutate(zip = as.numeric(zip)) |>
+    dplyr::rename_at(
+      c('zip', 'zip3_hipaa_all'), 
+      ~c('client_zip_code', 'zip3_hipaa')
+      ),
+  by = 'client_zip_code',
+  unmatched = 'ignore'
+  )
+```
+
+#### Apply Proxy Map
+
+We applied our proxy map to replace the internal `client_id` with our proxy value. We reduced our data to subjects within the MedStar Data.
+
+```{r}
+#| label: process-aps-par-proxy
+# Apply Proxy Map (id, id_aps, aps_client_num)
+aps_par <- aps_par |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_aps = NA_integer_,
+    aps_client_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_client,
+    by = 'client_id'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version. 
+
+```{r}
+#| label: process-aps-par-reduce
+# Reduce to non-PHI Columns
+aps_par <- aps_par |>
+  dplyr::select(
+    id, id_aps, aps_client_num,
+    age_90cat, dob_year, country, state, zip3_hipaa, pobox
+  )
+```
+
+### Investigations.xlsx
+
+We processed the APS Investigation Data.
+
+#### Process PHI Fields
+
+We created HIPAA compliant variants of dates.
+
+```{r}
+#| label: process-aps-invs-phi
+# Process PHI-containing Fields
+aps_invs <- aps_invs |>
+  dplyr::mutate(
+    ### Calculate the number of days the investigation was open
+    inv_dur_days = as.numeric(date_close - date_open, "days"),
+    ### Calculate study month and week for the open date
+    inv_open_study_month = 1 + lubridate::interval(
+        '2019-07-01', 
+        lubridate::as_date(date_open)
+        ) %/% months(1),
+     inv_open_study_week = 1 + lubridate::interval(
+      '2019-07-01',
+      lubridate::as_date(date_open)
+      ) %/% lubridate::dweeks(1),
+    ### Calculate study month and week for the close date
+      inv_close_study_month = 1 + lubridate::interval(
+          '2019-07-01', 
+          lubridate::as_date(date_close)
+          ) %/% months(1),
+       inv_close_study_week = 1 + lubridate::interval(
+        '2019-07-01',
+        lubridate::as_date(date_close)
+        ) %/% lubridate::dweeks(1),
+    ### Extract the year for the open and close dates
+    inv_open_year = lubridate::year(date_open),
+    inv_close_year = lubridate::year(date_close),
+    ### Determine which day of the week for opened and closed dates
+    inv_open_weekday = lubridate::wday(lubridate::as_date(date_open)),
+    inv_close_weekday = lubridate::wday(lubridate::as_date(date_close)),
+    dplyr::across(
+      c('inv_open_weekday', 'inv_close_weekday'), 
+      ~dplyr::case_when(
+          .x == 1 ~ 'sunday',
+          .x == 2 ~ 'monday',
+          .x == 3 ~ 'tuesday',
+          .x == 4 ~ 'wednesday',
+          .x == 5 ~ 'thursday',
+          .x == 6 ~ 'friday',
+          .x == 7 ~ 'saturday'
+        )
+      )
+  )
+```
+
+#### Apply Proxy Map
+
+We applied our proxy maps to replace the internal `client_id`, `inv_id`, and `case_id` with our proxy values.
+
+```{r}
+#| label: process-aps-inv-proxy
+# Apply Proxy Map (id, id_aps, aps_client_num, aps_inv_num, aps_case_num)
+aps_invs <- aps_invs |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_aps = NA_integer_,
+    aps_client_num = NA_integer_,
+    aps_inv_num = NA_integer_,
+    aps_case_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_client,
+    by = 'client_id'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_inv,
+    by = 'inv_id'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_case,
+    by = 'case_id'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version.
+
+```{r}
+#| label: process-aps-invs-reduce
+# Reduce to non-PHI Columns
+aps_invs <- aps_invs |>
+  dplyr::select(
+    -c('case_id', 'inv_id', 'client_id', 'date_open', 'date_close')
+  )
+```
+
+### Allegations.xlsx
+
+We processed the APS Allegation Data.
+
+#### Apply Proxy Map
+
+We applied our proxy maps to replace the internal `alleg_id`, `inv_id` and `case_id` with our proxy values.
+
+```{r}
+#| label: process-aps-alleg-proxy
+# Apply Proxy Map (aps_inv_num, aps_case_num, aps_alleg_num)
+aps_alleg <- aps_alleg |>
+  dplyr::mutate(
+    aps_inv_num = NA_integer_,
+    aps_case_num = NA_integer_,
+    aps_alleg_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_alleg,
+    by = 'alleg_id'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_inv,
+    by = 'inv_id'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_case,
+    by = 'case_id'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version.
+
+```{r}
+#| label: process-aps-alleg-reduce
+# Reduce to non-PHI Columns
+aps_alleg <- aps_alleg |>
+  dplyr::select(
+    -c('case_id', 'inv_id', 'alleg_id')
+  )
+```
+
+### Subsequent Intakes.xlsx
+
+We processed the APS Intake Data.
+
+#### Process PHI Fields
+
+We created HIPAA compliant variants of dates.
+
+```{r}
+#| label: process-aps-intakes-phi
+# Process PHI-containing Fields
+aps_intakes <- aps_intakes |>
+  dplyr::mutate(
+    ### Calculate study month and week for the intake
+    intake_study_month = 1 + lubridate::interval(
+        '2019-07-01', 
+        lubridate::as_date(intake_date)
+        ) %/% months(1),
+     intake_study_week = 1 + lubridate::interval(
+      '2019-07-01',
+      lubridate::as_date(intake_date)
+      ) %/% lubridate::dweeks(1),
+    ### Extract the year for the intake date
+    intake_year = lubridate::year(intake_date),
+    ### Determine which day of the week for intake date
+    intake_weekday = lubridate::wday(lubridate::as_date(intake_date)),
+    intake_weekday = dplyr::case_when(
+          intake_weekday == 1 ~ 'sunday',
+          intake_weekday == 2 ~ 'monday',
+          intake_weekday == 3 ~ 'tuesday',
+          intake_weekday == 4 ~ 'wednesday',
+          intake_weekday == 5 ~ 'thursday',
+          intake_weekday == 6 ~ 'friday',
+          intake_weekday == 7 ~ 'saturday'
+        )
+      )
+```
+
+#### Apply Proxy Map
+
+We applied our proxy maps to replace the internal `intake_id` `client_id` and `case_id` with our proxy values.
+
+```{r}
+#| label: process-aps-intakes-proxy
+# Apply Proxy Map (id, id_aps, aps_client_num, aps_case_num, aps_intake_num)
+aps_intakes <- aps_intakes |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_aps = NA_integer_,
+    aps_client_num = NA_integer_,
+    aps_case_num = NA_integer_,
+    aps_intake_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_intake,
+    by = 'intake_id'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_case,
+    by = 'case_id',
+    unmatched = 'ignore'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_client,
+    by = 'client_id',
+    unmatched = 'ignore'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version.
+
+```{r}
+#| label: process-aps-intakes-reduce
+# Reduce to non-PHI Columns
+aps_intakes <- aps_intakes |>
+  dplyr::select(
+    -c('client_id', 'case_id', 'intake_id', 'intake_date')
+  )
+```
+
+## Record Linkage Maps
+
+### Response-Investigation Linkage
+
+We processed our record linkage map connecting MedStar Responses to APS Investigations.
+
+#### Apply Proxy Map
+
+We used our proxy value maps to replace record identifier values with our proxies.
+
+```{r}
+#| label: process-rec-link-ms-inv-proxy
+# Apply Proxy Map (id, id_aps, id_ms, aps_inv_num, aps_case_num,
+# ms_resp_num, ms_record_num)
+map_aps_inv <- map_aps_inv |>
+  dplyr::mutate(
+    id_aps = NA_integer_,
+    id_ms = NA_integer_,
+    aps_inv_num = NA_integer_,
+    aps_case_num = NA_integer_,
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_,
+    key = paste(id, ems_num, sep = '_')
+  ) |>
+  dplyr::rows_update(
+    map_subjs |>
+      dplyr::filter(id %in% map_aps_inv$id),
+    by = 'id'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_case |>
+      dplyr::filter(case_id %in% map_aps_inv$case_id),
+    by = 'case_id',
+    unmatched = 'ignore'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_inv |>
+      dplyr::filter(inv_id %in% map_aps_inv$inv_id),
+    by = 'inv_id',
+    unmatched = 'ignore'
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::mutate(dup_drop = F) |>
+      dplyr::rows_update(
+        ms_records |>
+          dplyr::select(ms_record_num, dup_drop),
+        by = 'ms_record_num'
+      ) |>
+      dplyr::filter(!dup_drop) |>
+      dplyr::mutate(key = paste(id, ems_num, sep = '_')) |>
+      dplyr::select(key, ms_resp_num, ms_record_num) |>
+      dplyr::distinct(),
+    by = 'key',
+    unmatched = 'ignore'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version.
+
+```{r}
+#| label: process-rec-link-ms-inv-proxy
+# Reduce to non-PHI Columns
+map_aps_inv <- map_aps_inv |>
+  dplyr::select(
+    id, id_ms, id_ms, ms_resp_num, ms_record_num, 
+    aps_case_num, aps_inv_num, exact, inv_dispo, best_exact, best_window, 
+    intake_paired, intake_ems_poss, intake_ems_expl
+  )
+```
+
+### Response-Intake Linkage
+
+We processed our record linkage map connecting MedStar Responses to APS Intakes.
+
+#### Apply Proxy Map
+
+We used our proxy value maps to replace record identifier values with our proxies.
+
+```{r}
+#| label: process-rec-link-ms-intake-proxy
+# Apply Proxy Map (id, id_aps, id_ms, aps_intake_num, aps_case_num,
+# ms_resp_num, ms_record_num)
+map_aps_intake <- map_aps_intake |>
+  dplyr::mutate(
+    id_aps = NA_integer_,
+    id_ms = NA_integer_,
+    aps_intake_num = NA_integer_,
+    aps_case_num = NA_integer_,
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_,
+    key = paste(id, ems_num, sep = '_')
+  ) |>
+  dplyr::rows_update(
+    map_subjs |>
+      dplyr::filter(id %in% map_aps_intake$id),
+    by = 'id'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_case |>
+      dplyr::filter(case_id %in% map_aps_intake$case_id),
+    by = 'case_id',
+    unmatched = 'ignore'
+  ) |>
+  dplyr::rows_update(
+    proxy_aps_intake |>
+      dplyr::filter(intake_id %in% map_aps_intake$intake_id),
+    by = 'intake_id',
+    unmatched = 'ignore'
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::mutate(dup_drop = F) |>
+      dplyr::rows_update(
+        ms_records |>
+          dplyr::select(ms_record_num, dup_drop),
+        by = 'ms_record_num'
+      ) |>
+      dplyr::filter(!dup_drop) |>
+      dplyr::mutate(key = paste(id, ems_num, sep = '_')) |>
+      dplyr::select(key, ms_resp_num, ms_record_num) |>
+      dplyr::distinct(),
+    by = 'key',
+    unmatched = 'ignore'
+  )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version.
+
+```{r}
+#| label: process-rec-link-ms-intake-proxy
+# Reduce to non-PHI Columns
+map_aps_intake <- map_aps_intake |>
+  dplyr::select(
+    id, id_ms, id_ms, ms_resp_num, ms_record_num, 
+    aps_case_num, aps_intake_num, reporter_type, reporter_possible, 
+    reporter_ems
+  )
+```
+
+
+# 💾 Save and Export Data
+
+## MedStar Data
+
+We exported our de-identified MedStar data.
+
+```{r}
+#| label: save-medstar-records
+## Path
+path <- here::here(
+  "data", "deidentified", "medstar", "01_medstar_records"
+  )
+
+## Export RDS
+saveRDS(ms_records, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(ms_records, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-medstar-subjs
+## Path
+path <- here::here(
+  "data", "deidentified", "medstar", "02_medstar_subjects"
+  )
+
+## Export RDS
+saveRDS(ms_subjs, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(ms_subjs, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-medstar-obs
+## Path
+path <- here::here(
+  "data", "deidentified", "medstar", "03_medstar_observational"
+  )
+
+## Export RDS
+saveRDS(ms_obs, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(ms_obs, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-medstar-sdi
+## Path
+path <- here::here(
+  "data", "deidentified", "medstar", "04_medstar_sociodemographics"
+  )
+
+## Export RDS
+saveRDS(ms_sdi, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(ms_sdi, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-medstar-gh
+## Path
+path <- here::here(
+  "data", "deidentified", "medstar", "05_medstar_general_health"
+  )
+
+## Export RDS
+saveRDS(ms_gh, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(ms_sdi, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-medstar-sr
+## Path
+path <- here::here(
+  "data", "deidentified", "medstar", "06_medstar_self_report"
+  )
+
+## Export RDS
+saveRDS(ms_sr, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(ms_sdi, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-medstar-lead
+## Path
+path <- here::here(
+  "data", "deidentified", "medstar", "07_medstar_lead"
+  )
+
+## Export RDS
+saveRDS(ms_lead, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(ms_lead, paste0(path, ".csv"))
+```
+
+## APS Data
+
+We exported our de-identified APS data.
+
+```{r}
+#| label: save-aps-clients
+## Path
+path <- here::here(
+  "data", "deidentified", "aps", "01_aps_clients"
+  )
+
+## Export RDS
+saveRDS(aps_par, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(aps_par, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-aps-invs
+## Path
+path <- here::here(
+  "data", "deidentified", "aps", "02_aps_investigations"
+  )
+
+## Export RDS
+saveRDS(aps_invs, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(aps_invs, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-aps-allegs
+## Path
+path <- here::here(
+  "data", "deidentified", "aps", "03_aps_allegations"
+  )
+
+## Export RDS
+saveRDS(aps_alleg, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(aps_alleg, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-aps-intakes
+## Path
+path <- here::here(
+  "data", "deidentified", "aps", "04_aps_intakes"
+  )
+
+## Export RDS
+saveRDS(aps_intakes, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(aps_intakes, paste0(path, ".csv"))
+```
+
+## Record Linkage Maps
+
+We exported our de-identified Record-Linkage maps.
+
+```{r}
+#| label: save-map-subjs
+## Path
+path <- here::here(
+  "data", "deidentified", "record_linkage", "01_medstar_to_aps-subjs"
+  )
+
+## Export RDS
+saveRDS(map_subjs, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(map_subjs, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-map-aps-invs
+## Path
+path <- here::here(
+  "data", "deidentified", "record_linkage", "02_medstar_to_aps-investigation"
+  )
+
+## Export RDS
+saveRDS(map_aps_inv, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(map_aps_inv, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-map-aps-intake
+## Path
+path <- here::here(
+  "data", "deidentified", "record_linkage", "03_medstar_to_aps-intake"
+  )
+
+## Export RDS
+saveRDS(map_aps_intake, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(map_aps_intake, paste0(path, ".csv"))
+```
+
+## Proxy Maps
+
+We exported our proxy maps, in case re-identification was later required.
+
+```{r}
+#| label: save-proxy-ms-resp
+## Path
+path <- here::here("data", "cleaned_rds_files", "reidentification", "01_medstar_01_responses.rds")
+
+## Export
+saveRDS(proxy_ms_resp, path)
+```
+
+```{r}
+#| label: save-proxy-aps-client
+## Path
+path <- here::here("data", "cleaned_rds_files", "reidentification", "02_aps_01_client-id.rds")
+
+## Export
+saveRDS(proxy_aps_client, path)
+```
+
+```{r}
+#| label: save-proxy-aps-case
+## Path
+path <- here::here("data", "cleaned_rds_files", "reidentification", "02_aps_02_case.rds")
+
+## Export
+saveRDS(proxy_aps_case, path)
+```
+
+```{r}
+#| label: save-proxy-aps-inv
+## Path
+path <- here::here("data", "cleaned_rds_files", "reidentification", "02_aps_03_inv.rds")
+
+## Export
+saveRDS(proxy_aps_inv, path)
+```
+
+```{r}
+#| label: save-proxy-aps-alleg
+## Path
+path <- here::here("data", "cleaned_rds_files", "reidentification", "02_aps_04_alleg.rds")
+
+## Export
+saveRDS(proxy_aps_alleg, path)
+```
+
+```{r}
+#| label: save-proxy-aps-intake
+## Path
+path <- here::here("data", "cleaned_rds_files", "reidentification", "02_aps_05_intake.rds")
+
+## Export
+saveRDS(proxy_aps_intake, path)
+```
+
+# 🧹 Clean up
+
+```{r}
+rm(list=ls())
+```

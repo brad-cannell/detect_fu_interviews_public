@@ -513,10 +513,9 @@ general_health <- general_health |>
 ```{r}
 # Columns of interest for this code chunk
 cols <- c(
-  "depres_satisfied", "depres_hopeless", "depres_better", "depres_activities", 
-  "depres_empty", "depres_bored", "depres_spirits", "depres_afraid", 
-  "depres_happy", "depres_helpless", "depres_home", "depres_memory", 
-  "depres_alive", "depres_worthless", "depres_energy"
+  "depres_hopeless", "depres_better", "depres_activities", "depres_empty", 
+  "depres_bored", "depres_afraid", "depres_helpless", "depres_home", 
+  "depres_memory", "depres_worthless"
 )
 
 ```
@@ -530,6 +529,62 @@ get_values(general_health, cols)
 ```{r}
 # Numeric coding for character values in each column of interest
 value_labels <- c("No" = 0, "Yes" = 1)
+
+# NA values
+na_values <- c()
+
+# Suffix for the version of each column with "Don't Know" and "Refused" changed
+# to NA.
+suffix <- "2cat"
+
+# Labels and levels for factors (Shouldn't need to change this code)
+factor_labs_levs <- value_labels[!value_labels %in% na_values]
+
+# Column names for the version of each column with "Don't Know" and "Refused" 
+# changed to NA (Shouldn't need to change this code).
+cols_suffix <- paste(cols, suffix, sep = "_")
+
+# Prepare columns for analysis
+# - Convert character values to numeric values
+# - Create a version of each column with "Don't know" and "Refused" converted to NA
+# - Create a factor version of each column (w/o "Don't know" and "Refused")
+# - Arrange the columns as: original column, numeric column w/o "Don't know" and 
+#   "Refused", and the factor version of the column.
+general_health <- general_health |>
+  # Convert character values to numeric values
+  chars_to_nums(cols, value_labels) |> 
+  # Create a version of each column with "Don't know" and "Refused" converted to NA
+  nums_to_nas(cols, na_values, suffix) |> 
+  # Relocate new columns with NA values immediately after the original column
+  relocate_na_cols(cols, suffix) |> 
+  # Create a factor version of each column (w/o "Don't know" and "Refused")
+  factors(cols_suffix, factor_labs_levs) |> 
+  # Relocate factor columns immediately after the new columns with NA values
+  relocate_factors(cols_suffix) |>
+  # Drop the original variable if the version with "cat" suffix has the exact
+  # same values.
+  drop_dup_orig(cols, cols_suffix)
+```
+
+Several columns were reverse coded
+
+```{r}
+# Columns of interest for this code chunk
+cols <- c(
+  "depres_satisfied", "depres_spirits", "depres_happy", "depres_alive",
+  "depres_energy"
+)
+```
+
+Check that there are no capitalization inconsistencies in the columns of interest.
+
+```{r}
+get_values(general_health, cols)
+```
+
+```{r}
+# Numeric coding for character values in each column of interest
+value_labels <- c("No" = 1, "Yes" = 0)
 
 # NA values
 na_values <- c()

@@ -1,0 +1,1303 @@
+---
+title: "Analyses Section 2: DETECT-Tool Response Patterns"
+html:
+  embed-resources: true
+format: html
+---
+
+# ⭐️ Overview
+
+## This File
+
+This file performs the initial explorations and analyses of DETECT-Tool Response Patterns within the MedStar 5-year follow-up data, internally referred to as "Section 2: DETECT-Tool Response Patterns".
+
+## MedStar Data Background
+
+The MedStar records were originally recorded in Filemaker Pro. Processing of this data was extensive and across multiple data files. These files are documented in the [wiki](https://github.com/brad-cannell/detect_fu_interviews_public/wiki).
+
+The primary files of interest for subject-level interest included participant demographic data in the `participant_import.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/data_01_participant_import.qmd), and the original within-set unique subject ID assignment in `participant_unique_ids.rds` file [created in a separate Quarto file](https://github.com/brad-cannell/detect_fu_interviews_public/blob/main/data_management/unique_person_identification/data_02_unique_person_detect_fu_data.qmd).
+
+These files originally contained 92,160 observations of approximately 30 demographic variables. Refinement of unique subject ID assignments in subject-linkage to APS resulted in 41,955 values of `ms_id`.
+
+## Internal Files
+
+This document was created as part of the DETECT project, specifically the merger of APS and MedStar data for analysis using the full follow-up period data. Internal documents relating to these files, which contain PHI, are securely stored on the research group's SharePoint in the [5-year data manuscript directory](https://uthtmc.sharepoint.com/:f:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update?csf=1&web=1&e=fhfOfL).
+
+**Notes for analyses** start at the parent document["00_DETECT 5-year Analysis Notes.docx"](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update/tables/00_DETECT%205-Year%20Analysis%20Notes.docx?d=w09a61782c9ef4fe78780683996fdbd1b&csf=1&web=1&e=OWsgTv). Notes for this file are in ["section 2 - detect item response patterns.docx"](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/Manuscripts/Brianna%20Morri%20-%20APS%205%20year%20year%20update/tables/section%202%20-%20detect%20item%20response%20patterns.docx?d=wb545e8832bdc4d02a56ad337921e743d&csf=1&web=1&e=v9I3lg).
+
+Notes for the MedStar data are located in the [notes_00_data_medstar.docx](https://uthtmc.sharepoint.com/:w:/r/sites/SPHDETECT-RPC/Shared%20Documents/DETECT%20R01%202018/02%20Shared%20Folders/DETECT%20Follow-up%20Interview%20Data%20Shared/data/notes_documents/notes_00_data_medstar.docx?d=w7367b418df5644fbb3ff5117908f27d9&csf=1&web=1&e=gueXsZ) file.
+
+Please note: as these files contain PHI and proprietary information, they are not publicly available. Links are internal to the research team.
+
+# 📦 Load Packages and Functions
+
+## Library Imports
+
+```{r}
+#| label: imports-libraries
+#| warning: FALSE
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(here)
+  library(janitor, include.only = "clean_names")
+})
+```
+
+### Versioning
+
+This file was created with:
+
+-   R version 4.4.1 ("Race for Your Life").
+-   tidyverse version 2.0.0, including all attached packages
+-   here version 1.0.1
+-   janitor version 2.2.0
+-   stats version 4.4.1
+
+## Functions
+
+```{r}
+#| label: imports-functions
+# Function to reduce code repetition in informative imports of data
+source(here::here("r", "informative_df_import.R"))
+
+## Function that performs 2-Category Chi-Square and Fisher Exact and produces
+## a human-legible summary table
+source(here::here("r", "get_chi_fisher.R"))
+
+## Function that extracts response pattern tables from DETECT variables
+source(here::here("r", "get_dt_resp_pattern.R"))
+
+## Function that performs Chi-Square and Fisher's Exact on DETECT Response
+## Patterns, by Item
+source(here::here("r", "get_dt_rp_chi_fisher.R"))
+```
+
+# 📥 Load Data
+
+## MedStar Data
+
+We loaded our MedStar record-level data.
+
+```{r}
+#| label: load-ms-records
+# Load MedStar Record Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_01_record-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_records", path, overwrite = T
+  )
+
+ # 2025-03-07: MS RECORDS data imported with 91,700 rows and 126 columns.
+ # Data last modified on OneDrive: 2025-03-05 12:27:24 
+```
+
+We loaded our MedStar subject-level data.
+
+```{r}
+#| label: load-ms-subjs
+# Load MedStar Subject Level Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files", "analysis", 
+    "medstar_02_subj-lvl.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_subjs", path, overwrite = T
+  )
+
+ # 2025-03-07: MS SUBJS data imported with 41,612 rows and 75 columns.
+ # Data last modified on OneDrive: 2025-03-05 12:27:24 
+```
+
+## Prior Study Response Patterns
+
+We loaded the DETECT Tool response patterns from the Pilot study.
+
+```{r}
+#| label: load-prev-pat-pilot
+# Load Pilot study response pattern data
+## Path to data
+path <- here::here(
+    "data", "prev_data", "prev_dt_resp_pattern_pilot.csv"
+    )
+
+## Load
+informative_df_import(
+    "pat_pilot", path, overwrite = T,
+    show_col_types = F
+  )
+
+## Filter to only items that also appear in the current study
+pat_pilot <- pat_pilot |>
+  dplyr::filter(!is.na(var_val))
+
+## Add text-based formatted values for display in tables
+pat_pilot <- pat_pilot |>
+  ### Pivot to item_name, n, per format
+  tidyr::pivot_longer(
+    cols = dplyr::all_of(
+      c(dplyr::starts_with("n_"), dplyr::starts_with("per_"))
+      ), 
+    cols_vary = "slowest",
+    names_to = c(".value", "item_name"),
+    names_pattern = "(.*?)_(.*)"
+    ) |>
+  ### Add text value for display
+  dplyr::mutate(
+    text = paste0(
+      format(n, big.mark = ','),
+      " (",
+      stringr::str_trim(format(round(per*100, 2), nsmall = 2), side = 'both'), 
+      "%)"
+    )
+  ) |> 
+  ### Pivot back to DETECT item as row
+  tidyr::pivot_wider(
+    names_from = c('item_name'), 
+    values_from = c('n', 'per', 'text'), 
+    names_glue = "{.value}_{item_name}"
+    )
+
+### Set count of total responses
+total_pilot <- 1247
+
+ # 2025-03-07: PAT PILOT data imported with 26 rows and 12 columns.
+ # Data last modified on OneDrive: 2025-03-06 14:34:28 
+```
+
+We loaded the DETECT Tool response patterns from the 1 Year Study interval.
+
+```{r}
+#| label: load-prev-pat-year
+# Load 1-Year study response pattern data
+## Path to data
+path <- here::here(
+    "data", "prev_data", "prev_dt_resp_pattern_1year.csv"
+    )
+
+## Load
+informative_df_import(
+    "pat_year", path, overwrite = T,
+    show_col_types = F
+  )
+
+## Add text-based formatted values for display in tables
+pat_year <- pat_year |>
+  ### Pivot to item_name, n, per format
+  tidyr::pivot_longer(
+    cols = dplyr::all_of(
+      c(dplyr::starts_with("n_"), dplyr::starts_with("per_"))
+      ), 
+    cols_vary = "slowest",
+    names_to = c(".value", "item_name"),
+    names_pattern = "(.*?)_(.*)"
+    ) |>
+  ### Add text value for display
+  dplyr::mutate(
+    text = paste0(
+      format(n, big.mark = ','),
+      " (",
+      stringr::str_trim(format(round(per*100, 2), nsmall = 2), side = 'both'), 
+      "%)"
+    )
+  ) |> 
+  ### Pivot back to DETECT item as row
+  tidyr::pivot_wider(
+    names_from = c('item_name'), 
+    values_from = c('n', 'per', 'text'), 
+    names_glue = "{.value}_{item_name}"
+    )
+
+### Set count of total responses
+total_year <- 24007
+
+ # 2025-03-07: PAT YEAR data imported with 14 rows and 12 columns.
+ # Data last modified on OneDrive: 2025-03-06 14:48:35 
+```
+
+# Analyses
+
+We set the order we wanted to present our DETECT-Tool Items in our summary tables.
+
+```{r}
+#| label: set-value-orders
+# Set order of values when presented in summary table functions
+## DETECT Tool Variable Item Order
+dt_item_list <- list(
+  dt_env_odor = "Unusual odor (e.g., urine, feces)", 
+  dt_env_hoard = paste0(
+    "Inside of the home is in extreme disarray or there is hoarding"
+    ), 
+  dt_env_concern = paste0(
+    "Living environment poses a health or safety concern (e.g., fire hazard,",
+    " insect or rodent infestation, or urine or feces present)"
+    ), 
+  dt_pt_isolated = "Is the patient or older adult isolated in the home?", 
+  dt_pt_hygiene = paste0(
+    "Does the patient or older adult have poor personal hygiene",
+    " (including soiled in urine or feces)?"
+    ), 
+  dt_pt_clothes = paste0(
+    "Is the patient or older adult inadequately clothed or wearing",
+    " dirty, torn, or soiled clothing?"
+    ), 
+  dt_pt_needs = paste0(
+    "Does the patient or older adult have unmet needs for assistance",
+    " with eating, toileting, transferring, dressing, or bathing?"
+    ), 
+  dt_pt_depress = paste0(
+    "Does the patient or older adult appear depressed, anxious, or ",
+    "emotionally distressed for reasons other than their immediate medical",
+    " condition?"
+    ), 
+  dt_pt_med_hoard = paste0(
+    "Does the patient or older adult appear to be hoarding or saving old",
+    " medications?"), 
+  dt_pt_med_diff = paste0(
+    "Does the patient or older adult have difficulties taking their",
+    " prescribed medications as directed?"
+    ), 
+  dt_cg_lack = paste0(
+    "If caregiver is present, they appear to lack knowledge of the",
+    " patient or older adult’s medical needs"
+    ), 
+  dt_cg_uneng = paste0(
+    "If caregiver is present, they appear unengaged and inattentive in",
+    " caring for the patient or older adult"
+    ), 
+  dt_cg_frust = paste0(
+    "If caregiver is present, they appear frustrated, tired, angry, or ",
+    "burdened by the patient or older adult"
+    ), 
+  dt_cg_anx = paste0(
+    "If caregiver is present, they appear overly concerned ",
+    "(e.g., anxious, hovering)")
+  )
+```
+
+## Section 2: DETECT-Tool Response Patterns
+
+### Response Pattern Tables
+
+#### Table 2.1: Response Patterns: All Items (#sec2-t1-rp-all-resp)
+
+We wished to examine response patterns of DETECT-Tool Items, across all screenings.
+
+```{r}
+#| label: sec2-t1-rp-all-resp-subset
+# Take response-level subset for the following analyses
+t_df <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Subset to records with a screening
+  dplyr::filter(dt_screened)
+
+## Display number of records in subset
+format(nrow(t_df), big.mark = ',')
+```
+
+We calculated our response patterns for all DETECT Items, across all screenings. We stored this internally as Table 2.1.
+
+```{r}
+#| label: sec2-t1-rp-all-resp-table
+# Extract response pattern table
+## Get table
+resp_pattern <- get_dt_resp_pattern(t_df, dt_item_list)
+
+## Display text portion of table
+resp_pattern |>
+  dplyr::select(dplyr::all_of(dplyr::starts_with('text_')))
+```
+
+#### Comparison to Pilot Study
+
+We wished to examine differences in DETECT-Tool Item patterns with the Pilot study.
+
+#### Table 2.2: Item Completion (#sec2-t2-rp-pilot-resp-comp)
+
+We examined the difference in item completion patterns between our follow-up data and our Pilot study.  We stored this internally as Table 2.2.
+
+```{r}
+#| label: sec2-t2-rp-pilot-resp-comp-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  pat_pilot |>
+    dplyr::select(text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Pilot Completed"),
+  resp_pattern |>
+    dplyr::select(text_var_val, text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Follow-up Completed"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the completion rates of each item.
+
+```{r}
+#| label: sec2-t2-rp-pilot-resp-comp-stats
+# Chi-Square and Fisher's Exact Test, Completion Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  ### Use total number of responses to calculate the number "not complete"
+  resp_pattern |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = nrow(t_df) - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  pat_pilot |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = total_pilot - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  .target_vals = c("complete", "not_complete")
+)
+
+stats
+```
+
+##### Table 2.3: Item Response Patterns (#sec2-t3-rp-pilot-resp-pats)
+
+We examined the difference in item response patterns between our follow-up data and our Pilot study.  We stored this internally as Table 2.3.
+
+```{r}
+#| label: sec2-t3-rp-pilot-resp-pats-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  pat_pilot |>
+    dplyr::select(text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Pilot Yes", "Pilot No", "Pilot UTA")
+      ),
+  resp_pattern |>
+    dplyr::select(text_var_val, text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Follow-Up Yes", "Follow-Up No", "Follow-Up UTA")
+      ),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val) 
+```
+
+We calculated Chi-square and Fisher exact tests for the response patterns of each item.
+
+```{r}
+#| label: sec2-t3-rp-pilot-resp-pats-stats
+# Chi-Square and Fisher's Exact Test, Response Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  resp_pattern |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_yes", "n_no", "n_uta"), 
+      ~c("yes", "no", "uta")
+      ),
+  pat_pilot |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_yes", "n_no", "n_uta"), 
+      ~c("yes", "no", "uta")
+      ),
+  .target_vals = c("yes", "no", "uta"),
+  .omit_vals = c("uta")
+)
+
+stats
+```
+
+##### Table 2.4: "Only Yes" (#sec2-t4-rp-pilot-resp-onlyyes)
+
+We examined the difference in the "only yes" item patterns between our follow-up data and our Pilot study. We stored this internally as Table 2.4.
+
+```{r}
+#| label: sec2-t4-rp-pilot-resp-onlyyes-table
+# Extract comparative "only yes" pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  pat_pilot |>
+    dplyr::select(text_yes_only, var_val) |>
+    dplyr::rename_at("text_yes_only", ~"Pilot Yes (Only)"),
+  resp_pattern |>
+    dplyr::select(text_var_val, text_yes_only, var_val) |>
+    dplyr::rename_at("text_yes_only", ~"Follow-Up Yes (Only)"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the "only yes" patterns of each item.
+
+```{r}
+#| label: sec2-t4-rp-pilot-resp-onlyyes-stats
+# Chi-Square and Fisher's Exact Test, "Only Yes" comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  resp_pattern |>
+    dplyr::select(text_var_val, var_val, n_yes, n_yes_only) |>
+    ### Calculate the number of "Yes" responses that were *not* the only yes
+    dplyr::mutate(
+      not_only_yes = n_yes - n_yes_only 
+    ) |>
+    dplyr::select(-n_yes) |>
+    dplyr::rename_at(
+      c("n_yes_only", "not_only_yes"), 
+      ~c("only_yes", "not_only_yes")
+      ),
+  pat_pilot |>
+    dplyr::select(text_var_val, var_val, n_yes, n_yes_only) |>
+    dplyr::mutate(
+      not_only_yes = n_yes - n_yes_only 
+    ) |>
+    dplyr::select(-n_yes) |>
+    dplyr::rename_at(
+      c("n_yes_only", "not_only_yes"), 
+      ~c("only_yes", "not_only_yes")
+      ),
+  .target_vals = c("only_yes", "not_only_yes")
+)
+
+stats 
+```
+
+#### Comparison to 1-Year Study
+
+We wished to examine differences in DETECT-Tool Item patterns with the 1-Year Study
+
+###### Table 2.5: Item Completion (#sec2-t5-rp-year-resp-comp)
+
+We examined the difference in item completion patterns between our follow-up data and our 1-Year study.  We stored this internally as Table 2.5.
+
+```{r}
+#| label: sec2-t5-rp-year-resp-comp-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  pat_year |>
+    dplyr::select(text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Year Completed"),
+  resp_pattern |>
+    dplyr::select(text_var_val, text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Follow-up Completed"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the completion rates of each item.
+
+```{r}
+#| label: sec2-t5-rp-year-resp-comp-stats
+# Chi-Square and Fisher's Exact Test, Completion Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  ### Use total number of responses to calculate the number "not complete"
+  resp_pattern |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = nrow(t_df) - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  pat_year |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = total_year - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  .target_vals = c("complete", "not_complete")
+)
+
+stats
+```
+
+###### Table 2.6: Item Response Patterns (#sec2-t6-rp-year-resp-pats)
+
+We examined the difference in item response patterns between our follow-up data and our 1-Year study.  We stored this internally as Table 2.6.
+
+```{r}
+#| label: sec2-t6-rp-year-resp-pats-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  pat_year |>
+    dplyr::select(text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Year Yes", "Year No", "Year UTA")
+      ),
+  resp_pattern |>
+    dplyr::select(text_var_val, text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Follow-Up Yes", "Follow-Up No", "Follow-Up UTA")
+      ),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the response patterns of each item.
+
+```{r}
+#| label: sec2-t6-rp-year-resp-pats-stats
+# Chi-Square and Fisher's Exact Test, Response Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  resp_pattern |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_yes", "n_no", "n_uta"), 
+      ~c("yes", "no", "uta")
+      ),
+  pat_year |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_yes", "n_no", "n_uta"), 
+      ~c("yes", "no", "uta")
+      ),
+  .target_vals = c("yes", "no", "uta"),
+  .omit_vals = c("uta")
+)
+
+stats
+```
+
+##### Table 2.7: "Only Yes" (#sec2-t7-rp-year-resp-onlyyes)
+
+We examined the difference in the "only yes" item patterns between our follow-up data and our 1-Year study. We stored this internally as Table 2.7.
+
+```{r}
+#| label: sec2-t7-rp-year-resp-onlyyes-table
+# Extract comparative "only yes" pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  pat_year |>
+    dplyr::select(text_yes_only, var_val) |>
+    dplyr::rename_at("text_yes_only", ~"Year Yes (Only)"),
+  resp_pattern |>
+    dplyr::select(text_var_val, text_yes_only, var_val) |>
+    dplyr::rename_at("text_yes_only", ~"Follow-Up Yes (Only)"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the "only yes" patterns of each item.
+
+```{r}
+#| label: sec2-t7-rp-year-resp-onlyyes-stats
+# Chi-Square and Fisher's Exact Test, "Only Yes" comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  resp_pattern |>
+    dplyr::select(text_var_val, var_val, n_yes, n_yes_only) |>
+    ### Calculate the number of "Yes" responses that were *not* the only yes
+    dplyr::mutate(
+      not_only_yes = n_yes - n_yes_only 
+    ) |>
+    dplyr::select(-n_yes) |>
+    dplyr::rename_at(
+      c("n_yes_only", "not_only_yes"), 
+      ~c("only_yes", "not_only_yes")
+      ),
+  pat_year |>
+    dplyr::select(text_var_val, var_val, n_yes, n_yes_only) |>
+    dplyr::mutate(
+      not_only_yes = n_yes - n_yes_only 
+    ) |>
+    dplyr::select(-n_yes) |>
+    dplyr::rename_at(
+      c("n_yes_only", "not_only_yes"), 
+      ~c("only_yes", "not_only_yes")
+      ),
+  .target_vals = c("only_yes", "not_only_yes")
+)
+
+stats
+```
+
+#### Table 2.8: Item Completion by Screening Result (#sec2-t8-rp-result-resp-comp)
+
+We wished to examine differences in DETECT Tool Item completion between screenings with and without a DETECT-tool result, defined as one or more "yes" responses to DETECT Tool Items. We stored this internally as Table 2.8.
+
+```{r}
+#| label: sec2-rp-result-resp-subset
+# Take response-level subsets for the following analyses
+## Positive Screening
+screen_pos <- ms_records |>
+  ### Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ### Subset to records with a screening
+  dplyr::filter(dt_screened) |>
+  ### Subset to positive screenings
+  dplyr::filter(dt_positive)
+
+## Negative Screening
+screen_neg <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Subset to records with a screening
+  dplyr::filter(dt_screened) |>
+  ### Subset to negative screenings
+  dplyr::filter(!dt_positive)
+
+## Get total number of records in each subset
+screen_pos_total <- nrow(screen_pos)
+screen_neg_total <- nrow(screen_neg)
+
+## Get response patterns for each subset
+screen_pos <- get_dt_resp_pattern(screen_pos, .dt_item_list = dt_item_list)
+screen_neg <- get_dt_resp_pattern(screen_neg, .dt_item_list = dt_item_list)
+
+## Display text-summary of the record counts
+paste0(
+  format(screen_pos_total, big.mark = ','), " (",
+  stringr::str_trim(
+    format(
+      round(screen_pos_total*100 / (screen_pos_total + screen_neg_total), 2),
+      nsmall = 2
+      ), 
+    side = 'both'
+    ),
+  "%) records with positive screening. ",
+  format(screen_neg_total, big.mark = ','), " (",
+  stringr::str_trim(
+    format(
+      round(screen_neg_total*100 / (screen_pos_total + screen_neg_total), 2),
+      nsmall = 2
+      ), 
+    side = 'both'
+    ),"%) records with negative screening. "
+)
+```
+
+We examined the difference in item completion patterns between screenings with and without a DETECT-tool recorded intent to report.
+
+```{r}
+#| label: sec2-t8-rp-result-resp-comp-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  screen_pos |>
+    dplyr::select(text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Positive Screen Completed"),
+  screen_neg |>
+    dplyr::select(text_var_val, text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Negative Screen Completed"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the completion rates of each item.
+
+```{r}
+#| label: sec2-t8-rp-result-resp-comp-stats
+# Chi-Square and Fisher's Exact Test, Completion Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  ### Use total responses in subset to calculate the number "not complete"
+  screen_pos |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = screen_pos_total - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  screen_neg |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = screen_neg_total - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  .target_vals = c("complete", "not_complete")
+)
+
+stats
+```
+
+#### Comparison by Intent to Report, All Screenings
+
+We wished to examine differences in DETECT-Tool Item patterns between screenings with and without a DETECT-tool recorded intent to report, for all screenings.
+
+```{r}
+#| label: sec2-rp-all-intent-resp-subset
+# Take response-level subsets for the following analyses
+## Positive Intent
+intent_pos <- ms_records |>
+  ### Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ### Subset to records with a screening
+  dplyr::filter(dt_screened) |>
+  ### Subset to only screenings with a recorded intent to report
+  dplyr::filter(dt_aps_reported)
+
+## Negative Intent
+intent_neg <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Subset to records with a screening
+  dplyr::filter(dt_screened) |>
+  ## Subset to only screenings with a recorded intent to report
+  dplyr::filter(!dt_aps_reported)
+
+## Get total number of records in each subset
+intent_pos_total <- nrow(intent_pos)
+intent_neg_total <- nrow(intent_neg)
+
+## Get response patterns for each subset
+intent_pos <- get_dt_resp_pattern(intent_pos, .dt_item_list = dt_item_list)
+intent_neg <- get_dt_resp_pattern(intent_neg, .dt_item_list = dt_item_list)
+
+## Display text-summary of the record counts
+paste0(
+  format(intent_pos_total, big.mark = ','), " (",
+  stringr::str_trim(
+    format(
+      round(intent_pos_total*100 / (intent_pos_total + intent_neg_total), 2),
+      nsmall = 2
+      ), 
+    side = 'both'
+    ),
+  "%) records with positive intent. ",
+  format(intent_neg_total, big.mark = ','), " (",
+  stringr::str_trim(
+    format(
+      round(intent_neg_total*100 / (intent_pos_total + intent_neg_total), 2),
+      nsmall = 2
+      ), 
+    side = 'both'
+    ),"%) records with negative intent. "
+)
+```
+
+##### Table 2.9: Item Completion (#sec2-t2-rp-all-intent-resp-comp)
+
+We examined the difference in item completion patterns between screenings with and without a DETECT-tool recorded intent to report. We stored this internally as Table 2.9.
+
+```{r}
+#| label: sec2-t9-rp-all-intent-resp-comp-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  intent_pos |>
+    dplyr::select(text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Positive Intent Completed"),
+  intent_neg |>
+    dplyr::select(text_var_val, text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Negative Intent Completed"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the completion rates of each item.
+
+```{r}
+#| label: sec2-t9-rp-all-intent-resp-comp-stats
+# Chi-Square and Fisher's Exact Test, Completion Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  ### Use total responses in subset to calculate the number "not complete"
+  intent_pos |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = intent_pos_total - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  intent_neg |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = intent_neg_total - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  .target_vals = c("complete", "not_complete")
+)
+
+stats 
+```
+
+##### Table 2.10: Item Response Patterns (#sec2-t10-rp-all-intent-resp-pats)
+
+We examined the difference in item response patterns between screenings with and without a DETECT-tool recorded intent to report. We stored this internally as Table 2.10.
+
+```{r}
+#| label: sec2-t10-rp-all-intent-resp-pats-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  intent_pos |>
+    dplyr::select(text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Positive Intent Yes", "Positive Intent No", "Positive Intent UTA")
+      ),
+  intent_neg |>
+    dplyr::select(text_var_val, text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Negative Intent Yes", "Negative Intent No", "Negative Intent UTA")
+      ),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the response patterns of each item.
+
+```{r}
+#| label: sec2-t10-rp-all-intent-resp-pats-stats
+# Chi-Square and Fisher's Exact Test, Response Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  intent_pos |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_yes", "n_no", "n_uta"), 
+      ~c("yes", "no", "uta")
+      ),
+  intent_neg |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_yes", "n_no", "n_uta"), 
+      ~c("yes", "no", "uta")
+      ),
+  .target_vals = c("yes", "no", "uta"),
+  .omit_vals = c("uta")
+)
+
+stats
+```
+
+##### Table 2.11: "Only Yes" (#sec2-t11-rp-all-intent-resp-onlyyes)
+
+We examined the difference in the "only yes" item patterns between screenings with and without a DETECT-tool recorded intent to report. We stored this internally as Table 2.11.
+
+```{r}
+#| label: sec2-t11-rp-all-intent-resp-onlyyes-table
+# Extract comparative "only yes" pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  intent_pos |>
+    dplyr::select(text_yes_only, var_val) |>
+    dplyr::rename_at("text_yes_only", ~"Positive Intent Yes (Only)"),
+  intent_neg |>
+    dplyr::select(text_var_val, text_yes_only, var_val) |>
+    dplyr::rename_at("text_yes_only", ~"Negative Intent Yes (Only)"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the "only yes" patterns of each item.
+
+```{r}
+#| label: sec2-t11-rp-all-intent-resp-onlyyes-stats
+# Chi-Square and Fisher's Exact Test, "Only Yes" comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  intent_neg |>
+    dplyr::select(text_var_val, var_val, n_yes, n_yes_only) |>
+    ### Calculate the number of "Yes" responses that were *not* the only yes
+    dplyr::mutate(
+      not_only_yes = n_yes - n_yes_only 
+    ) |>
+    dplyr::select(-n_yes) |>
+    dplyr::rename_at(
+      c("n_yes_only", "not_only_yes"), 
+      ~c("only_yes", "not_only_yes")
+      ),
+  intent_pos |>
+    dplyr::select(text_var_val, var_val, n_yes, n_yes_only) |>
+    dplyr::mutate(
+      not_only_yes = n_yes - n_yes_only 
+    ) |>
+    dplyr::select(-n_yes) |>
+    dplyr::rename_at(
+      c("n_yes_only", "not_only_yes"), 
+      ~c("only_yes", "not_only_yes")
+      ),
+  .target_vals = c("only_yes", "not_only_yes")
+)
+
+stats
+```
+
+#### Comparison by Intent to Report, Positive Screenings
+
+We wished to examine differences in DETECT-Tool Item patterns between screenings with and without a DETECT-tool recorded intent to report, for positive screenings.
+
+```{r}
+#| label: sec2-rp-posscr-intent-resp-subset
+# Take response-level subsets for the following analyses
+## Positive Intent
+intent_pos <- ms_records |>
+  ### Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ### Subset to records with a screening
+  dplyr::filter(dt_screened) |>
+  ### Subset to positive screenings
+  dplyr::filter(dt_positive) |>
+  ### Subset to only screenings with a recorded intent to report
+  dplyr::filter(dt_aps_reported)
+
+## Negative Intent
+intent_neg <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Subset to records with a screening
+  dplyr::filter(dt_screened) |>
+  ### Subset to positive screenings
+  dplyr::filter(dt_positive) |>
+  ## Subset to only screenings with a recorded intent to report
+  dplyr::filter(!dt_aps_reported)
+
+## Get total number of records in each subset
+intent_pos_total <- nrow(intent_pos)
+intent_neg_total <- nrow(intent_neg)
+
+## Get response patterns for each subset
+intent_pos <- get_dt_resp_pattern(intent_pos, .dt_item_list = dt_item_list)
+intent_neg <- get_dt_resp_pattern(intent_neg, .dt_item_list = dt_item_list)
+
+## Display text-summary of the record counts
+paste0(
+  format(intent_pos_total, big.mark = ','), " (",
+  stringr::str_trim(
+    format(
+      round(intent_pos_total*100 / (intent_pos_total + intent_neg_total), 2),
+      nsmall = 2
+      ), 
+    side = 'both'
+    ),
+  "%) records with positive intent. ",
+  format(intent_neg_total, big.mark = ','), " (",
+  stringr::str_trim(
+    format(
+      round(intent_neg_total*100 / (intent_pos_total + intent_neg_total), 2),
+      nsmall = 2
+      ), 
+    side = 'both'
+    ),"%) records with negative intent. "
+)
+```
+
+##### Table 2.12: Item Completion (#sec2-t12-rp-posscr-intent-resp-comp)
+
+We examined the difference in item completion patterns between screenings with and without a DETECT-tool recorded intent to report. We stored this internally as Table 2.12.
+
+```{r}
+#| label: sec2-t12-rp-posscr-intent-resp-comp-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  intent_pos |>
+    dplyr::select(text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Positive Intent Completed"),
+  intent_neg |>
+    dplyr::select(text_var_val, text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Negative Intent Completed"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the completion rates of each item.
+
+```{r}
+#| label: sec2-t12-rp-posscr-intent-resp-comp-stats
+# Chi-Square and Fisher's Exact Test, Completion Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  ### Use total responses in subset to calculate the number "not complete"
+  intent_pos |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = intent_pos_total - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  intent_neg |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = intent_neg_total - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  .target_vals = c("complete", "not_complete")
+)
+
+stats
+```
+
+##### Table 2.13: Item Response Patterns (#sec2-t13-rp-posscr-intent-resp-pats)
+
+We examined the difference in item response patterns between screenings with and without a DETECT-tool recorded intent to report. We stored this internally as Table 2.13.
+
+```{r}
+#| label: sec2-t13-rp-posscr-intent-resp-pats-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  intent_pos |>
+    dplyr::select(text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Positive Intent Yes", "Positive Intent No", "Positive Intent UTA")
+      ),
+  intent_neg |>
+    dplyr::select(text_var_val, text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Negative Intent Yes", "Negative Intent No", "Negative Intent UTA")
+      ),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the response patterns of each item.
+
+```{r}
+#| label: sec2-t13-rp-posscr-intent-resp-pats-stats
+# Chi-Square and Fisher's Exact Test, Response Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  intent_pos |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_yes", "n_no", "n_uta"), 
+      ~c("yes", "no", "uta")
+      ),
+  intent_neg |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_yes", "n_no", "n_uta"), 
+      ~c("yes", "no", "uta")
+      ),
+  .target_vals = c("yes", "no", "uta"),
+  .omit_vals = c("uta")
+)
+
+stats 
+```
+
+##### Table 2.14: "Only Yes" (#sec2-t14-rp-posscr-intent-resp-onlyyes)
+
+We examined the difference in the "only yes" item patterns between screenings with and without a DETECT-tool recorded intent to report. We stored this internally as Table 2.14.
+
+```{r}
+#| label: sec2-t14-rp-posscr-intent-resp-onlyyes-table
+# Extract comparative "only yes" pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  intent_pos |>
+    dplyr::select(text_yes_only, var_val) |>
+    dplyr::rename_at("text_yes_only", ~"Positive Intent Yes (Only)"),
+  intent_neg |>
+    dplyr::select(text_var_val, text_yes_only, var_val) |>
+    dplyr::rename_at("text_yes_only", ~"Negative Intent Yes (Only)"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the "only yes" patterns of each item.
+
+```{r}
+#| label: sec2-t14-rp-posscr-intent-resp-onlyyes-stats
+# Chi-Square and Fisher's Exact Test, "Only Yes" comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  intent_neg |>
+    dplyr::select(text_var_val, var_val, n_yes, n_yes_only) |>
+    ### Calculate the number of "Yes" responses that were *not* the only yes
+    dplyr::mutate(
+      not_only_yes = n_yes - n_yes_only 
+    ) |>
+    dplyr::select(-n_yes) |>
+    dplyr::rename_at(
+      c("n_yes_only", "not_only_yes"), 
+      ~c("only_yes", "not_only_yes")
+      ),
+  intent_pos |>
+    dplyr::select(text_var_val, var_val, n_yes, n_yes_only) |>
+    dplyr::mutate(
+      not_only_yes = n_yes - n_yes_only 
+    ) |>
+    dplyr::select(-n_yes) |>
+    dplyr::rename_at(
+      c("n_yes_only", "not_only_yes"), 
+      ~c("only_yes", "not_only_yes")
+      ),
+  .target_vals = c("only_yes", "not_only_yes")
+)
+
+stats
+```
+
+
+#### Comparison by Intent to Report, Negative Screenings
+
+We wished to examine differences in DETECT-Tool Item patterns between screenings with and without a DETECT-tool recorded intent to report, for negative screenings.
+
+```{r}
+#| label: sec2-rp-negscr-intent-resp-subset
+# Take response-level subsets for the following analyses
+## Positive Intent
+intent_pos <- ms_records |>
+  ### Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ### Subset to records with a screening
+  dplyr::filter(dt_screened) |>
+  ### Subset to negative screenings
+  dplyr::filter(!dt_positive) |>
+  ### Subset to only screenings with a recorded intent to report
+  dplyr::filter(dt_aps_reported)
+
+## Negative Intent
+intent_neg <- ms_records |>
+  ## Drop "Duplicate" flagged records
+  dplyr::filter(!dup_drop) |>
+  ## Subset to records with a screening
+  dplyr::filter(dt_screened) |>
+  ### Subset to negative screenings
+  dplyr::filter(!dt_positive) |>
+  ## Subset to only screenings with a recorded intent to report
+  dplyr::filter(!dt_aps_reported)
+
+## Get total number of records in each subset
+intent_pos_total <- nrow(intent_pos)
+intent_neg_total <- nrow(intent_neg)
+
+## Get response patterns for each subset
+intent_pos <- get_dt_resp_pattern(intent_pos, .dt_item_list = dt_item_list)
+intent_neg <- get_dt_resp_pattern(intent_neg, .dt_item_list = dt_item_list)
+
+## Display text-summary of the record counts
+paste0(
+  format(intent_pos_total, big.mark = ','), " (",
+  stringr::str_trim(
+    format(
+      round(intent_pos_total*100 / (intent_pos_total + intent_neg_total), 2),
+      nsmall = 2
+      ), 
+    side = 'both'
+    ),
+  "%) records with positive intent. ",
+  format(intent_neg_total, big.mark = ','), " (",
+  stringr::str_trim(
+    format(
+      round(intent_neg_total*100 / (intent_pos_total + intent_neg_total), 2),
+      nsmall = 2
+      ), 
+    side = 'both'
+    ),"%) records with negative intent. "
+)
+```
+
+##### Table 2.15: Item Completion (#sec2-t15-rp-negscr-intent-resp-comp)
+
+We examined the difference in item completion patterns between screenings with and without a DETECT-tool recorded intent to report. We stored this internally as Table 2.15.
+
+```{r}
+#| label: sec2-t15-rp-negscr-intent-resp-comp-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  intent_pos |>
+    dplyr::select(text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Positive Intent Completed"),
+  intent_neg |>
+    dplyr::select(text_var_val, text_completed, var_val) |>
+    dplyr::rename_at("text_completed", ~"Negative Intent Completed"),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val)
+```
+
+We calculated Chi-square and Fisher exact tests for the completion rates of each item.
+
+```{r}
+#| label: sec2-t15-rp-negscr-intent-resp-comp-stats
+# Chi-Square and Fisher's Exact Test, Completion Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  ### Use total responses in subset to calculate the number "not complete"
+  intent_pos |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = intent_pos_total - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  intent_neg |>
+    dplyr::select(text_var_val, var_val, n_completed) |>
+    dplyr::mutate(not_complete = intent_neg_total - n_completed) |>
+    dplyr::rename_at("n_completed", ~"complete"),
+  .target_vals = c("complete", "not_complete")
+)
+
+stats
+```
+
+##### Table 2.16: Item Response Patterns (#sec2-t16-rp-negscr-intent-resp-pats)
+
+We examined the difference in item response patterns between screenings with and without a DETECT-tool recorded intent to report. We stored this internally as Table 2.16.
+
+```{r}
+#| label: sec2-t16-rp-negscr-intent-resp-pats-table
+# Extract comparative response pattern table
+## Pull text values of completion rates for both tables for display
+dplyr::left_join(
+  intent_pos |>
+    dplyr::select(text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Positive Intent Yes", "Positive Intent No", "Positive Intent UTA")
+      ),
+  intent_neg |>
+    dplyr::select(text_var_val, text_yes, text_no, text_uta, var_val) |>
+    dplyr::rename_at(
+      c("text_yes", "text_no", "text_uta"), 
+      ~c("Negative Intent Yes", "Negative Intent No", "Negative Intent UTA")
+      ),
+  by = 'var_val'
+  ) |>
+  dplyr::select(-var_val) |>
+  dplyr::relocate(text_var_val) |>
+  ### Omit "Yes" columns, as these are negative screenings (no yes by def.)
+  dplyr::select(-dplyr::all_of(dplyr::contains('yes', ignore.case = T)))
+```
+
+We calculated Chi-square and Fisher exact tests for the response patterns of each item.
+
+```{r}
+#| label: sec2-t16-rp-negscr-intent-resp-pats-stats
+# Chi-Square and Fisher's Exact Test, Response Comparison
+## Calculate statistics
+stats <- get_dt_rp_chi_fisher(
+  intent_pos |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_no", "n_uta"), 
+      ~c("no", "uta")
+      ),
+  intent_neg |>
+    dplyr::select(text_var_val, var_val, n_yes, n_no, n_uta) |>
+    dplyr::rename_at(
+      c("n_no", "n_uta"), 
+      ~c("no", "uta")
+      ),
+  .target_vals = c("no", "uta")
+)
+
+stats
+```
+
+# 🧹 Clean up
+
+```{r}
+#| label: end-cleanup
+rm(list=ls())
+```
