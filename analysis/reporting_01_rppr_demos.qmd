@@ -1,0 +1,175 @@
+---
+title: "RPPR Demos"
+date: 2025-07-25
+format: html
+---
+
+# Libraries
+
+```{r}
+library(dplyr)
+library(stringr)
+library(here)
+library(readr)
+```
+
+# Import Data
+
+```{r}
+emr_path <- here::here("data", "cleaned_rds_files", "participant_import.rds")
+emr_df <- readRDS(emr_path)
+emr_df <- emr_df |> 
+  dplyr::select(x_primary_key, medstar_id, medstar_internal_id, dob, age, race, sex) |>
+  dplyr::rename(
+    age_emr = age,
+    race_emr = race,
+    gender_emr = sex
+  )
+```
+
+```{r}
+consent_path <- here::here("data", "cleaned_rds_files", "consent_import.rds")
+consent_df <- readRDS(consent_path)
+consent_df <- consent_df |> 
+  dplyr::select(x_primary_key, medstar_id, x_record_status) |>
+  dplyr::rename(consent_status = x_record_status)
+```
+
+```{r}
+demo_path <- here::here("data", "cleaned_rds_files", "sociodemographic_information_import.rds")
+demo_df <- readRDS(demo_path)
+demo_df <- demo_df |>
+  dplyr::select(x_primary_key, medstar_id, sode_age, sode_age_years, sode_hispanic, sode_race, sogi_identity) |>
+  dplyr::rename(
+    age_sode = sode_age,
+    age_sode_years = sode_age_years,
+    hispanic_sode = sode_hispanic,
+    race_sode = sode_race,
+    gender_sode = sogi_identity
+  )
+```
+
+```{r}
+linkage_path <- here::here("data", "cleaned_rds_files", "record_linkage", "maps", "02_medstar-keys-to-id_ms.rds")
+linkage_df <- readRDS(linkage_path)
+linkage_df <- linkage_df
+```
+
+# Process
+
+## Join
+
+```{r}
+joined_df <- dplyr::left_join(
+  emr_df,
+  linkage_df,
+  by = c("x_primary_key", "medstar_internal_id")
+  ) |>
+  dplyr::relocate("id", "id_ms") |>
+  dplyr::left_join(
+    consent_df,
+    by = "medstar_id"
+  ) |>
+    dplyr::left_join(
+      demo_df,
+      by = "medstar_id"
+    )
+```
+
+## All Events (One Row per Interview)
+
+Manual review performed to verify transformations against codebooks and RPPR standards.
+
+```{r}
+all_records <- joined_df |>
+  dplyr::filter(consent_status == "Consent received/Participating") |>
+  dplyr::select(id, medstar_id, race_sode, hispanic_sode, gender_sode, age_sode_years) |>
+  dplyr::mutate(
+    Race = dplyr::case_when(
+      race_sode == "Black or African American" ~ "Black",
+      race_sode == "White" ~ "White",
+      race_sode == "American Indian or Alaskan Native" ~ "American Indian",
+      race_sode == "Asian" ~ "Asian",
+      race_sode == "Native Hawaiian or Other Pacific Islander" ~ "Hawaiian",
+      race_sode %in% c("Other", "Don't know", "Refused") | is.na(race_sode) ~ 
+        "Unknown",
+      TRUE ~ "More than one race"
+    ),
+    Ethnicity = dplyr::case_when(
+      hispanic_sode == 0 ~ "Not Hispanic or Latino",
+      hispanic_sode == 1 ~ "Hispanic or Latino",
+      TRUE ~ "Unknown"
+    ),
+    Sex = dplyr::case_when(
+      gender_sode == 1 ~ "Male",
+      gender_sode == 2 ~ "Female",
+      TRUE ~ "Unknown"
+    ),
+    Age.Unit = dplyr::case_when(
+      age_sode_years >= 90 ~ "Ninety Plus",
+      !is.na(age_sode_years) & age_sode_years < 90 ~ "Years",
+      is.na(age_sode_years) ~ "Unknown"
+    ),
+    Age = dplyr::case_when(
+      !is.na(age_sode_years) & age_sode_years < 90 ~ 
+        as.integer(age_sode_years),
+      TRUE ~ NA_integer_
+    )
+  ) |>
+  dplyr::select(id, medstar_id, Race, Ethnicity, Sex, Age.Unit, Age)
+```
+
+## Subject Level (One Row Per Subject)
+
+Manual review was done to check for any discrepancies. Race was assigned based on the most frequent option in multiple records. Lowest age value (first interview) was taken. 
+
+```{r}
+single_subj_records <- all_records |> 
+  dplyr::select(-medstar_id) |> 
+  dplyr::distinct() |> 
+  dplyr::mutate(dplyr::across(
+    c(Race, Ethnicity, Sex, Age.Unit), 
+    ~dplyr::if_else(.x == "Unknown", NA, .x)
+    )) |>
+  dplyr::group_by(id) |>
+  tidyr::fill(c(Race, Ethnicity, Sex, Age.Unit), .direction = "downup") |>
+  dplyr::mutate(
+    Race = dplyr::case_when(
+      id %in% c(1406, 9748, 16068) ~ "White",
+      id %in% c(25834, 25891, 36732, 37878) ~ "More than one race",
+      TRUE ~ Race
+      )
+    ) |>
+  dplyr::group_by(id) |>
+  dplyr::mutate(
+    Age = if (all(is.na(Age))) NA_integer_ else min(Age, na.rm = TRUE),
+    Age.Unit = ifelse(
+      Age.Unit %in% c("Ninety Plus", "Unknown") & !is.na(Age), 
+      "Years", 
+      Age.Unit
+      )
+  ) |>
+  dplyr::ungroup() |>
+  dplyr::distinct() |>
+  dplyr::mutate(dplyr::across(
+    c(Race, Ethnicity, Sex, Age.Unit), 
+    ~dplyr::if_else(is.na(.x), "Unknown", .x)
+    )) |>
+  dplyr::relocate(Race, Ethnicity, Sex, Age, Age.Unit) |>
+  dplyr::select(-id)
+
+single_subj_records
+```
+
+# Save Data
+
+```{r}
+save_path <- here::here("data", "detect_r01_fu_interview_subj_demos_all_events.csv")
+readr::write_csv(all_records, save_path)
+```
+
+```{r}
+save_path <- here::here("data", "detect_r01_fu_interview_subj_demos_single_row_per_subj.csv")
+readr::write_csv(single_subj_records, save_path)
+```
+
