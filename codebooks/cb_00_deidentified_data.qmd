@@ -487,6 +487,67 @@ codebook_df <- codebookr::codebook(
 print(codebook_df, export_path)
 ```
 
+### "Clutter Scale"
+
+We loaded and processed the MedStar Clutter Scale Data.
+
+```{r}
+#| label: codebook-medstar-clutter
+# MedStar Clutter Scale Measures
+## Paths
+### Data of interest
+data_path <- here::here(
+  "data", "deidentified", "medstar", "08_medstar_clutter_scale.rds"
+  )
+
+### Codebook Labels (CSV)
+labels_path <- here::here(
+  "data", "codebook_values", "deidentified_sets", "medstar", 
+  "08_medstar_clutter_scale_labels.csv"
+  )
+labels_path2 <- labels_path
+
+### Export Path
+export_path <- here::here(
+  "data", "deidentified", "docs", "codebooks", "medstar", 
+  "cb_08_medstar_clutter_scale.docx"
+)
+
+## Process Codebook
+### Load Data
+informative_df_import(
+  "codebook_df", data_path, overwrite = T
+  )
+
+### Load Labels
+informative_df_import(
+  "cb_labels", labels_path, overwrite = T, show_col_types = F
+  )
+
+### Order columns to match labels
+codebook_df <- codebook_df |>
+  dplyr::relocate(cb_labels$variable)
+
+### Label Data
+codebook_df <- cb_add_column_attributes_from_csv_file(
+  df = codebook_df,
+  attr_csv_path = labels_path2
+)
+
+### Generate codebook
+codebook_df <- codebookr::codebook(
+ df = codebook_df,
+ title = "DETECT 5-Year Data: Clutter Scale",
+ description = paste0(
+   "From 'clutter_scale.csv' file from FileMaker Pro"
+   ),
+ no_summary_stats = c('x_primary_key')
+)
+
+## Export Codebook
+print(codebook_df, export_path)
+```
+
 ## APS Data
 
 ### Clients.xlsx

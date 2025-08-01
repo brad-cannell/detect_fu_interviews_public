@@ -251,6 +251,28 @@ informative_df_import(
  #  Data last modified on OneDrive: 2025-03-27 09:07:13 
 ```
 
+### "clutter_scale_import.RDS"
+
+We loaded our MedStar follow-up interview clutter scale data.
+
+```{r}
+#| label: load-ms-clutter
+# Load MedStar Clutter Scale Data
+## Path to data
+path <- here::here(
+    "data", "cleaned_rds_files",
+    "clutter_scale_import.rds"
+    )
+
+## Load
+informative_df_import(
+    "ms_clutter", path, overwrite = T
+  )
+
+ # 2025-07-31: CLUTTER SCALE data imported with 892 rows and 29 columns.
+ # Data last modified on OneDrive: 2025-03-27 09:07:10 
+```
+
 ## APS Data
 
 ### Clients.xlsx (Pre-Cleaned)
@@ -1290,6 +1312,48 @@ ms_lead <- ms_lead |>
   )
 ```
 
+### "Clutter Scale"
+
+We processed our Clutter Scale Data Set.
+
+#### Apply Proxy Map
+
+We applied our proxy map to replace the internal `medstar_id` with our proxy values representing the EMS Response Number and Record Number.
+
+```{r}
+#| label: process-ms-clutter-proxy
+# Apply Proxy Map (id, id_ms, ms_resp_num, ms_record_num)
+ms_clutter <- ms_clutter |>
+  dplyr::mutate(
+    id = NA_integer_,
+    id_ms = NA_integer_,
+    ms_resp_num = NA_integer_,
+    ms_record_num = NA_integer_
+  ) |>
+  dplyr::rows_update(
+    proxy_ms_resp |>
+      dplyr::select(-ems_num),
+    by = 'medstar_id',
+    unmatched = 'ignore'
+  ) |>
+  dplyr::relocate(
+    'x_primary_key', 'id', 'id_ms', 'ms_resp_num', 'ms_record_num'
+    )
+```
+
+#### Reduce to non-PHI Columns
+
+We reduced our data to our de-identified version by removing the subject's name and `medstar_id`.
+
+```{r}
+#| label: process-ms-clutter-reduce
+# Reduce to non-PHI Columns
+ms_clutter <- ms_clutter |>
+  dplyr::select(
+    -c('name_full', 'medstar_id', 'xc_case_id', 'name_last')
+  )
+```
+
 ## APS
 
 ### Clients.xlsx
@@ -1840,6 +1904,20 @@ saveRDS(ms_lead, paste0(path, ".rds"))
 
 ## Export CSV 
 readr::write_csv(ms_lead, paste0(path, ".csv"))
+```
+
+```{r}
+#| label: save-medstar-clutter
+## Path
+path <- here::here(
+  "data", "deidentified", "medstar", "08_medstar_clutter_scale"
+  )
+
+## Export RDS
+saveRDS(ms_clutter, paste0(path, ".rds"))
+
+## Export CSV 
+readr::write_csv(ms_clutter, paste0(path, ".csv"))
 ```
 
 ## APS Data
