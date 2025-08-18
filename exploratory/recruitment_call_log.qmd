@@ -1,0 +1,126 @@
+---
+title: "Data Check: Recruiting Calls"
+author: "Brad Cannell"
+date: "2025-08-18"
+format: 
+  html:
+    embed-resources: true
+---
+
+# Overview
+
+I'm trying to download all of the scheduling call log data. Early in the study, MedStar had their own internal person doing the scheduling for the follow-up interviews, and then logging the call dispositions in FileMaker Pro. Later, we hired a call center, M Davis and Company (MDAC), to do the calls. MDAC sent us csv call logs every month, but I think we uploaded them all into FileMaker Pro too. 
+
+I emailed Sunil about this. Here was his response: "Yes, I remember we were working with MDavis for call center recruitment. Please see attached. If I recall, the data is merged into Phone Recruitment.csv. I've also included the call logs file, but I don't think that has MDavis data in there. Just let me know if this is not what you needed."
+
+I am checking the contents of those files below.
+
+# Load packages
+
+```{r}
+#| message: false
+
+library(here)
+library(readr)
+library(dplyr, warn.conflicts = FALSE)
+library(lubridate, warn.conflicts = FALSE)
+```
+
+# Import Phone Recruitment.csv
+
+## Get the spec for amending column types
+
+```{r}
+spec <- spec_csv(here("data", "filemaker_pro_exports", "Phone Recruitment.csv"))
+# spec
+```
+
+## Read in the data, amending column types as needed
+
+```{r}
+phone_recruitment <- read_csv(
+  here("data", "filemaker_pro_exports", "Phone Recruitment.csv"),
+  col_types = cols(
+    RecruitmentMethod = col_character(),
+    PhoneVerifyNumber = col_character(),
+    PhoneVerifyWrongNumber = col_character(),
+    PhoneConfirmFollowUp = col_character(),
+    AssignedInterviewer = col_character()
+  )
+)
+
+dim(phone_recruitment) # 41202    67
+```
+
+# Data management ----
+
+## Parse dates
+
+```{r}
+phone_recruitment <- phone_recruitment |> 
+  mutate(x_created_timestamp = mdy_hms(xCreatedTimestamp)) |> 
+  arrange(x_created_timestamp) |> 
+  # Remove the redundant record created time stamp
+  select(-xCreatedTimestamp)
+```
+
+## Create separate date and time record created columns
+
+```{r}
+phone_recruitment <- phone_recruitment |> 
+  mutate(
+    created_date = as_date(x_created_timestamp),
+    created_time = hms::as_hms(x_created_timestamp)
+  ) 
+
+dim(phone_recruitment) # 41202    69
+```
+
+## Remove rows
+
+There are 3 rows all dated 4/16/24 that need to be removed. These records weren't created when a recruiting call was made. They were created when I was viewing data in FileMaker Pro. We need to remove these rows. Let's check for any other rows in the data created by me.
+
+```{r}
+check_brad_rows <- phone_recruitment |> 
+  filter(stringr::str_detect(xCreatedBy, "mcannell"))
+# check_brad_rows
+```
+
+There are other rows completed by me, but they appear to be valid rows based on the values of `xRecordStatus`. So, I will filter by date only.
+
+```{r}
+phone_recruitment <- phone_recruitment |> 
+  filter(created_date <= "2024-01-01")
+
+dim(phone_recruitment) # 41199    69
+```
+
+Are there any other rows that need to be removed?
+
+Remove rows without a record status?
+
+```{r}
+no_record_status <- phone_recruitment |> 
+  filter(is.na(xRecordStatus))
+```
+
+I can't rule out that these were legitimate recruiting calls. I'm leaving them in the data for now.
+
+# EDA
+
+What is the earliest date?
+
+```{r}
+min(phone_recruitment$x_created_timestamp) # "2019-08-15 09:48:29 UTC"
+```
+
+What is the latest date?
+```{r}
+max(phone_recruitment$x_created_timestamp) # "2023-05-30 08:22:10 UTC"
+```
+
+How many total calls?
+
+```{r}
+nrow(phone_recruitment) # 41199
+```
