@@ -6,3 +6,6 @@ data/
 .rds
 .xlsx
 .DS_Store
+renv
+renv.lock
+.Rprofile
