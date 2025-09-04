@@ -159,6 +159,14 @@ safe_harbor_deid <- function(df) {
 clean_data <- safe_harbor_deid(clean_data)
 ```
 
+<!--
+- Drop records xCreatedBy "mcannell" which were created in 2024
+- Drop test records 
+- Perform common sense null checks
+    - Expand if necessary to ensure quality
+- Email sunil asking about codebook for phone recruitment data
+!-->
+
 # Save Clean Data
 
 ```{r}
