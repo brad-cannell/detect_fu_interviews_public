@@ -14,6 +14,7 @@ format:
 #| output: false
 library(here)
 library(tidyverse)
+library(validate)
 
 raw_data <- read_csv(
     here("data/Phone Recruitment.csv"),
@@ -110,6 +111,18 @@ clean_data <- raw_data |>
 Remove columns containing names
 
 ```{r}
+# Drop unnecessary records
+
+# Drop records xCreatedBy "mcannell"
+clean_data <- clean_data |>
+    filter(xCreatedBy != "uthouston\\mcannell")
+
+# Drop records with name full "test" or NA
+clean_data <- clean_data |>
+    filter(!stringr::str_detect(NameFull, "Test"), !is.na(NameFull))
+```
+
+```{r}
 #| label: name removal
 
 name_cols <- name_cols |>
@@ -160,12 +173,126 @@ clean_data <- safe_harbor_deid(clean_data)
 ```
 
 <!--
-- Drop records xCreatedBy "mcannell" which were created in 2024
-- Drop test records 
-- Perform common sense null checks
-    - Expand if necessary to ensure quality
 - Email sunil asking about codebook for phone recruitment data
 !-->
+
+# Tests
+
+## Basic Structural Checks
+
+```{r}
+#| label: basic structural checks
+
+rules <- validator(
+  # Each record must have a proxy ms_record_num after join
+  !is.na(ms_record_num),
+
+  # Key identifiers (like MedstarID originally) should not persist
+  !("MedstarID" %in% colnames(.)),
+
+  # Drop records with missing NameFull already handled,
+  # but verify again after cleaning
+  !is.na(NameFull)
+)
+```
+
+## Null and Completeness Checks
+
+```{r}
+#| label: null and completeness checks
+
+rules <- rules + validator(
+  # Record status must be present
+  !is.na(xRecordStatus),
+
+  # EntryDate should be converted to year, not missing
+  !is.na(EntryDate),
+
+  # AppointmentDate year available if Appointment scheduled
+  if (!is.na(AppointmentDate)) AppointmentDate >= 1900
+)
+```
+
+## Value Domain Checks
+
+```{r}
+#| label: value domain checks
+
+rules <- rules + validator(
+  # Record status only in defined set
+  xRecordStatus %in% c("Incomplete","Unverified","Participant not eligible",
+                       "Complete","Other"),
+
+  # PhoneEligibleConsent should be "Yes" or "No" if present
+  PhoneEligibleConsent %in% c(NA, "Yes", "No"),
+
+  # RecruitmentMethod constrained to known methods (adjust list as needed)
+  RecruitmentMethod %in% c(NA, "Phone", "Postcard", "In-person", "Other")
+)
+```
+
+## Logical Consistency Checks
+```{r}
+#| label: logical consistency checks
+
+rules <- rules + validator(
+  # If PhoneConfirmFollowUp is "Yes", then PhoneWantFollowUp should also be "Yes"
+  !(PhoneConfirmFollowUp == "Yes" & PhoneWantFollowUp != "Yes"),
+
+  # If MocaReady is "Yes", then at least one MoCA test item should be non-missing
+  !(MocaReady == "Yes" & is.na(cMocaDigitForward) & is.na(cMocaSerial7) &
+    is.na(cMocaSentenceRep) & is.na(cMocaOrientationYear))
+)
+```
+
+## Numeric Range Checks
+```{r}
+#| label: numeric range checks
+
+rules <- rules + validator(
+  # MoCA component scores typically range 0–5
+  cMocaDigitForward >= 0 & cMocaDigitForward <= 5,
+  cMocaDigitBackward >= 0 & cMocaDigitBackward <= 5,
+  cMocaSerial7 >= 0 & cMocaSerial7 <= 5,
+  cMocaOrientation >= 0 & cMocaOrientation <= 6,
+
+  # Total scores (cScore, MDScore) within 0–30
+  cScore >= 0 & cScore <= 30,
+  MDScore >= 0 & MDScore <= 30
+)
+```
+
+## De-identification Checks
+```{r}
+#| label: deidentification checks
+
+rules <- rules + validator(
+  # No columns should contain "name", "phone", "recruiter", "interviewer"
+  all(!grepl("name|phone|recruiter|interviewer", tolower(colnames(.)))),
+
+  # All date fields reduced to year only
+  EntryDate <= lubridate::year(Sys.Date()),
+  AppointmentDate <= lubridate::year(Sys.Date()),
+  xCreatedTimestamp <= lubridate::year(Sys.Date()),
+  xModifiedTimestamp <= lubridate::year(Sys.Date())
+)
+```
+
+## Report
+```{r}
+#| label: apply validation rules
+
+out <- confront(clean_data, rules)
+validation_results <- summary(out)
+
+knitr::kable(validation_results)
+```
+
+```{r}
+#| label: validation plot
+
+plot(out)
+```
 
 # Save Clean Data
 

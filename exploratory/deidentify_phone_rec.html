@@ -422,55 +422,433 @@ $ PhoneRecruiter          &lt;chr&gt; NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA
 <h2 class="anchored" data-anchor-id="name-removal">Name Removal</h2>
 <p>Remove columns containing names</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>name_cols <span class="ot">&lt;-</span> name_cols <span class="sc">|&gt;</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>cMocaOrientationDayName)</span>
-<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a></span>
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop unnecessary records</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop records xCreatedBy "mcannell"</span></span>
 <span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>clean_data <span class="ot">&lt;-</span> clean_data <span class="sc">|&gt;</span></span>
-<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span><span class="fu">colnames</span>(name_cols))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(xCreatedBy <span class="sc">!=</span> <span class="st">"uthouston</span><span class="sc">\\</span><span class="st">mcannell"</span>)</span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a><span class="co"># Drop records with name full "test" or NA</span></span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>clean_data <span class="ot">&lt;-</span> clean_data <span class="sc">|&gt;</span></span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(<span class="sc">!</span>stringr<span class="sc">::</span><span class="fu">str_detect</span>(NameFull, <span class="st">"Test"</span>), <span class="sc">!</span><span class="fu">is.na</span>(NameFull))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>name_cols <span class="ot">&lt;-</span> name_cols <span class="sc">|&gt;</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>cMocaOrientationDayName)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>clean_data <span class="ot">&lt;-</span> clean_data <span class="sc">|&gt;</span></span>
+<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span><span class="fu">colnames</span>(name_cols))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="date-compliance" class="level2">
 <h2 class="anchored" data-anchor-id="date-compliance">Date Compliance</h2>
 <p>Ensure that temporal data complies with HIPAA Safe Harbor regulation</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>date_cols <span class="ot">&lt;-</span> date_cols <span class="sc">|&gt;</span></span>
-<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>PhoneBetterTime)</span>
-<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-4"><a href="#cb15-4" aria-hidden="true" tabindex="-1"></a>safe_harbor_deid <span class="ot">&lt;-</span> <span class="cf">function</span>(df) {</span>
-<span id="cb15-5"><a href="#cb15-5" aria-hidden="true" tabindex="-1"></a>  df <span class="sc">|&gt;</span></span>
-<span id="cb15-6"><a href="#cb15-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
-<span id="cb15-7"><a href="#cb15-7" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Parse dates (mm/dd/yyyy) and keep ONLY the year</span></span>
-<span id="cb15-8"><a href="#cb15-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">EntryDate              =</span> <span class="fu">year</span>(<span class="fu">mdy</span>(EntryDate)),</span>
-<span id="cb15-9"><a href="#cb15-9" aria-hidden="true" tabindex="-1"></a>      <span class="at">AppointmentDate        =</span> <span class="fu">year</span>(<span class="fu">mdy</span>(AppointmentDate)),</span>
-<span id="cb15-10"><a href="#cb15-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-11"><a href="#cb15-11" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Parse timestamps and keep ONLY the year</span></span>
-<span id="cb15-12"><a href="#cb15-12" aria-hidden="true" tabindex="-1"></a>      <span class="at">xCreatedTimestamp      =</span> <span class="fu">year</span>(<span class="fu">mdy_hms</span>(xCreatedTimestamp, <span class="at">tz =</span> <span class="st">"UTC"</span>)),</span>
-<span id="cb15-13"><a href="#cb15-13" aria-hidden="true" tabindex="-1"></a>      <span class="at">xModifiedTimestamp     =</span> <span class="fu">year</span>(<span class="fu">mdy_hms</span>(xModifiedTimestamp, <span class="at">tz =</span> <span class="st">"UTC"</span>)),</span>
-<span id="cb15-14"><a href="#cb15-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-15"><a href="#cb15-15" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Remove fine-grained time information</span></span>
-<span id="cb15-16"><a href="#cb15-16" aria-hidden="true" tabindex="-1"></a>      <span class="at">AppointmentTime        =</span> <span class="cn">NA</span>,             <span class="co"># drop</span></span>
-<span id="cb15-17"><a href="#cb15-17" aria-hidden="true" tabindex="-1"></a>      <span class="at">AppointmentTimeMilitary=</span> <span class="cn">NA</span>,             <span class="co"># drop</span></span>
-<span id="cb15-18"><a href="#cb15-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-19"><a href="#cb15-19" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Drop day names and day-of-month; keep only year-level fields</span></span>
-<span id="cb15-20"><a href="#cb15-20" aria-hidden="true" tabindex="-1"></a>      <span class="at">cMocaOrientationDay       =</span> <span class="cn">NA</span>,</span>
-<span id="cb15-21"><a href="#cb15-21" aria-hidden="true" tabindex="-1"></a>      <span class="at">cMocaOrientationDayName   =</span> <span class="cn">NA</span>,</span>
-<span id="cb15-22"><a href="#cb15-22" aria-hidden="true" tabindex="-1"></a>      <span class="at">xRecordMonth              =</span> <span class="cn">NA</span>,</span>
-<span id="cb15-23"><a href="#cb15-23" aria-hidden="true" tabindex="-1"></a>      <span class="at">cMocaOrientationMonth     =</span> <span class="cn">NA</span>,</span>
-<span id="cb15-24"><a href="#cb15-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-25"><a href="#cb15-25" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Year fields are already OK</span></span>
-<span id="cb15-26"><a href="#cb15-26" aria-hidden="true" tabindex="-1"></a>      <span class="at">xRecordYear            =</span> <span class="fu">as.integer</span>(xRecordYear),</span>
-<span id="cb15-27"><a href="#cb15-27" aria-hidden="true" tabindex="-1"></a>      <span class="at">cMocaOrientationYear   =</span> <span class="fu">as.integer</span>(cMocaOrientationYear)</span>
-<span id="cb15-28"><a href="#cb15-28" aria-hidden="true" tabindex="-1"></a>    )</span>
-<span id="cb15-29"><a href="#cb15-29" aria-hidden="true" tabindex="-1"></a>}</span>
-<span id="cb15-30"><a href="#cb15-30" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb15-31"><a href="#cb15-31" aria-hidden="true" tabindex="-1"></a>clean_data <span class="ot">&lt;-</span> <span class="fu">safe_harbor_deid</span>(clean_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>date_cols <span class="ot">&lt;-</span> date_cols <span class="sc">|&gt;</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(<span class="sc">-</span>PhoneBetterTime)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>safe_harbor_deid <span class="ot">&lt;-</span> <span class="cf">function</span>(df) {</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  df <span class="sc">|&gt;</span></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(</span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Parse dates (mm/dd/yyyy) and keep ONLY the year</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">EntryDate              =</span> <span class="fu">year</span>(<span class="fu">mdy</span>(EntryDate)),</span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>      <span class="at">AppointmentDate        =</span> <span class="fu">year</span>(<span class="fu">mdy</span>(AppointmentDate)),</span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Parse timestamps and keep ONLY the year</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>      <span class="at">xCreatedTimestamp      =</span> <span class="fu">year</span>(<span class="fu">mdy_hms</span>(xCreatedTimestamp, <span class="at">tz =</span> <span class="st">"UTC"</span>)),</span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>      <span class="at">xModifiedTimestamp     =</span> <span class="fu">year</span>(<span class="fu">mdy_hms</span>(xModifiedTimestamp, <span class="at">tz =</span> <span class="st">"UTC"</span>)),</span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Remove fine-grained time information</span></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a>      <span class="at">AppointmentTime        =</span> <span class="cn">NA</span>,             <span class="co"># drop</span></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>      <span class="at">AppointmentTimeMilitary=</span> <span class="cn">NA</span>,             <span class="co"># drop</span></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Drop day names and day-of-month; keep only year-level fields</span></span>
+<span id="cb16-20"><a href="#cb16-20" aria-hidden="true" tabindex="-1"></a>      <span class="at">cMocaOrientationDay       =</span> <span class="cn">NA</span>,</span>
+<span id="cb16-21"><a href="#cb16-21" aria-hidden="true" tabindex="-1"></a>      <span class="at">cMocaOrientationDayName   =</span> <span class="cn">NA</span>,</span>
+<span id="cb16-22"><a href="#cb16-22" aria-hidden="true" tabindex="-1"></a>      <span class="at">xRecordMonth              =</span> <span class="cn">NA</span>,</span>
+<span id="cb16-23"><a href="#cb16-23" aria-hidden="true" tabindex="-1"></a>      <span class="at">cMocaOrientationMonth     =</span> <span class="cn">NA</span>,</span>
+<span id="cb16-24"><a href="#cb16-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-25"><a href="#cb16-25" aria-hidden="true" tabindex="-1"></a>      <span class="co"># Year fields are already OK</span></span>
+<span id="cb16-26"><a href="#cb16-26" aria-hidden="true" tabindex="-1"></a>      <span class="at">xRecordYear            =</span> <span class="fu">as.integer</span>(xRecordYear),</span>
+<span id="cb16-27"><a href="#cb16-27" aria-hidden="true" tabindex="-1"></a>      <span class="at">cMocaOrientationYear   =</span> <span class="fu">as.integer</span>(cMocaOrientationYear)</span>
+<span id="cb16-28"><a href="#cb16-28" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb16-29"><a href="#cb16-29" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb16-30"><a href="#cb16-30" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-31"><a href="#cb16-31" aria-hidden="true" tabindex="-1"></a>clean_data <span class="ot">&lt;-</span> <span class="fu">safe_harbor_deid</span>(clean_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<!--
+- Email sunil asking about codebook for phone recruitment data
+!-->
+</section>
+</section>
+<section id="tests" class="level1">
+<h1>Tests</h1>
+<section id="basic-structural-checks" class="level2">
+<h2 class="anchored" data-anchor-id="basic-structural-checks">Basic Structural Checks</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>rules <span class="ot">&lt;-</span> <span class="fu">validator</span>(</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Each record must have a proxy ms_record_num after join</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="sc">!</span><span class="fu">is.na</span>(ms_record_num),</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Key identifiers (like MedstarID originally) should not persist</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  <span class="sc">!</span>(<span class="st">"MedstarID"</span> <span class="sc">%in%</span> <span class="fu">colnames</span>(.)),</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Drop records with missing NameFull already handled,</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># but verify again after cleaning</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>  <span class="sc">!</span><span class="fu">is.na</span>(NameFull)</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="null-and-completeness-checks" class="level2">
+<h2 class="anchored" data-anchor-id="null-and-completeness-checks">Null and Completeness Checks</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>rules <span class="ot">&lt;-</span> rules <span class="sc">+</span> <span class="fu">validator</span>(</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Record status must be present</span></span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="sc">!</span><span class="fu">is.na</span>(xRecordStatus),</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># EntryDate should be converted to year, not missing</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  <span class="sc">!</span><span class="fu">is.na</span>(EntryDate),</span>
+<span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb18-8"><a href="#cb18-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># AppointmentDate year available if Appointment scheduled</span></span>
+<span id="cb18-9"><a href="#cb18-9" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="sc">!</span><span class="fu">is.na</span>(AppointmentDate)) AppointmentDate <span class="sc">&gt;=</span> <span class="dv">1900</span></span>
+<span id="cb18-10"><a href="#cb18-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="value-domain-checks" class="level2">
+<h2 class="anchored" data-anchor-id="value-domain-checks">Value Domain Checks</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>rules <span class="ot">&lt;-</span> rules <span class="sc">+</span> <span class="fu">validator</span>(</span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Record status only in defined set</span></span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  xRecordStatus <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"Incomplete"</span>,<span class="st">"Unverified"</span>,<span class="st">"Participant not eligible"</span>,</span>
+<span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>                       <span class="st">"Complete"</span>,<span class="st">"Other"</span>),</span>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>  <span class="co"># PhoneEligibleConsent should be "Yes" or "No" if present</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  PhoneEligibleConsent <span class="sc">%in%</span> <span class="fu">c</span>(<span class="cn">NA</span>, <span class="st">"Yes"</span>, <span class="st">"No"</span>),</span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># RecruitmentMethod constrained to known methods (adjust list as needed)</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>  RecruitmentMethod <span class="sc">%in%</span> <span class="fu">c</span>(<span class="cn">NA</span>, <span class="st">"Phone"</span>, <span class="st">"Postcard"</span>, <span class="st">"In-person"</span>, <span class="st">"Other"</span>)</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="logical-consistency-checks" class="level2">
+<h2 class="anchored" data-anchor-id="logical-consistency-checks">Logical Consistency Checks</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>rules <span class="ot">&lt;-</span> rules <span class="sc">+</span> <span class="fu">validator</span>(</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># If PhoneConfirmFollowUp is "Yes", then PhoneWantFollowUp should also be "Yes"</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="sc">!</span>(PhoneConfirmFollowUp <span class="sc">==</span> <span class="st">"Yes"</span> <span class="sc">&amp;</span> PhoneWantFollowUp <span class="sc">!=</span> <span class="st">"Yes"</span>),</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># If MocaReady is "Yes", then at least one MoCA test item should be non-missing</span></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="sc">!</span>(MocaReady <span class="sc">==</span> <span class="st">"Yes"</span> <span class="sc">&amp;</span> <span class="fu">is.na</span>(cMocaDigitForward) <span class="sc">&amp;</span> <span class="fu">is.na</span>(cMocaSerial7) <span class="sc">&amp;</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">is.na</span>(cMocaSentenceRep) <span class="sc">&amp;</span> <span class="fu">is.na</span>(cMocaOrientationYear))</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="numeric-range-checks" class="level2">
+<h2 class="anchored" data-anchor-id="numeric-range-checks">Numeric Range Checks</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>rules <span class="ot">&lt;-</span> rules <span class="sc">+</span> <span class="fu">validator</span>(</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># MoCA component scores typically range 0–5</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  cMocaDigitForward <span class="sc">&gt;=</span> <span class="dv">0</span> <span class="sc">&amp;</span> cMocaDigitForward <span class="sc">&lt;=</span> <span class="dv">5</span>,</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>  cMocaDigitBackward <span class="sc">&gt;=</span> <span class="dv">0</span> <span class="sc">&amp;</span> cMocaDigitBackward <span class="sc">&lt;=</span> <span class="dv">5</span>,</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>  cMocaSerial7 <span class="sc">&gt;=</span> <span class="dv">0</span> <span class="sc">&amp;</span> cMocaSerial7 <span class="sc">&lt;=</span> <span class="dv">5</span>,</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>  cMocaOrientation <span class="sc">&gt;=</span> <span class="dv">0</span> <span class="sc">&amp;</span> cMocaOrientation <span class="sc">&lt;=</span> <span class="dv">6</span>,</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Total scores (cScore, MDScore) within 0–30</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>  cScore <span class="sc">&gt;=</span> <span class="dv">0</span> <span class="sc">&amp;</span> cScore <span class="sc">&lt;=</span> <span class="dv">30</span>,</span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>  MDScore <span class="sc">&gt;=</span> <span class="dv">0</span> <span class="sc">&amp;</span> MDScore <span class="sc">&lt;=</span> <span class="dv">30</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="de-identification-checks" class="level2">
+<h2 class="anchored" data-anchor-id="de-identification-checks">De-identification Checks</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>rules <span class="ot">&lt;-</span> rules <span class="sc">+</span> <span class="fu">validator</span>(</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="co"># No columns should contain "name", "phone", "recruiter", "interviewer"</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">all</span>(<span class="sc">!</span><span class="fu">grepl</span>(<span class="st">"name|phone|recruiter|interviewer"</span>, <span class="fu">tolower</span>(<span class="fu">colnames</span>(.)))),</span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># All date fields reduced to year only</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>  EntryDate <span class="sc">&lt;=</span> lubridate<span class="sc">::</span><span class="fu">year</span>(<span class="fu">Sys.Date</span>()),</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>  AppointmentDate <span class="sc">&lt;=</span> lubridate<span class="sc">::</span><span class="fu">year</span>(<span class="fu">Sys.Date</span>()),</span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>  xCreatedTimestamp <span class="sc">&lt;=</span> lubridate<span class="sc">::</span><span class="fu">year</span>(<span class="fu">Sys.Date</span>()),</span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>  xModifiedTimestamp <span class="sc">&lt;=</span> lubridate<span class="sc">::</span><span class="fu">year</span>(<span class="fu">Sys.Date</span>())</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="report" class="level2">
+<h2 class="anchored" data-anchor-id="report">Report</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>out <span class="ot">&lt;-</span> <span class="fu">confront</span>(clean_data, rules)</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>validation_results <span class="ot">&lt;-</span> <span class="fu">summary</span>(out)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(validation_results)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 2%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 4%">
+<col style="width: 77%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">name</th>
+<th style="text-align: right;">items</th>
+<th style="text-align: right;">passes</th>
+<th style="text-align: right;">fails</th>
+<th style="text-align: right;">nNA</th>
+<th style="text-align: left;">error</th>
+<th style="text-align: left;">warning</th>
+<th style="text-align: left;">expression</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">V1</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">!is.na(ms_record_num)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V2</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">!“MedstarID” %vin% colnames(.)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V3</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">TRUE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">!is.na(NameFull)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V1.1</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">32114</td>
+<td style="text-align: right;">9075</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">!is.na(xRecordStatus)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V2.1</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">38763</td>
+<td style="text-align: right;">2426</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">!is.na(EntryDate)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V3.1</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">is.na(AppointmentDate) | (AppointmentDate - 1900 &gt;= -1e-08)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V1.2</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">16823</td>
+<td style="text-align: right;">15291</td>
+<td style="text-align: right;">9075</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">xRecordStatus %vin% c(“Incomplete”, “Unverified”, “Participant not eligible”, “Complete”, “Other”)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V2.2</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">3763</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">37426</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">PhoneEligibleConsent %vin% c(NA, “Yes”, “No”)</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V3.2</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">RecruitmentMethod %vin% c(NA, “Phone”, “Postcard”, “In-person”, “Other”)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V1.3</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">1095</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40094</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">PhoneConfirmFollowUp != “Yes” | PhoneWantFollowUp == “Yes”</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V2.3</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">27584</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">13605</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">MocaReady != “Yes” | !is.na(cMocaDigitForward) | !is.na(cMocaSerial7) | !is.na(cMocaSentenceRep) | !is.na(cMocaOrientationYear)</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V1.4</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">1699</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">39490</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">cMocaDigitForward - 0 &gt;= -1e-08 &amp; cMocaDigitForward - 5 &lt;= 1e-08</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V2.4</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">1687</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">39502</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">cMocaDigitBackward - 0 &gt;= -1e-08 &amp; cMocaDigitBackward - 5 &lt;= 1e-08</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V3.3</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">1594</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">39595</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">cMocaSerial7 - 0 &gt;= -1e-08 &amp; cMocaSerial7 - 5 &lt;= 1e-08</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V4</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">1539</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">39650</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">cMocaOrientation - 0 &gt;= -1e-08 &amp; cMocaOrientation - 6 &lt;= 1e-08</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V5</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">1701</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">39488</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">cScore - 0 &gt;= -1e-08 &amp; cScore - 30 &lt;= 1e-08</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V6</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">794</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40395</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">MDScore - 0 &gt;= -1e-08 &amp; MDScore - 30 &lt;= 1e-08</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V1.5</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">all(!grepl(“name|phone|recruiter|interviewer”, tolower(colnames(.))))</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V2.5</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">38763</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">2426</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">EntryDate &lt;= lubridate::year(Sys.Date())</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V3.4</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">525</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">40664</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">AppointmentDate &lt;= lubridate::year(Sys.Date())</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">V4.1</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">xCreatedTimestamp &lt;= lubridate::year(Sys.Date())</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">V5.1</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">41189</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">FALSE</td>
+<td style="text-align: left;">xModifiedTimestamp &lt;= lubridate::year(Sys.Date())</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot</span>(out)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Rules V3 not included in plot since they could not be executed. See ?errors</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="deidentify_phone_rec_files/figure-html/validation%20plot-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
 </div>
 </section>
 </section>
 <section id="save-clean-data" class="level1">
 <h1>Save Clean Data</h1>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(clean_data, <span class="fu">here</span>(<span class="st">"data/Phone Recruitment Cleaned.csv"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">write_csv</span>(clean_data, <span class="fu">here</span>(<span class="st">"data/Phone Recruitment Cleaned.csv"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 
